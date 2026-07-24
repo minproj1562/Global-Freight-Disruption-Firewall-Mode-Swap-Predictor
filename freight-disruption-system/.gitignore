@@ -1,0 +1,499 @@
+# ============================================
+# PROJECT ROOT .gitignore
+# Freight Disruption System
+# Python + React + PostgreSQL + Docker
+# ============================================
+
+# ============================================
+# PYTHON
+# ============================================
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Python distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Django stuff (if any)
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff (if any)
+instance/
+.webassets-cache
+
+# Scrapy stuff (if any)
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# ============================================
+# NODE.JS / FRONTEND
+# ============================================
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Vite build output
+build/
+out/
+*.tsbuildinfo
+
+# NPM lock files (ignore all, keep one if needed)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Frontend environment variables
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# ============================================
+# POSTGRESQL / DATABASE
+# ============================================
+
+# PostgreSQL database files
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.sqlite-journal
+
+# PostgreSQL dumps
+*.sql
+*.backup
+*.pgdump
+
+# Alembic migrations (keep version controlled, but ignore temp files)
+alembic/versions/*.pyc
+alembic/versions/*.pyo
+
+# ============================================
+# DOCKER
+# ============================================
+
+# Docker volumes
+docker-data/
+*.docker-volumes/
+postgres_data/
+pgdata/
+
+# Docker compose overrides (optional)
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Docker images
+*.tar
+*.tar.gz
+*.docker
+
+# ============================================
+# IDE / EDITOR FILES
+# ============================================
+
+# Visual Studio Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# VS Code in-project settings (optional)
+.vscode-test/
+
+# IntelliJ / PyCharm / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+.classpath
+.project
+.settings/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+*.atom
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+._*
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ============================================
+# OPERATING SYSTEM FILES
+# ============================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+.directory
+*.pid
+*.lock
+*.socket
+
+# ============================================
+# LOGS & TEMPORARY FILES
+# ============================================
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Temp files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache directories
+.cache/
+.cache/*
+!.cache/.gitkeep
+
+# ============================================
+# TESTING
+# ============================================
+
+# Test coverage reports
+coverage/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+
+# Testing artifacts
+*.test
+*.spec
+
+# ============================================
+# SECURITY / SECRETS
+# ============================================
+
+# Environment variables (all environments)
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+.env.staging
+.env.*.local
+
+# API keys (if accidentally saved)
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# JWT / OAuth secrets
+jwt_secret.txt
+oauth_secret.txt
+
+# ============================================
+# MISCELLANEOUS
+# ============================================
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Documentation build
+docs/_build/
+
+# Data files (if large, consider gitignoring)
+*.h5
+*.parquet
+*.pickle
+*.pkl
+
+# Generated files
+*.generated.*
+*.auto.*
+*.min.*
+
+# ============================================
+# PROJECT-SPECIFIC
+# ============================================
+
+# AIS Stream data cache (if any)
+ais_cache/
+vessel_positions_cache/
+
+# Simulation results cache (temp files)
+simulation_cache/
+mc_results/
+
+# Uploaded files (user uploads)
+uploads/
+media/
+
+# Backup database dumps
+backups/
+*.backup.sql
+
+# ============================================
+# THIRD-PARTY / EXTERNAL
+# ============================================
+
+# External dependencies that shouldn't be committed
+external/
+vendor/
+bower_components/
+
+# ============================================
+# GIT
+# ============================================
+
+# Git hooks (if using local hooks)
+.hooks/
+*.git
+
+# Git patch files
+*.patch
+*.diff
+
+# ============================================
+# TERRAFORM / INFRASTRUCTURE (if any)
+# ============================================
+
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+*.terraform.lock.hcl
+
+# ============================================
+# KUBERNETES (if any)
+# ============================================
+
+*.kubeconfig
+*.kubeconfig.*
+.kube/
+
+# ============================================
+# GITHUB ACTIONS
+# ============================================
+
+.github/actions/
+.github/artifacts/
+.github/cache/
+
+# ============================================
+# DEVELOPMENT TOOLS
+# ============================================
+
+# Direnv
+.envrc
+.direnv/
+
+# Nix
+result
+*.drv
+
+# just
+.just
+
+# Rye
+.rye/
+
+# UV
+uv.lock
+.uv/
+
+# ============================================
+# LOCAL CONFIGURATION
+# ============================================
+
+# Local development settings
+local_settings.py
+local_config.py
+config.local.py
