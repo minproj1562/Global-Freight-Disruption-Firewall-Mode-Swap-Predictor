@@ -8,56 +8,48 @@
 
 ## 📋 Table of Contents
 
-- [Project Overview](#project-overview)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Installation Guide](#installation-guide)
-  - [Step 1: Install Python](#step-1-install-python)
-  - [Step 2: Install Node.js](#step-2-install-nodejs)
-  - [Step 3: Install PostgreSQL & PostGIS](#step-3-install-postgresql--postgis)
-  - [Step 4: Install Git](#step-4-install-git)
-  - [Step 5: Install Docker (Optional)](#step-5-install-docker-optional)
-  - [Step 6: Install VS Code Extensions](#step-6-install-vs-code-extensions)
-- [Project Setup](#project-setup)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-  - [Database Setup](#database-setup)
-  - [API Keys Setup](#api-keys-setup)
-- [Running the Application](#running-the-application)
-- [Verification Checklist](#verification-checklist)
-- [Troubleshooting](#troubleshooting)
-- [Project Structure](#project-structure)
-- [Team Contributions](#team-contributions)
+1. [Project Overview](#project-overview)
+2. [Tech Stack](#tech-stack)
+3. [Prerequisites](#prerequisites)
+4. [Installation Guide](#installation-guide)
+5. [Project Setup](#project-setup)
+6. [Running the Application](#running-the-application)
+7. [Verification Checklist](#verification-checklist)
+8. [Troubleshooting](#troubleshooting)
+9. [Project Structure](#project-structure)
+10. [Team Contributions](#team-contributions)
 
 ---
 
 ## 🎯 Project Overview
 
+### What This System Does
+
 This system helps shipping companies make faster, smarter rerouting decisions during global disruptions (weather, geopolitics, port strikes, etc.).
 
-### What It Does
-
-- **Live Tracking**: Shows all 50 vessels on an interactive map
-- **Disruption Alerts**: Notifies logistics managers of active disruptions
-- **Smart Rerouting**: Runs 2,000 Monte Carlo simulations to find optimal routes
-- **Historical Validation**: Tests the system against real events (Suez 2021, Shanghai 2022, etc.)
-- **Executive Dashboard**: Shows cost savings and risk overview for C-suite
+| Feature | Description |
+|---------|-------------|
+| **Live Tracking** | Shows all 50 vessels on an interactive Mapbox map |
+| **Disruption Alerts** | Notifies logistics managers of active disruptions in real-time |
+| **Smart Rerouting** | Runs 2,000 Monte Carlo simulations to find optimal routes |
+| **Historical Validation** | Tests the system against real events (Suez 2021, Shanghai 2022, etc.) |
+| **Executive Dashboard** | Shows cost savings and risk overview for C-suite |
 
 ### 5 Dashboards | 20 Pages
 
 | Dashboard | User | Purpose |
 |-----------|------|---------|
-| Operations | Logistics Manager | Real-time monitoring + reroute decisions |
-| Simulator | Route Analyst | Run simulations and validate scenarios |
-| Port | Port Operations Officer | Monitor port health and vessel arrivals |
-| Admin | System Administrator | Manage data, users, system health |
-| Executive | CEO/COO | High-level KPIs and cost savings |
+| **Operations** | Logistics Manager | Real-time monitoring + reroute decisions |
+| **Simulator** | Route Analyst | Run simulations and validate scenarios |
+| **Port** | Port Operations Officer | Monitor port health and vessel arrivals |
+| **Admin** | System Administrator | Manage data, users, system health |
+| **Executive** | CEO/COO | High-level KPIs and cost savings |
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Backend
+### Backend Stack
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
@@ -70,12 +62,11 @@ This system helps shipping companies make faster, smarter rerouting decisions du
 | Alembic | 1.12+ | Database migrations |
 | GeoAlchemy2 | 0.14+ | PostGIS support for SQLAlchemy |
 | NetworkX | 3.2+ | Graph/route analysis |
-| OR-Tools | 9.8+ | Route optimization (optional) |
 | NumPy | 1.26+ | Monte Carlo calculations |
 | Pandas | 2.1+ | Data manipulation |
 | PyJWT | 2.8+ | Authentication tokens |
 
-### Frontend
+### Frontend Stack
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
@@ -96,28 +87,16 @@ This system helps shipping companies make faster, smarter rerouting decisions du
 
 | Service | Purpose | Free Tier |
 |---------|---------|-----------|
-| MarineTraffic | Vessel positions (AIS data) | 500 records/day |
+| aisstream.io | Vessel positions (AIS data) | FREE - Unlimited streaming (BETA) |
 | OpenWeatherMap | Weather data | 1,000 calls/day |
 | Mapbox | Maps & geocoding | 50,000 loads/month |
-| Port API (RapidAPI) | Port congestion | ~100 calls/day (use multiple APIs) |
-
----
-
-## 📦 Prerequisites
-
-Before you start, make sure you have:
-
-- Windows 10/11 (this guide is for Windows)
-- Admin access to install software
-- Stable internet connection
-- Minimum 8GB RAM (16GB recommended)
-- 10GB free disk space
+| Sinay Port API | Port congestion | 500 calls/month |
 
 ---
 
 ## 🔧 Installation Guide
 
-### Step 1: Install Python
+### Step 1: Install Python 3.11+
 
 1. Download Python 3.11+ from: https://www.python.org/downloads/windows/
 2. During installation, **IMPORTANT**: Check ✅ **"Add Python to PATH"**
@@ -127,46 +106,46 @@ Before you start, make sure you have:
 python --version
 # Should show: Python 3.11.x or higher
 
-"### Step 2: Install Node.js"
-Download Node.js 20 LTS from: https://nodejs.org/en/download/
-
-Choose "Windows Installer (.msi)"
-
-Verify installation:
 pip --version
 # Should show: pip 23.x.x
+```
 
+---
+
+### Step 2: Install Node.js 20+ LTS
+
+1. Download Node.js 20 LTS from: https://nodejs.org/en/download/
+2. Choose "Windows Installer (.msi)"
+3. Verify installation:
+
+```powershell
 node --version
 # Should show: v20.x.x
 
 npm --version
 # Should show: 10.x.x
+```
 
-"### Step 3: Install PostgreSQL & PostGIS"
-Download PostgreSQL 15+ from: https://www.postgresql.org/download/windows/
+---
 
-Run the installer:
+### Step 3: Install PostgreSQL 15+ & PostGIS
 
-Port: 5432 (default)
+1. Download PostgreSQL 15+ from: https://www.postgresql.org/download/windows/
+2. Run the installer:
+   - Port: `5432` (default)
+   - Password: Choose a strong password and **SAVE IT**
+   - ✅ Check "Install Stack Builder" at the end
 
-Password: Choose a strong password and SAVE IT (you'll need it later)
+3. **Install PostGIS** (IMPORTANT):
+   - Open Stack Builder (Start Menu → PostgreSQL 15 → Stack Builder)
+   - Select your PostgreSQL installation
+   - Navigate to "Spatial Extensions"
+   - Check ✅ "PostGIS 3.4 Bundle for PostgreSQL 15"
+   - Click Next and install
 
-✅ Check "Install Stack Builder" at the end
+4. Verify installation:
 
-Install PostGIS (IMPORTANT):
-
-Open Stack Builder (Start Menu → PostgreSQL 15 → Stack Builder)
-
-Select your PostgreSQL installation
-
-Navigate to "Spatial Extensions"
-
-Check ✅ "PostGIS 3.4 Bundle for PostgreSQL 15"
-
-Click Next and install
-
-Verify installation:
-
+```powershell
 # Open PostgreSQL
 psql -U postgres
 
@@ -184,15 +163,25 @@ SELECT PostGIS_Version();
 
 # Exit psql
 \q
+```
+
+---
 
 ### Step 4: Install Git
+
+1. Download Git from: https://git-scm.com/download/win
+2. Verify:
+
+```powershell
 git --version
 # Should show: git version 2.x.x
+```
 
-Step 6: Install VS Code Extensions
-Open VS Code and install these extensions (you can use the command below):
+---
 
-# Install all extensions at once
+### Step 5: Install VS Code Extensions
+
+```powershell
 code --install-extension ms-python.python
 code --install-extension ms-python.vscode-pylance
 code --install-extension dbaeumer.vscode-eslint
@@ -203,15 +192,31 @@ code --install-extension eamodio.gitlens
 code --install-extension ms-azuretools.vscode-docker
 code --install-extension ckolkman.vscode-postgres
 code --install-extension rangav.vscode-thunder-client
-code --install-extension formulahendry.auto-rename-tag
-code --install-extension christian-kohler.path-intellisense
+```
 
+---
+
+## 📁 Project Setup
+
+### Step 1: Create Project Structure
+
+```powershell
+# Navigate to your documents folder
+cd C:\Users\YourName\Documents
+
+# Create project folder
 mkdir freight-disruption-system
 cd freight-disruption-system
 
-Step 2: Backend Setup
-2.1 Create Virtual Environment
-powershell
+# Open in VS Code
+code .
+```
+
+### Step 2: Backend Setup
+
+#### 2.1 Create Virtual Environment
+
+```powershell
 cd backend
 
 # Create virtual environment
@@ -222,12 +227,24 @@ python -m venv venv
 
 # If you get execution policy error:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
+> 💡 You should see `(venv)` in your terminal prompt.
+
+
+#### 2.2 Install Dependencies
+
+```powershell
 pip install -r requirements.txt
+```
 
-Step 3: Frontend Setup
-3.1 Create React + Vite Project
-powershell
+---
+
+### Step 3: Frontend Setup
+
+#### 3.1 Create React + Vite Project
+
+```powershell
 # Go back to project root
 cd ..
 
@@ -235,9 +252,11 @@ cd ..
 npm create vite@latest frontend -- --template react-ts
 
 cd frontend
+```
 
-3.2 Install Dependencies
-powershell
+#### 3.2 Install Dependencies
+
+```powershell
 # Install core dependencies
 npm install
 
@@ -245,16 +264,277 @@ npm install
 npm install react-router-dom axios zustand @tanstack/react-query
 npm install recharts mapbox-gl date-fns jspdf jspdf-autotable
 npm install --save-dev @types/mapbox-gl
+npm install zustand framer-motion lucide-react react-router-dom
+npm install --save-dev @types/node
 
 # Install TailwindCSS
 npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
+```
 
-# Install Shadcn UI
+#### 3.3 Create Tailwind Config Manually (Skip npx)
+
+Since you had issues with `npx`, create these files manually:
+
+**Create `frontend/tailwind.config.js`**:
+
+```javascript
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+**Create `frontend/postcss.config.js`**:
+
+```javascript
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+```
+
+**Update `frontend/src/index.css`** (Tailwind v4 syntax):
+
+```css
+@import "tailwindcss";
+```
+
+#### 3.4 Update TypeScript Configs
+
+**Update `frontend/tsconfig.app.json`**:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src"]
+}
+```
+
+**Update `frontend/vite.config.ts`**:
+
+```typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
+```
+
+#### 3.5 Install Node Types
+
+```powershell
+npm install --save-dev @types/node
+```
+
+#### 3.6 Install Shadcn UI
+
+```powershell
 npx shadcn@latest init
-# Choose: Style=Default, Color=Slate, CSS variables=Yes 
+```
+npx shadcn@latest add input
+npx shadcn@latest add label
+npx shadcn@latest add toast
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add dialog
+npx shadcn@latest add toast
 
-4.3 Initialize Alembic (Database Migrations)
-powershell
+
+### Step 4: Database Setup
+
+#### 4.1 Create Database
+
+```powershell
+# Open PostgreSQL
+psql -U postgres
+
+# In psql:
+CREATE DATABASE freight_db;
+\c freight_db;
+CREATE EXTENSION postgis;
+SELECT PostGIS_Version();
+\q
+```
+
+#### 4.2 Initialize Alembic
+
+```powershell
 cd backend
 alembic init alembic
+```
+
+Edit `backend/alembic.ini`:
+
+```ini
+sqlalchemy.url = postgresql://postgres:YOUR_PASSWORD@localhost:5432/freight_db
+```
+
+---
+
+### Step 5: API Keys Setup
+
+#### 5.1 aisstream.io (for vessel positions)
+
+1. Go to: https://aisstream.io/
+2. Sign in with GitHub (free)
+3. Generate API key at: https://aisstream.io/apikeys
+4. Add to `backend/.env` as `AISSTREAM_API_KEY`
+
+#### 5.2 Sinay Port Congestion API
+
+1. Go to: https://developers.sinay.ai/home
+2. Create free account (500 calls/month)
+3. Generate API key
+4. Add to `backend/.env` as `SINAY_API_KEY`
+
+#### 5.3 Mapbox Token
+
+1. Go to: https://account.mapbox.com/
+2. Sign up (free)
+3. Copy your public token
+4. Add to `backend/.env` and `frontend/.env`
+
+#### 5.4 OpenWeatherMap API
+
+1. Go to: https://openweathermap.org/api
+2. Sign up (free tier: 1,000 calls/day)
+3. Add to `backend/.env` as `OPENWEATHER_API_KEY`
+
+---
+
+## 🚀 Running the Application
+
+
+**Terminal 1 - PostgreSQL**:
+```powershell
+# Make sure PostgreSQL is running
+# Check in Services (services.msc)
+# Service name: postgresql-x64-15
+```
+
+**Terminal 2 - Backend**:
+```powershell
+cd backend
+.\venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
+# Runs on: http://localhost:8000
+```
+
+**Terminal 3 - Frontend**:
+```powershell
+cd frontend
+npm run dev
+# Runs on: http://localhost:5173
+```
+
+---
+
+## ✅ Verification Checklist
+
+- [ ] Python 3.11+ installed (`python --version`)
+- [ ] Node.js 20+ installed (`node --version`)
+- [ ] PostgreSQL 15+ installed (`psql --version`)
+- [ ] PostGIS extension enabled (`SELECT PostGIS_Version();`)
+- [ ] Git installed (`git --version`)
+- [ ] Backend running on http://localhost:8000
+- [ ] Frontend running on http://localhost:5173
+- [ ] Database connected (check `/docs` endpoint)
+- [ ] API keys added to `.env` files
+
+---
+
+## 🆘 Troubleshooting
+
+### PowerShell Execution Policy Error
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### PostgreSQL Connection Error
+```powershell
+# Check if PostgreSQL is running
+Get-Service -Name postgresql*
+
+# Start if stopped
+Start-Service postgresql-x64-15
+```
+
+### Port Already in Use
+```powershell
+# Find process on port 8000
+netstat -ano | findstr :8000
+
+# Kill process (replace PID with actual number)
+taskkill /PID <PID> /F
+```
+
+### Tailwind v4 Syntax Error
+Make sure your `index.css` uses:
+```css
+@import "tailwindcss";
+```
+Not the old v3 syntax.
+
+### TypeScript Deprecation Warning
+Add `"ignoreDeprecations": "6.0"` to `tsconfig.app.json` under `compilerOptions`.
+
+*** To get the folder structure ***
+function Clean-Tree($path, $indent = "") {
+    $exclude = @(
+        "venv","node_modules","__pycache__",".git",
+        "site-packages","pip","dist","build",".cache","logs"
+    )
+
+    Get-ChildItem $path | Where-Object {
+        $exclude -notcontains $_.Name
+    } | ForEach-Object {
+        Write-Output "$indent$($_.Name)"
+        if ($_.PSIsContainer) {
+            Clean-Tree $_.FullName "$indent  "
+        }
+    }
+}
+
+Clean-Tree .
+
+**Built with ❤️ by Team Freight Disruption Firewall**
+
+**Deadline: October 31**
+
