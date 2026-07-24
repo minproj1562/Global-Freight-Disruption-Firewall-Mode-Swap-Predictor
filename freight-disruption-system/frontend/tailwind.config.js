@@ -74,16 +74,16 @@ export default {
         },
         sail: {
           '0%': { transform: 'translateX(-100%) translateY(0)' },
-          '100%': { transform: 'translateX(100vw) translateY(-20px)' },
+          '25%': { transform: 'translateX(25vw) translateY(-8px)' },
+          '50%': { transform: 'translateX(50vw) translateY(-4px)' },
+          '75%': { transform: 'translateX(75vw) translateY(-12px)' },
+          '100%': { transform: 'translateX(100vw) translateY(-6px)' },
         },
         fly: {
           '0%': { transform: 'translateX(-100%) translateY(20%)' },
           '100%': { transform: 'translateX(100vw) translateY(10%)' },
         },
-        train: {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100vw)' },
-        },
+
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -92,7 +92,7 @@ export default {
         float: "float 3s ease-in-out infinite",
         sail: "sail 45s linear infinite",
         fly: "fly 30s linear infinite",
-        train: "train 35s linear infinite",
+
       },
     },
   },
