@@ -1,5 +1,5 @@
 // frontend/src/pages/LoginPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Ship, Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react';
@@ -23,12 +23,6 @@ export const LoginPage: React.FC = () => {
   const { login } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (preSelectedRole) {
-      setSelectedRole(preSelectedRole);
-    }
-  }, [preSelectedRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -44,6 +44,14 @@ const generateStars = (): StarData[] => {
 
 export const AnimatedBackground: React.FC = () => {
   const [stars] = useState(generateStars);
+  const [particles] = useState(() =>
+    [...Array(10)].map(() => ({
+      left: 15 + Math.random() * 70,
+      top: 25 + Math.random() * 50,
+      duration: 5 + Math.random() * 4,
+      delay: Math.random() * 4,
+    }))
+  );
 
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
@@ -215,20 +223,21 @@ export const AnimatedBackground: React.FC = () => {
 
       {/* Subtle golden particles */}
       <div className="absolute inset-0 overflow-hidden">
-        {[...Array(10)].map((_, i) => (
+        {particles.map((p, i) => (
           <div
             key={i}
             className="absolute w-1 h-1 rounded-full bg-maritime-gold/30"
             style={{
-              left: `${15 + Math.random() * 70}%`,
-              top: `${25 + Math.random() * 50}%`,
-              animation: `particleFloat ${5 + Math.random() * 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 4}s`,
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              animation: `particleFloat ${p.duration}s ease-in-out infinite`,
+              animationDelay: `${p.delay}s`,
               boxShadow: '0 0 6px rgba(200,164,92,0.25)',
             }}
           />
         ))}
       </div>
+
 
       {/* ====== KEYFRAMES ====== */}
       <style>{`

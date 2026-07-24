@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
         return false;
       },
       
-      register: async (email, password, name, role) => {
+      register: async (email, _password, name, role) => {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1500));
         
