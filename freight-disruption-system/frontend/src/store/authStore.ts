@@ -28,16 +28,16 @@ export const useAuthStore = create<AuthState>()(
       setRole: (role) => set({ role }),
       
       login: async (email, password, role) => {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock authentication (replace with real API call)
-        if (password === 'demo123') {
+        // FASTAPI REPLACEMENT POINT: POST /api/v1/auth/token (OAuth2 password flow)
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Accept demo login credentials
+        if (password && password.trim().length > 0) {
           set({
-            role,
+            role: role || 'operations',
             isAuthenticated: true,
             user: {
-              name: email.split('@')[0],
+              name: email.split('@')[0].replace('.', ' ').toUpperCase(),
               email,
             },
           });
