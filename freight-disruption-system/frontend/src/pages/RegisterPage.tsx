@@ -1,358 +1,392 @@
+// src/pages/RegisterPage.tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Ship, Mail, Lock, User, ArrowLeft, Loader2, Building2, CheckCircle2, XCircle, ShieldCheck, Compass, Globe } from 'lucide-react';
+import { motion } from 'framer-motion';
+import {
+  Ship,
+  Mail,
+  Lock,
+  User,
+  BadgeCheck,
+  Phone,
+  Anchor,
+  UserCheck,
+  Building2,
+  ArrowLeft,
+  Loader2,
+  ShieldCheck,
+  CheckCircle2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuthStore, UserRole } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
-import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
 export const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    fullName: '',
+    employeeId: '',
     email: '',
-    organization: '',
+    mobileNumber: '',
+    portName: 'Port of Rotterdam (NLRTM)',
+    username: '',
     password: '',
     confirmPassword: '',
+    department: 'Harbor Control & Terminal Ops',
+    accessLevel: 'Senior Port Authority Manager',
+    acceptTerms: true,
   });
-  const [selectedRole, setSelectedRole] = useState<UserRole>('operations');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { register } = useAuthStore();
+  const { registerPortManager } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Password strength calculation
-  const getPasswordStrength = (pass: string) => {
-    let score = 0;
-    if (pass.length >= 8) score += 1;
-    if (/[A-Z]/.test(pass)) score += 1;
-    if (/[0-9]/.test(pass)) score += 1;
-    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
-
-    if (pass.length === 0) return { score: 0, label: '', color: 'bg-slate-800' };
-    if (score <= 1) return { score: 25, label: 'Weak', color: 'bg-rose-500', textColor: 'text-rose-400' };
-    if (score === 2) return { score: 50, label: 'Fair', color: 'bg-amber-500', textColor: 'text-amber-400' };
-    if (score === 3) return { score: 75, label: 'Strong', color: 'bg-blue-500', textColor: 'text-blue-400' };
-    return { score: 100, label: 'Enterprise Grade', color: 'bg-emerald-500', textColor: 'text-emerald-400' };
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { id, value, type } = e.target as HTMLInputElement;
+    setFormData((prev) => ({
+      ...prev,
+      [id]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
   };
-
-  const passStrength = getPasswordStrength(formData.password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError('Passwords do not match. Please re-enter.');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (!formData.acceptTerms) {
+      setError('Please agree to the Maritime Port Security Compliance terms.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const success = await register(
-        formData.email,
-        formData.password,
-        formData.name,
-        selectedRole
-      );
+      const success = await registerPortManager({
+        fullName: formData.fullName,
+        employeeId: formData.employeeId,
+        email: formData.email,
+        mobileNumber: formData.mobileNumber,
+        portName: formData.portName,
+        username: formData.username,
+        password: formData.password,
+        department: formData.department,
+        accessLevel: formData.accessLevel,
+      });
 
       if (success) {
         toast({
-          title: "Account Provisioned",
-          description: "Welcome to Freight Disruption Firewall. Opening command center...",
+          title: '⚓ Port Manager Registered Successfully!',
+          description: `Welcome ${formData.fullName}. Accessing Port Dashboard...`,
         });
 
         setTimeout(() => {
-          navigate(`/dashboard/operations`);
+          navigate('/dashboard/port');
         }, 600);
       } else {
-        setError('Registration failed. Email may already exist.');
+        setError('Registration failed. Employee ID or Username may already be registered.');
       }
     } catch {
-      setError('An error occurred during account creation. Please try again.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.id]: e.target.value,
-    }));
-  };
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-white flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <AnimatedBackground />
 
-      {/* Header bar */}
-      <header className="relative z-20 flex items-center justify-between px-6 py-4 max-w-7xl w-full mx-auto">
-        <Link to="/" className="inline-flex items-center text-amber-400 hover:text-amber-300 font-medium text-sm transition-colors group">
-          <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />
-          Back to Portal
+      <div className="relative z-10 max-w-2xl mx-auto w-full">
+        {/* Back Navigation */}
+        <Link
+          to="/"
+          className="inline-flex items-center text-amber-400 hover:text-amber-300 transition-colors mb-6 text-sm font-semibold group"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+          Back to Main Overview
         </Link>
-        <ThemeToggle />
-      </header>
 
-      {/* Main Split Screen */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-4 lg:p-8">
-        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/60 backdrop-blur-2xl border border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl">
-
-          {/* Left Pane — Branding */}
-          <div className="lg:col-span-5 p-8 lg:p-12 bg-gradient-to-br from-slate-900/90 via-slate-950/90 to-blue-950/60 border-r border-slate-800/60 flex flex-col justify-between min-h-[560px]">
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-3 shadow-lg shadow-amber-500/20 text-slate-950">
-                  <Ship className="w-8 h-8" strokeWidth={2.2} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-white font-mono">FREIGHT FIREWALL</h2>
-                  <p className="text-xs text-amber-400 font-medium tracking-wider">ENTERPRISE ONBOARDING</p>
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold text-slate-100 mb-3 leading-snug">
-                Join the Global Supply Chain Resilience Network
-              </h3>
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                Deploy predictive disruption alerts, automatic mode-swaps, and AIS telemetry across your fleet & port terminals.
-              </p>
-
-              <div className="space-y-3.5">
-                {[
-                  { icon: ShieldCheck, title: 'Geopolitical Risk Shield', desc: 'Predictive alerts for Suez, Panama, Bab-el-Mandeb' },
-                  { icon: Compass, title: 'Multi-Modal Route Swapping', desc: 'Sea → Air & Sea → Rail instant cost/time trade-offs' },
-                  { icon: Globe, title: 'Real-Time Congestion Indexing', desc: 'Port waiting times & berth utilization telemetry' },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5 border border-white/5">
-                    <item.icon className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-200">{item.title}</h4>
-                      <p className="text-[11px] text-slate-400">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Card Container */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-slate-900/90 border border-white/15 rounded-3xl p-8 sm:p-10 shadow-2xl backdrop-blur-2xl"
+        >
+          {/* Top Badge & Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-xl mb-4">
+              <Anchor className="w-8 h-8" strokeWidth={2.5} />
             </div>
-
-            <div className="mt-8 pt-4 border-t border-slate-800/80 text-xs text-slate-500 font-mono">
-              Role-Based Access Control • SOC2 Type II Certified
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Port Manager Registration
+            </h1>
+            <p className="text-sm text-slate-300 mt-2">
+              Authorized Maritime Authority Portal • Telemetry & Gatekeeper Access
+            </p>
           </div>
 
-          {/* Right Pane — Registration Form */}
-          <div className="lg:col-span-7 p-8 lg:p-12">
-            <div className="max-w-md mx-auto">
-              <div className="mb-6">
-                <h1 className="text-3xl font-bold text-white tracking-tight mb-1">
-                  Create Enterprise Account
-                </h1>
-                <p className="text-xs text-slate-400">
-                  Fill in your credentials to provision your operational workspace
-                </p>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Grid 1: Full Name & Employee ID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <Label htmlFor="fullName" className="text-xs font-semibold text-slate-200">
+                  Full Name <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="fullName"
+                    type="text"
+                    required
+                    placeholder="Capt. Alexander Vance"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Full Name */}
-                <div className="space-y-1">
-                  <Label htmlFor="name" className="text-xs font-medium text-slate-300">Full Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Captain Sarah Jenkins"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      className="pl-10 h-10 bg-slate-950/80 border-slate-800 focus:border-amber-400 text-white placeholder:text-slate-500 rounded-xl text-xs"
-                    />
-                  </div>
+              {/* Employee ID */}
+              <div className="space-y-1.5">
+                <Label htmlFor="employeeId" className="text-xs font-semibold text-slate-200">
+                  Employee ID <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <BadgeCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="employeeId"
+                    type="text"
+                    required
+                    placeholder="PM-9082-NL"
+                    value={formData.employeeId}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
                 </div>
-
-                {/* Email & Organization in Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-xs font-medium text-slate-300">Work Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="s.jenkins@maersk.com"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        className="pl-10 h-10 bg-slate-950/80 border-slate-800 focus:border-amber-400 text-white placeholder:text-slate-500 rounded-xl text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="organization" className="text-xs font-medium text-slate-300">Organization</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
-                        id="organization"
-                        type="text"
-                        placeholder="Maersk Logistics Global"
-                        value={formData.organization}
-                        onChange={handleChange}
-                        required
-                        className="pl-10 h-10 bg-slate-950/80 border-slate-800 focus:border-amber-400 text-white placeholder:text-slate-500 rounded-xl text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Password & Confirm Password */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="password" className="text-xs font-medium text-slate-300">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                        className="pl-10 h-10 bg-slate-950/80 border-slate-800 focus:border-amber-400 text-white placeholder:text-slate-500 rounded-xl text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="confirmPassword" className="text-xs font-medium text-slate-300">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                        className="pl-10 h-10 bg-slate-950/80 border-slate-800 focus:border-amber-400 text-white placeholder:text-slate-500 rounded-xl text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Password Strength Meter */}
-                {formData.password && (
-                  <div className="space-y-1.5 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">Password Strength:</span>
-                      <span className={`font-semibold ${passStrength.textColor}`}>{passStrength.label}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${passStrength.color} transition-all duration-300`}
-                        style={{ width: `${passStrength.score}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-400 pt-1">
-                      <span className="flex items-center gap-1">
-                        {formData.password.length >= 8 ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-slate-600" />} 8+ Characters
-                      </span>
-                      <span className="flex items-center gap-1">
-                        {/[A-Z]/.test(formData.password) ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-slate-600" />} Uppercase Letter
-                      </span>
-                      <span className="flex items-center gap-1">
-                        {/[0-9]/.test(formData.password) ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-slate-600" />} Number
-                      </span>
-                      <span className="flex items-center gap-1">
-                        {/[^A-Za-z0-9]/.test(formData.password) ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-slate-600" />} Special Character
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Role Selection */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-300">Select Operational Role</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'operations', label: 'Global Ops' },
-                      { value: 'port', label: 'Port Command' },
-                      { value: 'admin', label: 'Admin' },
-                    ].map((role) => (
-                      <button
-                        key={role.value}
-                        type="button"
-                        onClick={() => setSelectedRole(role.value as UserRole)}
-                        className={`py-2 px-3 rounded-xl text-xs font-semibold transition-all border ${
-                          selectedRole === role.value
-                            ? 'bg-amber-400/15 border-amber-400/60 text-amber-300'
-                            : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-                        }`}
-                      >
-                        {role.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Error Banner */}
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="rounded-xl bg-rose-500/15 border border-rose-500/40 p-3 text-xs text-rose-300 font-medium"
-                    >
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold py-3 text-sm rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center mt-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-slate-950" />
-                      Provisioning Account...
-                    </>
-                  ) : (
-                    'Complete Enterprise Registration'
-                  )}
-                </Button>
-              </form>
-
-              {/* Login Link */}
-              <div className="mt-5 text-center text-xs text-slate-400">
-                Already registered?{' '}
-                <Link to="/login" className="text-amber-400 hover:text-amber-300 font-bold hover:underline">
-                  Sign in to command center
-                </Link>
               </div>
             </div>
-          </div>
-        </div>
-      </main>
 
-      <footer className="relative z-10 py-3 text-center text-[11px] text-slate-500 font-mono">
-        GLOBAL FREIGHT DISRUPTION FIREWALL & MODE-SWAP PREDICTOR &copy; 2026
-      </footer>
+            {/* Grid 2: Email & Mobile Number */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-semibold text-slate-200">
+                  Email Address <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    placeholder="a.vance@portauthority.org"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Number */}
+              <div className="space-y-1.5">
+                <Label htmlFor="mobileNumber" className="text-xs font-semibold text-slate-200">
+                  Mobile Phone Number <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="mobileNumber"
+                    type="tel"
+                    required
+                    placeholder="+31 6 1234 5678"
+                    value={formData.mobileNumber}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 3: Assigned Port Name & Username */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Port Name */}
+              <div className="space-y-1.5">
+                <Label htmlFor="portName" className="text-xs font-semibold text-slate-200">
+                  Assigned Port Facility <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Anchor className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
+                  <select
+                    id="portName"
+                    value={formData.portName}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 h-11 bg-slate-950/80 border border-white/15 text-white focus:border-amber-400 rounded-xl text-xs focus:outline-none"
+                  >
+                    <option value="Port of Rotterdam (NLRTM)">Port of Rotterdam (Netherlands)</option>
+                    <option value="Port of Singapore (SGSIN)">Port of Singapore (Singapore)</option>
+                    <option value="Port of Shanghai (CNSHA)">Port of Shanghai (China)</option>
+                    <option value="Port of Los Angeles (USLAX)">Port of Los Angeles (USA)</option>
+                    <option value="Port of Hamburg (DEHAM)">Port of Hamburg (Germany)</option>
+                    <option value="Port of Jebel Ali (AEJEA)">Port of Jebel Ali (Dubai, UAE)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Username */}
+              <div className="space-y-1.5">
+                <Label htmlFor="username" className="text-xs font-semibold text-slate-200">
+                  Username <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="username"
+                    type="text"
+                    required
+                    placeholder="vance_nlrtm"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 4: Password & Confirm Password */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Password */}
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs font-semibold text-slate-200">
+                  Password <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-200">
+                  Confirm Password <span className="text-amber-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="pl-10 h-11 bg-slate-950/80 border-white/15 text-white placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Extra Recommended Fields: Department & Access Level */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white/5 p-3 rounded-2xl border border-white/10">
+              <div>
+                <Label htmlFor="department" className="text-[11px] font-semibold text-amber-300">
+                  Operational Department
+                </Label>
+                <input
+                  id="department"
+                  type="text"
+                  value={formData.department}
+                  onChange={handleInputChange}
+                  className="w-full mt-1 p-2 bg-slate-950/90 border border-white/10 rounded-lg text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="accessLevel" className="text-[11px] font-semibold text-amber-300">
+                  Security Access Clearance
+                </Label>
+                <input
+                  id="accessLevel"
+                  type="text"
+                  value={formData.accessLevel}
+                  onChange={handleInputChange}
+                  className="w-full mt-1 p-2 bg-slate-950/90 border border-white/10 rounded-lg text-xs text-white"
+                />
+              </div>
+            </div>
+
+            {/* Terms Checkbox */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="acceptTerms"
+                type="checkbox"
+                checked={formData.acceptTerms}
+                onChange={handleInputChange}
+                className="w-4 h-4 accent-amber-400 rounded cursor-pointer"
+              />
+              <label htmlFor="acceptTerms" className="text-xs text-slate-300 cursor-pointer">
+                I accept the Port Security Operations Policy & Telemetry Access Protocol.
+              </label>
+            </div>
+
+            {/* Error banner */}
+            {error && (
+              <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-red-300 text-xs">
+                {error}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-slate-950 font-extrabold py-6 rounded-xl text-base shadow-xl transition-all"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating Port Manager Credentials...
+                </>
+              ) : (
+                'Complete Registration & Access Port Overview'
+              )}
+            </Button>
+          </form>
+
+          {/* Login Link Footer */}
+          <div className="mt-6 text-center text-xs text-slate-400">
+            Already registered as Port Manager?{' '}
+            <Link to="/login" className="text-amber-400 hover:text-amber-300 font-bold underline">
+              Sign In Here
+            </Link>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 };
