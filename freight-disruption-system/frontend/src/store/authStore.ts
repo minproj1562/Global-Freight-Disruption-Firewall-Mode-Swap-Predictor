@@ -1,42 +1,45 @@
-// src/store/authStore.ts
+// frontend/src/store/authStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type UserRole = 'operations' | 'port' | 'admin' | null;
 
-export interface UserProfile {
-  name: string;
-  employeeId?: string;
+export interface PortManagerData {
+  fullName: string;
+  employeeId: string;
   email: string;
-  mobileNumber?: string;
-  portName?: string;
-  username?: string;
+  mobileNumber: string;
+  portName: string;
+  username: string;
   department?: string;
-  accessLevel?: string;
-  role: UserRole;
+  securityPassId?: string;
 }
 
 interface AuthState {
   role: UserRole;
   isAuthenticated: boolean;
-  user: UserProfile | null;
-  setRole: (role: UserRole) => void;
-  login: (credentials: {
-    usernameOrEmail: string;
-    password: string;
-    employeeId?: string;
-    role: UserRole;
-  }) => Promise<boolean>;
-  registerPortManager: (details: {
-    fullName: string;
-    employeeId: string;
+  user: {
+    name: string;
     email: string;
-    mobileNumber: string;
-    portName: string;
-    username: string;
-    password: string;
+    organization?: string;
+    employeeId?: string;
+    mobileNumber?: string;
+    portName?: string;
+    username?: string;
     department?: string;
-    accessLevel?: string;
+  } | null;
+  setRole: (role: UserRole) => void;
+  login: (emailOrUser: string, password: string, role: UserRole, assignedPort?: string) => Promise<boolean>;
+  register: (data: {
+    email: string;
+    password: string;
+    name: string;
+    role: UserRole;
+    employeeId?: string;
+    mobileNumber?: string;
+    portName?: string;
+    username?: string;
+    department?: string;
   }) => Promise<boolean>;
   logout: () => void;
 }
@@ -50,28 +53,24 @@ export const useAuthStore = create<AuthState>()(
 
       setRole: (role) => set({ role }),
 
-      login: async ({ usernameOrEmail, password, employeeId, role }) => {
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
+      login: async (emailOrUser, password, role, assignedPort) => {
+        // Simulate API check
+        await new Promise((resolve) => setTimeout(resolve, 600));
 
-        // Demo condition (or any password demo123/admin)
-        if (password === 'demo123' || password.length >= 6) {
+        if (password && password.trim().length > 0) {
+          const userNameFormatted = emailOrUser.includes('@')
+            ? emailOrUser.split('@')[0].replace('.', ' ').toUpperCase()
+            : emailOrUser.toUpperCase();
+
           set({
             role: role || 'port',
             isAuthenticated: true,
             user: {
-              name: usernameOrEmail.includes('@')
-                ? usernameOrEmail.split('@')[0].toUpperCase()
-                : usernameOrEmail,
-              email: usernameOrEmail.includes('@')
-                ? usernameOrEmail
-                : `${usernameOrEmail}@portauthority.gov`,
-              employeeId: employeeId || 'PM-88204',
-              portName: 'Port of Rotterdam',
-              username: usernameOrEmail,
-              department: 'Harbor Control & Quay Ops',
-              accessLevel: 'Senior Port Director',
-              role: role || 'port',
+              name: userNameFormatted,
+              email: emailOrUser.includes('@') ? emailOrUser : `${emailOrUser}@portops.gov`,
+              username: emailOrUser,
+              portName: assignedPort || 'Port of Rotterdam',
+              employeeId: `PM-${Math.floor(10000 + Math.random() * 90000)}`,
             },
           });
           return true;
@@ -79,23 +78,21 @@ export const useAuthStore = create<AuthState>()(
         return false;
       },
 
-      registerPortManager: async (details) => {
-        // Simulate API network call delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      register: async (data) => {
+        // Simulate API call
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
         set({
-          role: 'port',
+          role: data.role || 'port',
           isAuthenticated: true,
           user: {
-            name: details.fullName,
-            employeeId: details.employeeId,
-            email: details.email,
-            mobileNumber: details.mobileNumber,
-            portName: details.portName,
-            username: details.username,
-            department: details.department || 'Harbor Operations',
-            accessLevel: details.accessLevel || 'Port Authority Manager',
-            role: 'port',
+            name: data.name,
+            email: data.email,
+            employeeId: data.employeeId || `PM-${Math.floor(10000 + Math.random() * 90000)}`,
+            mobileNumber: data.mobileNumber || '+1 (555) 019-2834',
+            portName: data.portName || 'Port of Rotterdam',
+            username: data.username || data.email.split('@')[0],
+            department: data.department || 'Terminal Operations Command',
           },
         });
         return true;
@@ -109,7 +106,7 @@ export const useAuthStore = create<AuthState>()(
         }),
     }),
     {
-      name: 'auth-storage-v2',
+      name: 'auth-storage',
     }
   )
 );

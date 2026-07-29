@@ -1,7 +1,7 @@
 // frontend/src/pages/LandingPage.tsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Ship, Anchor, Settings } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Ship, Anchor, Settings, ArrowRight, ShieldCheck } from 'lucide-react';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 import { TransportAnimation } from '@/components/landing/TransportAnimation';
 import { RoleCard } from '@/components/landing/RoleCard';
@@ -11,27 +11,33 @@ export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleRoleClick = (role: string) => {
-    // Navigate to login with role pre-selected
-    navigate('/login', { state: { role } });
+    if (role === 'port') {
+      // Direct navigation to dedicated Port Manager Registration & Login
+      navigate('/auth/port-manager');
+    } else if (role === 'operations') {
+      navigate('/dashboard/operations');
+    } else {
+      navigate('/login', { state: { role } });
+    }
   };
 
   const roles = [
     {
-      title: 'Operations',
-      description: 'Real-time monitoring, reroute decisions & executive KPIs',
+      title: 'Global Fleet Ops',
+      description: 'Real-time vessel tracking, reroute decisions & executive KPIs',
       icon: Ship,
       color: '#3B82F6',
       role: 'operations',
     },
     {
-      title: 'Port',
-      description: 'Monitor port health, congestion & vessel arrivals',
+      title: 'Port Operations',
+      description: 'Dedicated Port Manager Portal: Registration, Login & Port Health',
       icon: Anchor,
       color: '#10B981',
       role: 'port',
     },
     {
-      title: 'Admin',
+      title: 'Admin Command',
       description: 'System management, simulations & validation',
       icon: Settings,
       color: '#8B5CF6',
@@ -40,7 +46,7 @@ export const LandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100 font-sans">
       {/* Background - sky, stars, ocean */}
       <AnimatedBackground />
 
@@ -50,44 +56,101 @@ export const LandingPage: React.FC = () => {
       {/* ======== MAIN CONTENT (z-20 so it sits above everything) ======== */}
       <div className="relative z-20 flex min-h-screen flex-col items-center px-4">
 
-        {/* Top bar - subtle logo */}
-        <motion.div
+        {/* Top bar - Header nav with direct Port Manager link */}
+        <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full flex justify-center pt-6 pb-2"
+          className="w-full max-w-6xl flex items-center justify-between pt-6 pb-2 px-4"
         >
-          <img
-            src="/reroute-ripple-logo.png"
-            alt="Reroute Ripple"
-            className="h-14 md:h-16 w-auto opacity-90 drop-shadow-[0_0_12px_rgba(200,164,92,0.25)]"
-          />
-        </motion.div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 p-2 shadow-md shadow-amber-500/20 text-slate-950">
+              <Ship className="w-5 h-5" strokeWidth={2.2} />
+            </div>
+            <div>
+              <span className="text-sm font-bold font-mono text-white tracking-tight block">
+                FREIGHT FIREWALL
+              </span>
+              <span className="text-[10px] text-amber-400 font-mono font-medium tracking-wider block">
+                MARITIME LOGISTICS SYSTEM
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/auth/port-manager"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-all text-xs font-mono font-bold shadow-lg"
+            >
+              <Anchor className="w-4 h-4 text-emerald-400" />
+              Port Manager Reg / Login →
+            </Link>
+            <Link
+              to="/dashboard/ports"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all text-xs font-mono"
+            >
+              Port Overview (3.1)
+            </Link>
+          </div>
+        </motion.header>
 
         {/* ======== HERO SECTION ======== */}
         <div className="flex-1 flex flex-col items-center justify-center max-w-5xl w-full py-8">
+          
+          {/* Prominent Port Manager Quick Access Banner */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6 }}
+            className="w-full mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-amber-950/60 border border-emerald-500/40 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                <Anchor className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  Port Operations & Terminal Managers Portal
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                    EXCLUSIVE FLOW
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Full Manager Registration (Full Name, Employee ID, Email, Mobile, Assigned Port, Username, Password) & Login
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/auth/port-manager"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-300 transition-all shrink-0 flex items-center gap-1.5"
+            >
+              Open Port Manager Auth <ArrowRight className="w-4 h-4" />
+            </Link>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-center mb-12"
+            className="text-center mb-10"
           >
             {/* Title */}
             <motion.h1
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3, duration: 1 }}
-              className="mb-5 text-5xl font-bold leading-tight md:text-6xl lg:text-7xl"
+              className="mb-5 text-4xl font-bold leading-tight md:text-5xl lg:text-6xl"
             >
               <span className="relative inline-block">
                 <span className="relative bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
-                  Global Freight
+                  Global Freight Disruption
                 </span>
               </span>
               <br />
               <span className="relative inline-block mt-2">
-                <span className="relative bg-gradient-to-r from-maritime-gold via-maritime-amber to-yellow-500 bg-clip-text text-transparent">
-                  Disruption Firewall
+                <span className="relative bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                  Firewall & Mode-Swap Predictor
                 </span>
               </span>
             </motion.h1>
@@ -97,40 +160,10 @@ export const LandingPage: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="mx-auto max-w-2xl text-lg text-gray-300/90 md:text-xl leading-relaxed"
+              className="mx-auto max-w-2xl text-base text-gray-300/90 md:text-lg leading-relaxed"
             >
-              AI-powered route optimization with real-time monitoring and
-              <span className="text-maritime-gold font-semibold"> Monte Carlo simulations</span>
+              AI-powered maritime route optimization, port congestion monitoring, and live terminal operations.
             </motion.p>
-
-            {/* Stats row */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="mt-10 flex flex-wrap justify-center gap-6 md:gap-10"
-            >
-              {[
-                { value: '<5min', label: 'Decision Time', icon: '⚡' },
-                { value: '2000+', label: 'MC Simulations', icon: '🎲' },
-                { value: '24/7', label: 'Live Monitoring', icon: '📡' },
-              ].map((stat, index) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, scale: 0.5 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.9 + index * 0.1, type: 'spring' }}
-                >
-                  <div className="text-center bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-xl px-5 py-3 hover:bg-white/[0.08] transition-all duration-300 cursor-default">
-                    <div className="text-2xl mb-0.5">{stat.icon}</div>
-                    <div className="text-xl font-bold text-maritime-gold">
-                      {stat.value}
-                    </div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
           </motion.div>
 
           {/* ======== ROLE CARDS ======== */}
@@ -138,10 +171,10 @@ export const LandingPage: React.FC = () => {
             <motion.h2
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1.1 }}
-              className="mb-8 text-center text-2xl md:text-3xl font-bold text-white"
+              transition={{ delay: 0.7 }}
+              className="mb-6 text-center text-xl md:text-2xl font-bold text-white"
             >
-              Select Your <span className="text-maritime-gold">Dashboard</span>
+              Select Operational Portal
             </motion.h2>
 
             <div className="grid gap-6 md:grid-cols-3 px-2">
@@ -150,36 +183,17 @@ export const LandingPage: React.FC = () => {
                   key={role.role}
                   {...role}
                   onClick={() => handleRoleClick(role.role)}
-                  delay={1.3 + index * 0.12}
+                  delay={0.8 + index * 0.1}
                 />
               ))}
             </div>
           </div>
         </div>
 
-        {/* ======== FOOTER - always visible above waves ======== */}
-        <motion.footer
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.8 }}
-          className="w-full pb-6 pt-4 text-center"
-        >
-          <div className="inline-flex items-center gap-2 bg-black/30 backdrop-blur-md border border-white/[0.08] rounded-full px-5 py-2.5">
-            <div className="flex items-center gap-3 text-sm text-gray-300">
-              <span className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                Monte Carlo Engine
-              </span>
-              <span className="text-gray-600">•</span>
-              <span>NetworkX</span>
-              <span className="text-gray-600">•</span>
-              <span>OR-Tools</span>
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-gray-400">
-            Research Project © 2025
-          </p>
-        </motion.footer>
+        {/* ======== FOOTER ======== */}
+        <footer className="w-full pb-6 pt-4 text-center text-xs text-slate-500 font-mono">
+          GLOBAL FREIGHT DISRUPTION FIREWALL & PORT MANAGEMENT PLATFORM &copy; 2026
+        </footer>
       </div>
     </div>
   );
