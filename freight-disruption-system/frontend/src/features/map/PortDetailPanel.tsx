@@ -1,6 +1,7 @@
+//frontend/src/features/map/PortDetailPanel.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Anchor, Clock, Ship, AlertOctagon, BarChart3, PackageCheck, MapPin } from 'lucide-react';
+import { X, Anchor, Clock, Ship, BarChart3, MapPin } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { Port } from '../../types';
 

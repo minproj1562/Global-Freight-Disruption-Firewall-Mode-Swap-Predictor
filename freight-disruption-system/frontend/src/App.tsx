@@ -19,6 +19,10 @@ const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode; 
   }
 
   // If specific role requested and doesn't match, still allow command center access in demo mode
+  if (allowedRole && role && allowedRole !== role) {
+    // Demo mode: still allow access
+  }
+
   return <>{children}</>;
 };
 

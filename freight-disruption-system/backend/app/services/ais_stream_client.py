@@ -2,65 +2,72 @@
 import asyncio
 import json
 import websockets
-import os
+import logging
 from datetime import datetime
-from dotenv import load_dotenv
+from app.core.config import settings
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
-AISSTREAM_API_KEY = os.getenv("AISSTREAM_API_KEY")
+# Correct aisstream.io endpoint (v0, no API key in URL)
+AISSTREAM_URI = "wss://stream.aisstream.io/v0/stream"
+
 
 class AISStreamClient:
     def __init__(self):
-        self.api_key = AISSTREAM_API_KEY
-        self.uri = f"wss://stream.aisstream.io/v1/stream?apiKey={self.api_key}"
+        self.api_key = settings.AISSTREAM_API_KEY
+        self.uri = AISSTREAM_URI
         self.websocket = None
+        self._running = False
 
     async def connect(self):
-        """Establish WebSocket connection to aisstream.io"""
+        """Establish WebSocket connection to aisstream.io.
+        
+        The API key is NOT part of the URL — it goes in the subscription message.
+        Raises websockets.exceptions.* on failure so the caller can handle it.
+        """
+        logger.info("[AIS] Connecting to %s ...", self.uri)
         self.websocket = await websockets.connect(self.uri)
-        print(f"[AIS] Connected to aisstream.io at {datetime.now()}")
+        logger.info("[AIS] Connected at %s", datetime.now())
 
     async def subscribe(self, bbox=None, ship_types=None):
-        """
-        Subscribe to vessel data.
-        
+        """Send subscription message with API key and bounding box filter.
+
         Args:
-            bbox: [min_lon, min_lat, max_lon, max_lat] - e.g., [-180, -90, 180, 90] for global
-            ship_types: List of ship type numbers (e.g., [70, 71, 80] for cargo)
+            bbox: [[min_lon, min_lat, max_lon, max_lat]] — global by default
+            ship_types: list of AIS ship type codes (empty = all types)
         """
         if bbox is None:
-            bbox = [-180, -90, 180, 90]  # Global coverage
+            # Global bounding box — aisstream expects a list-of-lists
+            bbox = [[-180, -90, 180, 90]]
 
-        # Build the subscription message
         subscription_message = {
             "APIKey": self.api_key,
-            "BoundingBoxes": [[bbox]],
-            "FiltersShipType": ship_types or [],  # Empty = all types
+            "BoundingBoxes": [bbox],
+            "FiltersShipType": ship_types or [],
         }
 
         await self.websocket.send(json.dumps(subscription_message))
-        print("[AIS] Subscription sent. Waiting for data...")
+        logger.info("[AIS] Subscription sent — waiting for vessel data...")
 
     async def receive_data(self, callback_function):
-        """
-        Continuously receive vessel data and call your callback.
-        
-        Args:
-            callback_function: A function that processes each vessel update
-        """
-        try:
-            while True:
-                # Receive message from WebSocket
-                message = await self.websocket.recv()
-                data = json.loads(message)
+        """Continuously receive vessel position updates and invoke callback.
 
-                # Check if it's a vessel update
+        Runs until the connection drops, then attempts reconnection.
+        """
+        self._running = True
+        try:
+            async for raw_message in self.websocket:
+                if not self._running:
+                    break
+                try:
+                    data = json.loads(raw_message)
+                except json.JSONDecodeError:
+                    continue
+
                 if data.get("MessageType") == "PositionReport":
                     vessel = data.get("MetaData", {})
                     position = data.get("Message", {}).get("PositionReport", {})
 
-                    # Extract relevant data
                     vessel_data = {
                         "mmsi": vessel.get("MMSI"),
                         "vessel_name": vessel.get("ShipName", "Unknown"),
@@ -69,30 +76,55 @@ class AISStreamClient:
                         "ship_type": vessel.get("ShipType", 0),
                         "latitude": position.get("Latitude", 0),
                         "longitude": position.get("Longitude", 0),
-                        "speed": position.get("Sog", 0),  # Speed over ground (knots)
-                        "heading": position.get("Cog", 0),  # Course over ground
+                        "speed": position.get("Sog", 0),
+                        "heading": position.get("Cog", 0),
                         "course": position.get("Cog", 0),
-                        "timestamp": position.get("TimeStamp", None),
+                        "timestamp": position.get("TimeStamp"),
                     }
 
-                    # Pass the data to your callback
-                    await callback_function(vessel_data)
+                    try:
+                        await callback_function(vessel_data)
+                    except Exception as cb_err:
+                        logger.warning("[AIS] Callback error: %s", cb_err)
 
         except websockets.ConnectionClosed:
-            print("[AIS] Connection closed. Reconnecting...")
-            await self.reconnect(callback_function)
+            logger.warning("[AIS] Connection closed.")
         except Exception as e:
-            print(f"[AIS] Error: {e}")
+            logger.error("[AIS] Receive error: %s", e)
 
     async def reconnect(self, callback_function):
-        """Handle reconnection if the WebSocket closes"""
-        await asyncio.sleep(5)  # Wait before reconnecting
-        await self.connect()
-        await self.subscribe()
-        await self.receive_data(callback_function)
+        """Reconnect with exponential back-off (5 s, 10 s, 20 s … max 60 s)."""
+        delay = 5
+        while self._running:
+            logger.info("[AIS] Reconnecting in %ds...", delay)
+            await asyncio.sleep(delay)
+            try:
+                await self.connect()
+                await self.subscribe()
+                await self.receive_data(callback_function)
+                return  # successfully reconnected and running
+            except Exception as e:
+                logger.error("[AIS] Reconnect failed: %s", e)
+                delay = min(delay * 2, 60)
+
+    async def run_forever(self, callback_function):
+        """Connect, subscribe, and keep running with auto-reconnect.
+        
+        This is the main entry point called from main.py. It never raises —
+        failures are logged and retried so the rest of the API stays up.
+        """
+        while self._running:
+            try:
+                await self.connect()
+                await self.subscribe()
+                await self.receive_data(callback_function)
+            except Exception as e:
+                logger.error("[AIS] Stream error: %s — will retry in 10s", e)
+                await asyncio.sleep(10)
 
     async def close(self):
-        """Close the WebSocket connection"""
+        """Gracefully shut down the AIS stream."""
+        self._running = False
         if self.websocket:
             await self.websocket.close()
-            print("[AIS] Connection closed.")
+            logger.info("[AIS] Connection closed.")

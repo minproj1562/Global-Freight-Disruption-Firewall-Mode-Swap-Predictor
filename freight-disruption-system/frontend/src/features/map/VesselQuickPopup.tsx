@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ship, Navigation, Gauge, MapPin, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Navigation, Gauge, MapPin, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Vessel } from '../../types';
 
 interface VesselQuickPopupProps {

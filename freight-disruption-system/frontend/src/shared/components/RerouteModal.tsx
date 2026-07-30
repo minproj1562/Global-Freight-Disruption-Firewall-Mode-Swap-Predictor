@@ -2,18 +2,31 @@
 // FASTAPI REPLACEMENT POINT: Connect "Execute Reroute Plan" to POST /api/v1/reroutes/execute
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, Plane, Train, Truck, ArrowRight, ShieldCheck, DollarSign, Clock, Leaf, CheckCircle2, Loader2 } from 'lucide-react';
 import { ModeSwapOption, Vessel } from '../../types';
 import { useToast } from '../../components/ui/use-toast';
 
 interface RerouteModalProps {
   vessel: Vessel;
-  option: ModeSwapOption;
+  option?: ModeSwapOption;
+  route?: any;
   onClose: () => void;
 }
 
-export const RerouteModal: React.FC<RerouteModalProps> = ({ vessel, option, onClose }) => {
+const DEFAULT_OPTION: ModeSwapOption = {
+  id: 'opt-default',
+  mode: 'Sea -> Rail',
+  estimated_time_saving_days: 4,
+  estimated_cost_delta_usd: 12000,
+  co2_impact_percent: -15,
+  feasibility_score: 92,
+  recommended_carrier: 'Intermodal Rail Transit',
+  hub_port_code: 'RTM-RAIL',
+  transit_summary: 'Shift container freight to express rail corridor around bottleneck.'
+};
+
+export const RerouteModal: React.FC<RerouteModalProps> = ({ vessel, option = DEFAULT_OPTION, onClose }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isExecuted, setIsExecuted] = useState(false);
   const { toast } = useToast();

@@ -1,5 +1,5 @@
 // Extended Mock Dataset for Port Operations, Health Cards, Berth Diagrams & 72h Arrivals
-import { Port, CongestionLevel } from '../../types';
+import { Port } from '../../types';
 
 export interface BerthDetail {
   berth_id: string;

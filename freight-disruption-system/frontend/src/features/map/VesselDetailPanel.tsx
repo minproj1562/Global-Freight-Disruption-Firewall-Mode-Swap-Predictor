@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { X, Ship, Gauge, Navigation, MapPin, Anchor, ShieldAlert, GitPullRequest, Calendar, Layers } from 'lucide-react';
+import { X, Ship, Gauge, Navigation, MapPin, ShieldAlert, GitPullRequest } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { Vessel, Route } from '../../types';
 

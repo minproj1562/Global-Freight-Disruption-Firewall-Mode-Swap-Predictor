@@ -8,6 +8,7 @@ export interface ToasterToast {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  variant?: "default" | "destructive"
 }
 
 const TOAST_LIMIT = 1
@@ -17,6 +18,7 @@ interface ToastProps {
   title?: string
   description?: string
   action?: ToastActionElement
+  variant?: "default" | "destructive"
 }
 
 type ActionType = {

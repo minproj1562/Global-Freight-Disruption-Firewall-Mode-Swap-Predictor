@@ -115,13 +115,14 @@ export const MapView: React.FC<MapViewProps> = ({
       // Cluster Click Handler — Expand zoom on click
       map.on('click', 'vessel-clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['vessel-clusters'] });
-        const clusterId = features[0]?.properties?.cluster_id;
+        const feature = features[0] as any;
+        const clusterId = feature?.properties?.cluster_id;
         if (clusterId !== undefined) {
           const source = map.getSource('vessels-cluster-source') as mapboxgl.GeoJSONSource;
           source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-            if (err || !features[0].geometry || features[0].geometry.type !== 'Point') return;
+            if (err || !feature?.geometry || feature.geometry.type !== 'Point') return;
             map.easeTo({
-              center: features[0].geometry.coordinates as [number, number],
+              center: feature.geometry.coordinates as [number, number],
               zoom: (zoom || 8) + 1,
               duration: 1000,
             });
@@ -180,7 +181,7 @@ export const MapView: React.FC<MapViewProps> = ({
         const fillLayerId = `fill-${disruption.id}`;
         const lineLayerId = `line-${disruption.id}`;
 
-        const geojson: GeoJSON.Feature = {
+        const geojson: any = {
           type: 'Feature',
           properties: {
             id: disruption.id,
@@ -247,7 +248,7 @@ export const MapView: React.FC<MapViewProps> = ({
         const sourceId = `source-route-${route.id}`;
         const layerId = `layer-route-${route.id}`;
 
-        const geojson: GeoJSON.Feature = {
+        const geojson: any = {
           type: 'Feature',
           properties: {
             id: route.id,
@@ -321,8 +322,8 @@ export const MapView: React.FC<MapViewProps> = ({
 
     if (layers.vessels) {
       // 1. Update Cluster Source GeoJSON Data & Course Trails GeoJSON Data
-      const vesselPointFeatures: GeoJSON.Feature[] = [];
-      const courseTrailFeatures: GeoJSON.Feature[] = [];
+      const vesselPointFeatures: any[] = [];
+      const courseTrailFeatures: any[] = [];
 
       filteredVessels.forEach((vessel) => {
         let lon = vessel.longitude;

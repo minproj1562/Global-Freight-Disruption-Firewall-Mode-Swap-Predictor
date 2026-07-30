@@ -1,7 +1,7 @@
 // frontend/src/pages/LandingPage.tsx
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Ship, Anchor, Settings, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Ship, Anchor, Settings, ArrowRight } from 'lucide-react';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 import { TransportAnimation } from '@/components/landing/TransportAnimation';
 import { RoleCard } from '@/components/landing/RoleCard';

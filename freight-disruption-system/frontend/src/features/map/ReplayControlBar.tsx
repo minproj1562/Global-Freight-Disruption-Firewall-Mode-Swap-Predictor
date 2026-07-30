@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, FastForward, Clock } from 'lucide-react';
+import React from 'react';
+import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
 
 interface ReplayControlBarProps {
   isPlaying: boolean;
@@ -20,7 +20,6 @@ export const ReplayControlBar: React.FC<ReplayControlBarProps> = ({
   onChangeSpeed,
   className = '',
 }) => {
-  const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   // Compute timestamp string based on progress (past 24h)
   const getTimestampForProgress = (pct: number) => {

@@ -1,3 +1,4 @@
+//frontend/src/pages/PortOverviewPage.tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,18 +7,12 @@ import {
   Globe,
   Ship,
   Clock,
-  Gauge,
   Search,
   Filter,
   ArrowRight,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
   Activity,
-  Layers,
   User,
   LogOut,
-  RefreshCw,
 } from 'lucide-react';
 import { EXTENDED_PORTS_DATA, ExtendedPortDetail } from '@/shared/mock/portMockData';
 import { useAuthStore } from '@/store/authStore';
@@ -34,7 +29,7 @@ const geoToCanvas = (lat: number, lon: number, width: number, height: number) =>
 
 export const PortOverviewPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, role, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevel, setFilterLevel] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all');

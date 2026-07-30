@@ -1,8 +1,8 @@
+//frontend/src/pages/PortManagerAuthPage.tsx
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Ship,
   Mail,
   Lock,
   User,
@@ -13,12 +13,11 @@ import {
   Anchor,
   ArrowLeft,
   Loader2,
-  CheckCircle2,
-  XCircle,
   ShieldCheck,
   Globe,
   HelpCircle,
   KeyRound,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -584,6 +583,46 @@ export const PortManagerAuthPage: React.FC = () => {
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Enter your Port Manager credentials or Employee ID to access assigned terminal
                     </p>
+                  </div>
+
+                  {/* Quick Demo Manager Presets */}
+                  <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30">
+                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-800 dark:text-amber-300 mb-2">
+                      <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                      1-CLICK QUICK DEMO MANAGER PRESETS:
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { name: 'Rotterdam', id: 'port-rotterdam', code: 'NLRTM', manager: 'PM-Rotterdam' },
+                        { name: 'Singapore', id: 'port-singapore', code: 'SGSIN', manager: 'PM-Singapore' },
+                        { name: 'Los Angeles', id: 'port-la', code: 'USLAX', manager: 'PM-LA' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setLoginData({
+                              usernameOrId: preset.manager,
+                              password: 'Password123!',
+                              assignedPort: `Port of ${preset.name}`,
+                              rememberMe: true,
+                            });
+                            login(preset.manager, 'Password123!', 'port', `Port of ${preset.name}`);
+                            toast({
+                              title: `Quick Demo Active: ${preset.name}`,
+                              description: `Launching Port Manager Console for Port of ${preset.name}...`,
+                            });
+                            setTimeout(() => {
+                              navigate(`/dashboard/ports/${preset.id}`);
+                            }, 400);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-400 text-[11px] font-medium text-slate-800 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 transition-all flex flex-col items-center justify-center text-center shadow-sm"
+                        >
+                          <span className="font-bold font-mono">{preset.name}</span>
+                          <span className="text-[9px] text-slate-400 font-mono">{preset.code}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <form onSubmit={handleLoginSubmit} className="space-y-4">

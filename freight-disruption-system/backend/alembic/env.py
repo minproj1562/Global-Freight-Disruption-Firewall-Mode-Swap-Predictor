@@ -1,50 +1,67 @@
+# backend/alembic/env.py
 from logging.config import fileConfig
-from app.models import *
-
-from sqlalchemy import engine_from_config
+from sqlalchemy import create_engine
 from sqlalchemy import pool
-
 from alembic import context
+import os
+import sys
+from pathlib import Path
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# Add the backend directory to sys.path so we can import app modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# this is the Alembic Config object
 config = context.config
 
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
+# Import Base and all models so autogenerate can detect them
+from app.database import Base
+from app.models import (
+    User, PortManager, Vessel, Port,
+    BerthSlot, PortCongestionHistory, VesselArrival, PortDisruption
+)
+
+# Set target metadata for autogenerate support
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Load database URL from .env — store it directly (do NOT pass through
+# configparser/set_main_option because configparser treats '%' as interpolation
+# syntax and will raise ValueError on URL-encoded characters like %40).
+from dotenv import load_dotenv
+load_dotenv()
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:Ss%4020052607@localhost:5432/freight_db"
+)
+
+# PostGIS system tables that Alembic should never touch
+POSTGIS_TABLES = {
+    "spatial_ref_sys",
+    "geometry_columns",
+    "geography_columns",
+    "raster_columns",
+    "raster_overviews",
+}
+
+def include_object(object, name, type_, reflected, compare_to):
+    """Exclude PostGIS system tables from autogenerate."""
+    if type_ == "table" and name in POSTGIS_TABLES:
+        return False
+    return True
+
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
-    url = config.get_main_option("sqlalchemy.url")
+    """Run migrations in 'offline' mode (no DB connection needed)."""
     context.configure(
-        url=url,
+        url=DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -52,21 +69,15 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    """Run migrations in 'online' mode (live DB connection)."""
+    # Create engine directly from the env URL to avoid configparser % interpolation issues
+    connectable = create_engine(DATABASE_URL, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

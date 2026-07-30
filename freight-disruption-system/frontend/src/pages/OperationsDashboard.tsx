@@ -8,7 +8,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ship, User, LogOut, Layers, X } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useTheme } from '../shared/hooks/useTheme';
 import { MapView } from '../features/map/MapView';
 import { MapSearch } from '../features/map/MapSearch';
 import { MapToolbar, LayerVisibilityState } from '../features/map/MapToolbar';
@@ -33,7 +32,6 @@ import {
 
 export const OperationsDashboard: React.FC = () => {
   const { user, role, logout } = useAuthStore();
-  const { theme } = useTheme();
 
   // Layer Visibility State
   const [layers, setLayers] = useState<LayerVisibilityState>({
@@ -277,7 +275,7 @@ export const OperationsDashboard: React.FC = () => {
               speed={replaySpeed}
               onTogglePlay={() => setIsPlaying(!isPlaying)}
               onSeek={setReplayProgress}
-              onChangeSpeed={setReplaySpeed}
+              onChangeSpeed={(spd: number) => setReplaySpeed(spd as 1 | 2 | 4)}
             />
           </div>
         )}
