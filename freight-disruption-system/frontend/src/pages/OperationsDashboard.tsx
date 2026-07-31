@@ -5,9 +5,11 @@
 // WEBSOCKET: ws://backend:8000/api/v1/ws/telemetry
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ship, User, LogOut, Layers, X } from 'lucide-react';
+import { Ship, User, LogOut, Layers, X, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
 import { MapView } from '../features/map/MapView';
 import { MapSearch } from '../features/map/MapSearch';
 import { MapToolbar, LayerVisibilityState } from '../features/map/MapToolbar';
@@ -31,6 +33,7 @@ import {
 } from '../shared/mock/mockData';
 
 export const OperationsDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { user, role, logout } = useAuthStore();
 
   // Layer Visibility State
@@ -112,22 +115,35 @@ export const OperationsDashboard: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
+      <PortManagerSidebar />
+
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / NAV HEADER */}
       {/* ========================================================================= */}
-      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-slate-950/80 dark:bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-lg">
-        {/* Left Branding */}
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-slate-950/80 dark:bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-lg ml-16">
+        {/* Left Branding & Back to Port Dashboard */}
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 p-2 shadow-md shadow-amber-500/20 text-slate-950">
-            <Ship className="w-5 h-5" strokeWidth={2.2} />
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="text-sm font-bold font-mono text-white tracking-tight leading-none">
-              FREIGHT FIREWALL
-            </h1>
-            <p className="text-[10px] text-amber-400 font-mono font-medium tracking-wider mt-0.5">
-              MODE-SWAP PREDICTOR • LIVE MAP
-            </p>
+          <button
+            onClick={() => navigate('/dashboard/ports')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs font-mono font-bold transition-all shadow-sm"
+            title="Return to Port Manager Dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Port Dashboard</span>
+          </button>
+          
+          <div className="hidden sm:flex items-center gap-3 border-l border-slate-800 pl-3">
+            <div className="rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 p-2 shadow-md shadow-amber-500/20 text-slate-950">
+              <Ship className="w-5 h-5" strokeWidth={2.2} />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold font-mono text-white tracking-tight leading-none">
+                FREIGHT FIREWALL
+              </h1>
+              <p className="text-[10px] text-amber-400 font-mono font-medium tracking-wider mt-0.5">
+                MODE-SWAP PREDICTOR • LIVE MAP
+              </p>
+            </div>
           </div>
         </div>
 

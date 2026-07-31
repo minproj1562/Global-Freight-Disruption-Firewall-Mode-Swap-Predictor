@@ -1,5 +1,5 @@
 # backend/app/database.py
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -28,7 +28,38 @@ def get_db():
         db.close()
 
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables and run lightweight migrations for new columns"""
     from app.models import User, PortManager, Vessel, Port, BerthSlot, PortCongestionHistory, VesselArrival, PortDisruption
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+
+    # Safely ensure new columns exist in pre-existing PostgreSQL tables
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE ports ADD COLUMN IF NOT EXISTS congestion_updated_by VARCHAR;"))
+        conn.execute(text("ALTER TABLE ports ADD COLUMN IF NOT EXISTS congestion_updated_at TIMESTAMP WITH TIME ZONE;"))
+        conn.execute(text("ALTER TABLE ports ADD COLUMN IF NOT EXISTS congestion_source VARCHAR DEFAULT 'api';"))
+        conn.execute(text("ALTER TABLE vessel_arrivals ADD COLUMN IF NOT EXISTS atd TIMESTAMP WITH TIME ZONE;"))
+
+    # Seed Default Admin User if not present
+    db = SessionLocal()
+    try:
+        admin_user = db.query(User).filter(User.role == "admin").first()
+        if not admin_user:
+            from app.core.security import get_password_hash
+            default_admin = User(
+                username="admin",
+                email="admin@freightfirewall.com",
+                hashed_password=get_password_hash("adminpassword123"),
+                full_name="System Administrator",
+                role="admin",
+                is_active=True
+            )
+            db.add(default_admin)
+            db.commit()
+            print("[DB] Default Admin user created: admin / adminpassword123")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] Error seeding default admin: {e}")
+    finally:
+        db.close()
+
+    print("[DB] Database tables initialized and schemas migrated successfully")

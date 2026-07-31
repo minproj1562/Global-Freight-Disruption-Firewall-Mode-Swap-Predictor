@@ -51,6 +51,11 @@ interface AuthState {
     securityPassId?: string;
   }) => Promise<boolean>;
   logout: () => void;
+  setAuthSession: (
+    user: { id?: string; name: string; email: string; username?: string; portName?: string },
+    token: string,
+    role: UserRole
+  ) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -74,6 +79,9 @@ export const useAuthStore = create<AuthState>()(
 
           const response = await loginPortManager(credentials);
 
+          // Store token in localStorage for axios interceptor
+          localStorage.setItem('token', response.access_token);
+
           // Map backend response to frontend user structure
           set({
             role: response.user.role as UserRole,
@@ -89,19 +97,27 @@ export const useAuthStore = create<AuthState>()(
           });
 
           return true;
-        } catch (error) {
-          console.error('Login error:', error);
+        } catch (error: any) {
+          console.error('Backend Login error:', error);
           
-          // Fallback to demo mode if backend is unavailable
+          // Re-throw error so PortManagerAuthPage can display backend error message if backend is active
+          if (error.message && !error.message.includes('Failed to fetch')) {
+            throw error;
+          }
+
+          // Fallback to demo mode only if backend server is offline (Failed to fetch)
           if (password && password.trim().length > 0) {
             const userNameFormatted = emailOrUser.includes('@')
               ? emailOrUser.split('@')[0].replace('.', ' ').toUpperCase()
               : emailOrUser.toUpperCase();
 
+            const demoToken = 'demo-token';
+            localStorage.setItem('token', demoToken);
+
             set({
               role: role || 'port',
               isAuthenticated: true,
-              token: 'demo-token',
+              token: demoToken,
               user: {
                 name: userNameFormatted,
                 email: emailOrUser.includes('@') ? emailOrUser : `${emailOrUser}@portops.gov`,
@@ -134,6 +150,9 @@ export const useAuthStore = create<AuthState>()(
 
           const response = await registerPortManager(apiData);
 
+          // Store token in localStorage for axios interceptor
+          localStorage.setItem('token', response.access_token);
+
           // Set authenticated state
           set({
             role: response.user.role as UserRole,
@@ -152,14 +171,22 @@ export const useAuthStore = create<AuthState>()(
           });
 
           return true;
-        } catch (error) {
-          console.error('Registration error:', error);
+        } catch (error: any) {
+          console.error('Backend Registration error:', error);
           
-          // Fallback to demo mode if backend is unavailable
+          // Re-throw error so PortManagerAuthPage can display backend error message if backend is active
+          if (error.message && !error.message.includes('Failed to fetch')) {
+            throw error;
+          }
+
+          // Fallback to demo mode only if backend server is offline (Failed to fetch)
+          const demoToken = 'demo-token';
+          localStorage.setItem('token', demoToken);
+
           set({
             role: data.role || 'port',
             isAuthenticated: true,
-            token: 'demo-token',
+            token: demoToken,
             user: {
               name: data.name,
               email: data.email,
@@ -174,13 +201,26 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () =>
+      logout: () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('auth-storage');
         set({
           role: null,
           isAuthenticated: false,
           token: null,
           user: null,
-        }),
+        });
+      },
+
+      setAuthSession: (user, token, role) => {
+        localStorage.setItem('token', token);
+        set({
+          role,
+          isAuthenticated: true,
+          token,
+          user,
+        });
+      },
     }),
     {
       name: 'auth-storage',

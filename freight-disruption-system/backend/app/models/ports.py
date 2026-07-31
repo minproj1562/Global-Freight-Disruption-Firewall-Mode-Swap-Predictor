@@ -26,6 +26,11 @@ class Port(Base):
     avg_wait_hours = Column(Float, default=0.0)
     status_label = Column(String, default="Operational")
     
+    # Manual Congestion Override Tracking
+    congestion_updated_by = Column(String)  # Name of manager who last updated manually
+    congestion_updated_at = Column(DateTime(timezone=True))  # When it was manually updated
+    congestion_source = Column(String, default="api")  # "api" | "manual"
+    
     # Port Details
     primary_exports = Column(JSON, default=list)  # Array of export commodities
     max_vessel_draught_meters = Column(Float)

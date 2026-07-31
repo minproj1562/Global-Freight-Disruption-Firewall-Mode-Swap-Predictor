@@ -54,7 +54,6 @@ export interface AuthResponse {
   };
 }
 
-
 export const registerPortManager = async (data: PortManagerRegisterData): Promise<AuthResponse> => {
   const response = await fetch(`${API_BASE_URL}/api/auth/port-manager/register`, {
     method: 'POST',
@@ -64,7 +63,13 @@ export const registerPortManager = async (data: PortManagerRegisterData): Promis
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Registration failed');
+    let msg = 'Registration failed';
+    if (typeof error.detail === 'string') {
+      msg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      msg = error.detail.map((d: { msg?: string; message?: string }) => d.msg || d.message).join(', ');
+    }
+    throw new Error(msg);
   }
 
   return response.json();
@@ -79,7 +84,34 @@ export const loginPortManager = async (credentials: LoginCredentials): Promise<A
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Login failed');
+    let msg = 'Login failed';
+    if (typeof error.detail === 'string') {
+      msg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      msg = error.detail.map((d: { msg?: string; message?: string }) => d.msg || d.message).join(', ');
+    }
+    throw new Error(msg);
+  }
+
+  return response.json();
+};
+
+export const loginAdmin = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    let msg = 'Admin Login failed';
+    if (typeof error.detail === 'string') {
+      msg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      msg = error.detail.map((d: { msg?: string; message?: string }) => d.msg || d.message).join(', ');
+    }
+    throw new Error(msg);
   }
 
   return response.json();

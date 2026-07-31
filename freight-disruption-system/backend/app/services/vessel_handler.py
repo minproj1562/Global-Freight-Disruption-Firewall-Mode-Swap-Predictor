@@ -70,14 +70,26 @@ async def handle_vessel_update(vessel_data: Dict):
             
             print(f"[AIS] Updated {vessel.name} ({vessel.mmsi}) - Speed: {vessel.speed:.1f} kts")
         else:
+            # Parse IMO integer safely (convert empty string or non-numeric to None)
+            raw_imo = vessel_data.get("imo")
+            imo_val = None
+            if raw_imo and str(raw_imo).strip():
+                try:
+                    imo_val = int(raw_imo)
+                except (ValueError, TypeError):
+                    imo_val = None
+
+            raw_name = vessel_data.get("vessel_name", "").strip() or "Unknown Vessel"
+            callsign_val = vessel_data.get("callsign", "").strip() or None
+
             # Create new vessel
             vessel_type_name = get_vessel_type_name(vessel_data.get("ship_type", 0))
             
             new_vessel = Vessel(
                 mmsi=vessel_data["mmsi"],
-                imo=vessel_data.get("imo"),
-                name=vessel_data.get("vessel_name", "Unknown"),
-                callsign=vessel_data.get("callsign"),
+                imo=imo_val,
+                name=raw_name,
+                callsign=callsign_val,
                 vessel_type=vessel_type_name,
                 ship_type_code=vessel_data.get("ship_type", 0),
                 latitude=vessel_data["latitude"],

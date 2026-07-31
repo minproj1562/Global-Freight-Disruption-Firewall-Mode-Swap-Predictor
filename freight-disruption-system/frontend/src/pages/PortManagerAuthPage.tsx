@@ -1,5 +1,5 @@
 //frontend/src/pages/PortManagerAuthPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -26,6 +26,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { EXTENDED_PORTS_DATA } from '@/shared/mock/portMockData';
+import { fetchAllPorts } from '@/services/portManagerApi';
 
 export const PortManagerAuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'register' | 'login'>('register');
@@ -58,6 +59,21 @@ export const PortManagerAuthPage: React.FC = () => {
   const { register, login } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Dynamic ports list from backend API (with mock fallback)
+  const [portsList, setPortsList] = useState<Array<{ id: string; name: string; code: string; country: string }>>(
+    EXTENDED_PORTS_DATA.map(p => ({ id: p.id, name: p.name, code: p.code, country: p.country }))
+  );
+
+  useEffect(() => {
+    fetchAllPorts()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setPortsList(data.map(p => ({ id: p.id, name: p.name, code: p.code, country: p.country })));
+        }
+      })
+      .catch((err) => console.log('Using default ports dropdown:', err));
+  }, []);
 
   // Password strength calculation
   const getPasswordStrength = (pass: string) => {
@@ -99,8 +115,8 @@ export const PortManagerAuthPage: React.FC = () => {
       return;
     }
 
-    if (regData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (regData.password.length < 8) {
+      setError('Password must be at least 8 characters long and include uppercase, number & special character');
       return;
     }
 
@@ -133,8 +149,8 @@ export const PortManagerAuthPage: React.FC = () => {
       } else {
         setError('Registration failed. Username or Employee ID may already exist.');
       }
-    } catch {
-      setError('An error occurred during Port Manager account creation.');
+    } catch (err: any) {
+      setError(err?.message || 'An error occurred during Port Manager account creation.');
     } finally {
       setIsLoading(false);
     }
@@ -173,8 +189,8 @@ export const PortManagerAuthPage: React.FC = () => {
       } else {
         setError('Invalid Port Manager credentials. Please check your login details.');
       }
-    } catch {
-      setError('Authentication failed. Please verify connection and retry.');
+    } catch (err: any) {
+      setError(err?.message || 'Authentication failed. Please verify connection and retry.');
     } finally {
       setIsLoading(false);
     }
@@ -421,7 +437,7 @@ export const PortManagerAuthPage: React.FC = () => {
                             required
                             className="w-full pl-10 pr-3 h-10 bg-slate-50 dark:bg-slate-950/90 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl text-xs appearance-none cursor-pointer"
                           >
-                            {EXTENDED_PORTS_DATA.map((p) => (
+                            {portsList.map((p) => (
                               <option key={p.id} value={p.name} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                                 {p.name} ({p.code}) — {p.country}
                               </option>
@@ -658,7 +674,7 @@ export const PortManagerAuthPage: React.FC = () => {
                           onChange={handleLoginChange}
                           className="w-full pl-10 pr-3 h-10 bg-slate-50 dark:bg-slate-950/90 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl text-xs appearance-none cursor-pointer"
                         >
-                          {EXTENDED_PORTS_DATA.map((p) => (
+                          {portsList.map((p) => (
                             <option key={p.id} value={p.name} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                               {p.name} ({p.code}) — {p.country}
                             </option>
