@@ -110,7 +110,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Main Split-Screen Container */}
       <main className="relative z-10 flex-1 flex items-center justify-center p-4 lg:p-8">
-        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/60 backdrop-blur-2xl border border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white/90 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200 dark:border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl text-slate-900 dark:text-slate-100">
           
           {/* Left Side — Branding & Dynamic Visual */}
           <div className="lg:col-span-5 p-8 lg:p-12 bg-gradient-to-br from-slate-900/90 via-slate-950/90 to-blue-950/60 border-r border-slate-800/60 flex flex-col justify-between min-h-[480px]">

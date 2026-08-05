@@ -5,6 +5,9 @@ import {
   Globe, 
   Anchor, 
   Map, 
+  AlertTriangle,
+  Compass,
+  FileText,
   LogOut, 
   Menu, 
   ChevronLeft 
@@ -22,9 +25,12 @@ export const PortManagerSidebar: React.FC<PortManagerSidebarProps> = ({ currentP
   const { user, logout } = useAuthStore(); 
 
   const navItems = [
-    { name: 'Port Overview', icon: Globe, route: '/dashboard/ports' },
-    { name: 'Port Detail', icon: Anchor, route: `/dashboard/ports/${currentPortId || 'default'}` },
     { name: 'Operations Map', icon: Map, route: '/dashboard/operations' },
+    { name: 'Alert Center', icon: AlertTriangle, route: '/dashboard/disruptions' },
+    { name: 'Reroute Planner', icon: Compass, route: '/dashboard/reroute-planner' },
+    { name: 'Port Overview', icon: Globe, route: '/dashboard/ports' },
+    { name: 'Vessel Logs', icon: FileText, route: '/dashboard/vessel-logs' },
+    { name: 'Port Detail', icon: Anchor, route: `/dashboard/ports/${currentPortId || 'port-rotterdam'}` },
   ];
 
   const handleLogout = () => {

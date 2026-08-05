@@ -10,12 +10,14 @@ import { SinglePortDetailPage } from './pages/SinglePortDetailPage';
 import { VesselLogsPage } from './pages/VesselLogsPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AdminAuthPage } from './pages/AdminAuthPage';
+import { DisruptionAlertCenterPage } from './pages/DisruptionAlertCenterPage';
+import { RerouteRecommendationPage } from './pages/RerouteRecommendationPage';
 import { Toaster } from '@/components/ui/toaster';
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-slate-950 font-sans">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -30,6 +32,14 @@ function App() {
           <Route path="/port-manager" element={<PortManagerAuthPage />} />
           <Route path="/port-login" element={<PortManagerAuthPage />} />
           <Route path="/port-register" element={<PortManagerAuthPage />} />
+
+          {/* Page 1.2 — Disruption Alert Center */}
+          <Route path="/dashboard/disruptions" element={<DisruptionAlertCenterPage />} />
+          <Route path="/dashboard/alert-center" element={<DisruptionAlertCenterPage />} />
+
+          {/* Page 1.3 — Reroute Recommendation Page */}
+          <Route path="/dashboard/reroute-planner" element={<RerouteRecommendationPage />} />
+          <Route path="/dashboard/reroute" element={<RerouteRecommendationPage />} />
 
           {/* Page 3.1 — Port Overview */}
           <Route path="/dashboard/ports" element={<PortOverviewPage />} />

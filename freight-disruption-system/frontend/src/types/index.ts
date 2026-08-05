@@ -47,16 +47,39 @@ export interface Port {
   primary_exports?: string[];
 }
 
+export type DisruptionCategory = 'geopolitical' | 'weather' | 'labor' | 'canal';
+export type AcknowledgementStatus = 'unacknowledged' | 'acknowledged' | 'resolved';
+
+export interface RecommendedAction {
+  id: string;
+  disruption_id: string;
+  summary: string;
+  action_type: 'Reroute Sea Cape' | 'Sea -> Air' | 'Sea -> Rail' | 'Port Diversion';
+  estimated_delay_avoided_days: number;
+  estimated_cost_delta_usd: number;
+  affected_vessels_count: number;
+  suggested_route_id?: string;
+  confidence_score: number; // 0 to 100
+}
+
 export interface Disruption {
   id: string;
   name: string;
   type: string; // e.g. "Geopolitical / Armed Activity", "Extreme Weather", "Chokepoint Congestion"
+  category?: DisruptionCategory;
   severity: DisruptionSeverity;
+  status?: AcknowledgementStatus;
   description: string;
   polygon_coordinates: [number, number][]; // Array of [lon, lat] pairs (GeoJSON order)
   affected_vessels_count: number;
   active_since: string;
+  time_since_detected?: string;
+  estimated_duration_remaining?: string;
+  location_name?: string;
   mitigation_advice: string;
+  affected_vessels_list?: Vessel[];
+  recommended_action?: RecommendedAction;
+  is_new?: boolean;
 }
 
 export interface ModeSwapOption {
@@ -80,6 +103,74 @@ export interface Route {
   waypoints: [number, number][]; // [lon, lat] pairs
   requires_reroute: boolean;
   recommended_mode_swap: ModeSwapOption | null;
+}
+
+export interface RouteRequest {
+  origin_port: string;
+  destination_port: string;
+  vessel_id: string;
+  cargo_type: string;
+  priority: 'Cost' | 'Time' | 'Balanced';
+  disruption_to_avoid: string;
+}
+
+export interface RouteResult {
+  id: string;
+  rank: number;
+  is_recommended: boolean;
+  title: string;
+  mode_breakdown: {
+    sea: number; // percentage (0-100)
+    rail: number;
+    air: number;
+    road?: number;
+  };
+  waypoints: [number, number][];
+  waypoint_names: string[];
+  total_cost_usd: number;
+  total_time_days: number;
+  confidence_score: number; // 0 to 100
+  risk_level: DisruptionSeverity;
+  co2_carbon_footprint_tons: number;
+  savings_vs_original: {
+    cost_usd: number;
+    time_days: number;
+  };
+  transit_summary: string;
+  carrier_name: string;
+}
+
+export interface SimulatedPoint {
+  id: string;
+  cost: number;
+  time: number;
+  confidence: number;
+  risk: DisruptionSeverity;
+  isTop3: boolean;
+  rank?: number;
+  routeName?: string;
+  modeLabel?: string;
+}
+
+export interface SimulationResult {
+  request: RouteRequest;
+  total_simulations_run: number;
+  recommended_routes: RouteResult[];
+  scatter_cloud: SimulatedPoint[];
+  dijkstra_comparison: {
+    route_name: string;
+    cost_usd: number;
+    time_days: number;
+    risk_level: DisruptionSeverity;
+    co2_tons: number;
+    bottlenecks: string[];
+    details: string;
+    mc_diff: {
+      cost_saved_usd: number;
+      time_saved_days: number;
+      risk_reduction: string;
+    };
+  };
 }
 
 export interface KPISnapshot {
@@ -108,3 +199,4 @@ export interface SearchResult {
   longitude: number;
   item: Vessel | Port | Disruption;
 }
+

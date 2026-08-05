@@ -105,7 +105,7 @@
 
 /* Glassmorphism Classes */
 .glass-panel {
-  @apply bg-slate-900/80 dark:bg-slate-950/85 backdrop-blur-xl border border-slate-700/50 shadow-2xl text-slate-100;
+  @apply bg-white/90 dark:bg-slate-950/85 backdrop-blur-xl border border-slate-200/80 dark:border-slate-700/50 shadow-2xl text-slate-900 dark:text-slate-100;
 }
 
 .glass-panel-light {

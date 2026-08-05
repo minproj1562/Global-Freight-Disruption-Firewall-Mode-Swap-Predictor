@@ -19,6 +19,8 @@ import { MOCK_VESSEL_LOGS, VesselLogEntry } from '@/shared/mock/vesselLogMockDat
 import { useAuthStore } from '@/store/authStore';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
+import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+
 export const VesselLogsPage: React.FC = () => {
   const { user } = useAuthStore();
 
@@ -106,26 +108,27 @@ export const VesselLogsPage: React.FC = () => {
     switch (status) {
       case 'Berthed':
       case 'Docked':
-        return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400';
+        return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400';
       case 'In Transit':
-        return 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400';
+        return 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400';
       case 'Clearing Customs':
-        return 'bg-amber-500/15 border-amber-500/40 text-amber-400';
+        return 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400';
       case 'Anchored':
-        return 'bg-blue-500/15 border-blue-500/40 text-blue-400';
+        return 'bg-blue-500/15 border-blue-500/40 text-blue-600 dark:text-blue-400';
       case 'Departed':
-        return 'bg-slate-500/15 border-slate-500/40 text-slate-300';
+        return 'bg-slate-500/15 border-slate-500/40 text-slate-600 dark:text-slate-300';
       case 'Expected':
-        return 'bg-purple-500/15 border-purple-500/40 text-purple-400';
+        return 'bg-purple-500/15 border-purple-500/40 text-purple-600 dark:text-purple-400';
       default:
-        return 'bg-slate-700/40 border-slate-600 text-slate-300';
+        return 'bg-slate-200 dark:bg-slate-700/40 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300';
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col transition-colors duration-300">
+      <PortManagerSidebar />
       {/* ======== TOP NAVIGATION BAR ======== */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 lg:px-8 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md px-4 lg:px-8 py-3 flex items-center justify-between ml-16">
         <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-2 group">
             <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:scale-105 transition-transform">
@@ -184,16 +187,16 @@ export const VesselLogsPage: React.FC = () => {
       </header>
 
       {/* ======== MAIN CONTENT AREA ======== */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-6 ml-16">
 
         {/* PAGE HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 p-6 rounded-2xl border border-slate-800 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-1">
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-600 dark:text-emerald-400 mb-1">
               <Clock className="w-4 h-4" />
               <span>TERMINAL TELEMETRY ENGINE • PAGE 3.3</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Vessel Arrival & Departure Log
             </h1>
             <p className="text-sm text-slate-400 mt-1 max-w-2xl">

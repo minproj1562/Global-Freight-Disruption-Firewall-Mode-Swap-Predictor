@@ -16,8 +16,12 @@ interface MapViewProps {
   selectedPort: Port | null;
   onSelectVessel: (vessel: Vessel | null) => void;
   onSelectPort: (port: Port | null) => void;
-  onOpenVesselQuickPopup: (vessel: Vessel, point: { x: number; y: number }) => void;
-  replayProgress: number; // 0-100
+  onOpenVesselQuickPopup?: (vessel: Vessel, point: { x: number; y: number }) => void;
+  replayProgress?: number; // 0-100
+  selectedDisruption?: Disruption | null;
+  initialCenter?: [number, number];
+  initialZoom?: number;
+  className?: string;
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -35,7 +39,11 @@ export const MapView: React.FC<MapViewProps> = ({
   onSelectVessel,
   onSelectPort,
   onOpenVesselQuickPopup,
-  replayProgress,
+  replayProgress = 100,
+  selectedDisruption,
+  initialCenter = [45.0, 20.0],
+  initialZoom = 3,
+  className = 'w-full h-full min-h-screen',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -55,8 +63,8 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: theme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
-      center: [45.0, 20.0], // Initial view centered near Suez / Indian Ocean
-      zoom: 3,
+      center: initialCenter,
+      zoom: initialZoom,
       pitch: 30,
     });
 
@@ -430,7 +438,9 @@ export const MapView: React.FC<MapViewProps> = ({
           el.addEventListener('click', (e) => {
             e.stopPropagation();
             onSelectVessel(vessel);
-            onOpenVesselQuickPopup(vessel, { x: e.clientX, y: e.clientY });
+            if (onOpenVesselQuickPopup) {
+              onOpenVesselQuickPopup(vessel, { x: e.clientX, y: e.clientY });
+            }
           });
 
           const marker = new mapboxgl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
@@ -547,12 +557,24 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [secondaryInfra, layers.secondaryInfra]);
 
-  // Fly To when selectedVessel or selectedPort changes
+  // Fly To when selectedVessel, selectedPort, or selectedDisruption changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (selectedVessel) {
+    if (selectedDisruption && selectedDisruption.polygon_coordinates?.length) {
+      const lons = selectedDisruption.polygon_coordinates.map((c) => c[0]);
+      const lats = selectedDisruption.polygon_coordinates.map((c) => c[1]);
+      const avgLon = lons.reduce((a, b) => a + b, 0) / lons.length;
+      const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+
+      map.flyTo({
+        center: [avgLon, avgLat],
+        zoom: 5.5,
+        pitch: 25,
+        duration: 1200,
+      });
+    } else if (selectedVessel) {
       map.flyTo({
         center: [selectedVessel.longitude, selectedVessel.latitude],
         zoom: 7,
@@ -567,8 +589,8 @@ export const MapView: React.FC<MapViewProps> = ({
         duration: 1500,
       });
     }
-  }, [selectedVessel, selectedPort]);
+  }, [selectedVessel, selectedPort, selectedDisruption]);
 
-  return <div ref={mapContainerRef} className="w-full h-full min-h-screen" />;
+  return <div ref={mapContainerRef} className={className} />;
 };
 

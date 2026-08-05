@@ -114,13 +114,13 @@ export const OperationsDashboard: React.FC = () => {
     : null;
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
+    <div className="relative w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <PortManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / NAV HEADER */}
       {/* ========================================================================= */}
-      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-slate-950/80 dark:bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-lg ml-16">
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-slate-950/85 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 shadow-lg ml-16">
         {/* Left Branding & Back to Port Dashboard */}
         <div className="flex items-center gap-3">
           <button
