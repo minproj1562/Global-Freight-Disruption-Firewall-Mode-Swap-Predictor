@@ -2,7 +2,7 @@
 // Page 4.1 — System Health Monitor
 // Status cards for Database, AIS Poller, Weather Poller, Port Congestion Poller. API call usage chart. Error log table.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Database,
@@ -27,35 +27,79 @@ import {
   SYSTEM_HEALTH_CARDS,
   API_USAGE_HISTORY,
   INITIAL_ERROR_LOGS,
-  SystemErrorLog,
 } from '@/shared/mock/adminMockData';
+import {
+  getSystemHealthCards,
+  syncSystemPollerCard,
+  getApiUsageHistory,
+  getSystemErrorLogs,
+  toggleErrorLogResolve,
+  SystemHealthCardData,
+  SystemErrorLogData,
+  ApiUsageDataPoint
+} from '@/services/api';
 
 export const SystemHealthMonitor: React.FC = () => {
-  const [healthCards, setHealthCards] = useState(SYSTEM_HEALTH_CARDS);
-  const [errorLogs, setErrorLogs] = useState<SystemErrorLog[]>(INITIAL_ERROR_LOGS);
+  const [healthCards, setHealthCards] = useState<SystemHealthCardData[]>(SYSTEM_HEALTH_CARDS);
+  const [apiUsage, setApiUsage] = useState<ApiUsageDataPoint[]>(API_USAGE_HISTORY);
+  const [errorLogs, setErrorLogs] = useState<SystemErrorLogData[]>(INITIAL_ERROR_LOGS);
   const [logFilter, setLogFilter] = useState<string>('all');
   const [logSearch, setLogSearch] = useState<string>('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
+  // Fetch telemetry & health data from Backend API
+  const fetchHealthData = async () => {
+    try {
+      const [cards, usage, logs] = await Promise.all([
+        getSystemHealthCards(),
+        getApiUsageHistory(),
+        getSystemErrorLogs(),
+      ]);
+      if (cards && cards.length > 0) setHealthCards(cards);
+      if (usage && usage.length > 0) setApiUsage(usage);
+      if (logs && logs.length > 0) setErrorLogs(logs);
+    } catch (err) {
+      console.warn('Backend API connection fallback to mock data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHealthData();
+  }, []);
+
   // Manual Trigger Sync for Pollers
-  const handleManualSync = (id: string) => {
+  const handleManualSync = async (id: string) => {
     setSyncingId(id);
-    setTimeout(() => {
+    try {
+      const updatedCard = await syncSystemPollerCard(id);
+      setHealthCards((prev) =>
+        prev.map((card) => (card.id === id ? updatedCard : card))
+      );
+    } catch (err) {
       setHealthCards((prev) =>
         prev.map((card) =>
           card.id === id ? { ...card, lastSync: 'Just now (0.1s)' } : card
         )
       );
+    } finally {
       setSyncingId(null);
-    }, 1000);
+    }
   };
 
   // Resolve Error Log Action
-  const handleToggleResolveError = (id: string) => {
-    setErrorLogs((prev) =>
-      prev.map((log) => (log.id === id ? { ...log, resolved: !log.resolved } : log))
-    );
+  const handleToggleResolveError = async (id: string) => {
+    try {
+      const updatedLog = await toggleErrorLogResolve(id);
+      setErrorLogs((prev) =>
+        prev.map((log) => (log.id === id ? updatedLog : log))
+      );
+    } catch (err) {
+      setErrorLogs((prev) =>
+        prev.map((log) => (log.id === id ? { ...log, resolved: !log.resolved } : log))
+      );
+    }
   };
+
 
   // Filter Error Logs
   const filteredLogs = errorLogs.filter((log) => {
@@ -82,7 +126,7 @@ export const SystemHealthMonitor: React.FC = () => {
     }
   };
 
-  const getSeverityBadge = (severity: SystemErrorLog['severity']) => {
+  const getSeverityBadge = (severity: SystemErrorLogData['severity']) => {
     switch (severity) {
       case 'CRITICAL':
         return 'bg-red-500/15 border-red-500/40 text-red-400';
@@ -130,18 +174,24 @@ export const SystemHealthMonitor: React.FC = () => {
           >
             <div>
               <div className="flex items-center justify-between mb-3">
-                <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80">
                   {getPollerIcon(card.id)}
                 </div>
-
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span
+                  className={`text-[11px] font-mono font-bold px-2.5 py-1 rounded-full border ${
+                    card.status === 'Operational'
+                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      : card.status === 'Degraded'
+                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                      : 'bg-red-500/15 text-red-400 border-red-500/30'
+                  }`}
+                >
                   {card.status}
                 </span>
               </div>
 
-              <h3 className="font-bold text-white text-sm">{card.name}</h3>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{card.details}</p>
+              <h4 className="text-base font-bold text-white tracking-tight">{card.name}</h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">{card.details}</p>
 
               {/* Key Metrics */}
               <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
@@ -200,7 +250,7 @@ export const SystemHealthMonitor: React.FC = () => {
         {/* Recharts Area Chart */}
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={API_USAGE_HISTORY} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={apiUsage} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="aisGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />

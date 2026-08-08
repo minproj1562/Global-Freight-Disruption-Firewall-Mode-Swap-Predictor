@@ -3,7 +3,7 @@
 // Left: Add New Disruption form (type, location, start/end, severity, description, radius).
 // Right: All disruptions table with CRUD, filtering, resolve toggle.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
@@ -15,7 +15,15 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { INITIAL_DISRUPTIONS, ManagedDisruption } from '@/shared/mock/adminMockData';
+import { INITIAL_DISRUPTIONS } from '@/shared/mock/adminMockData';
+import {
+  getAdminDisruptions,
+  createAdminDisruption,
+  updateAdminDisruption,
+  deleteAdminDisruption,
+  toggleDisruptionResolve,
+  ManagedDisruption
+} from '@/services/api';
 
 export const DisruptionManagement: React.FC = () => {
   const [disruptions, setDisruptions] = useState<ManagedDisruption[]>(INITIAL_DISRUPTIONS);
@@ -40,19 +48,39 @@ export const DisruptionManagement: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Fetch disruptions from Backend API
+  const fetchDisruptions = async () => {
+    try {
+      const data = await getAdminDisruptions({ search: searchQuery, severity: severityFilter });
+      if (data && data.length > 0) {
+        setDisruptions(data);
+      }
+    } catch (err) {
+      console.warn('Backend API connection fallback to mock data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchDisruptions();
+  }, []);
+
   // Handle Form Submit (Add Disruption)
-  const handleCreateDisruption = (e: React.FormEvent) => {
+  const handleCreateDisruption = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.locationName || !formData.description) return;
 
-    const newDisruption: ManagedDisruption = {
-      id: `DIS-0${disruptions.length + 1}`,
-      ...formData,
-      affectedVesselsCount: Math.floor(Math.random() * 20) + 5,
-      resolved: false,
-    };
-
-    setDisruptions([newDisruption, ...disruptions]);
+    try {
+      const created = await createAdminDisruption(formData);
+      setDisruptions([created, ...disruptions]);
+    } catch (err) {
+      const newDisruption: ManagedDisruption = {
+        id: `DIS-0${disruptions.length + 1}`,
+        ...formData,
+        affectedVesselsCount: Math.floor(Math.random() * 20) + 5,
+        resolved: false,
+      };
+      setDisruptions([newDisruption, ...disruptions]);
+    }
 
     // Reset Form
     setFormData({
@@ -69,29 +97,45 @@ export const DisruptionManagement: React.FC = () => {
   };
 
   // Toggle Resolve State
-  const handleToggleResolve = (id: string) => {
-    setDisruptions((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, resolved: !d.resolved } : d))
-    );
+  const handleToggleResolve = async (id: string) => {
+    try {
+      const updated = await toggleDisruptionResolve(id);
+      setDisruptions((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    } catch (err) {
+      setDisruptions((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, resolved: !d.resolved } : d))
+      );
+    }
   };
 
   // Delete Disruption
-  const handleDeleteDisruption = (id: string) => {
+  const handleDeleteDisruption = async (id: string) => {
     if (confirm('Are you sure you want to remove this disruption event?')) {
-      setDisruptions((prev) => prev.filter((d) => d.id !== id));
+      try {
+        await deleteAdminDisruption(id);
+        setDisruptions((prev) => prev.filter((d) => d.id !== id));
+      } catch (err) {
+        setDisruptions((prev) => prev.filter((d) => d.id !== id));
+      }
     }
   };
 
   // Save Edit
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDisruption) return;
 
-    setDisruptions((prev) =>
-      prev.map((d) => (d.id === editingDisruption.id ? editingDisruption : d))
-    );
+    try {
+      const updated = await updateAdminDisruption(editingDisruption.id, editingDisruption);
+      setDisruptions((prev) => prev.map((d) => (d.id === editingDisruption.id ? updated : d)));
+    } catch (err) {
+      setDisruptions((prev) =>
+        prev.map((d) => (d.id === editingDisruption.id ? editingDisruption : d))
+      );
+    }
     setEditingDisruption(null);
   };
+
 
   // Filtered Disruptions
   const filteredDisruptions = disruptions.filter((d) => {

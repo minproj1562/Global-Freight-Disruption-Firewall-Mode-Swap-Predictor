@@ -2,7 +2,7 @@
 // Page 3.3 — Vessel Arrival/Departure Log
 // Tabs: Arrivals, Departures, Expected. Table with vessel details. Filter by date/type/flag, search, export CSV.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -15,7 +15,8 @@ import {
   Activity,
   Settings,
 } from 'lucide-react';
-import { MOCK_VESSEL_LOGS, VesselLogEntry } from '@/shared/mock/vesselLogMockData';
+import { MOCK_VESSEL_LOGS } from '@/shared/mock/vesselLogMockData';
+import { getVesselLogs, getVesselLogsExportUrl, VesselLogEntry } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
@@ -23,6 +24,10 @@ import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar
 
 export const VesselLogsPage: React.FC = () => {
   const { user } = useAuthStore();
+
+  // Logs state
+  const [logs, setLogs] = useState<VesselLogEntry[]>(MOCK_VESSEL_LOGS);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Tab State: 'Arrivals' | 'Departures' | 'Expected'
   const [activeTab, setActiveTab] = useState<'Arrivals' | 'Departures' | 'Expected'>('Arrivals');
@@ -32,20 +37,44 @@ export const VesselLogsPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [flagFilter, setFlagFilter] = useState<string>('all');
 
+  // Fetch vessel logs from Backend API
+  const fetchLogs = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getVesselLogs({
+        category: activeTab,
+        search: searchTerm,
+        type: typeFilter,
+        flag: flagFilter
+      });
+      if (data && data.length > 0) {
+        setLogs(data);
+      }
+    } catch (err) {
+      console.warn('Backend API connection fallback to mock data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, [activeTab, searchTerm, typeFilter, flagFilter]);
+
   // Extract unique vessel types and flags for dropdown filters
   const vesselTypes = useMemo(() => {
-    const types = new Set(MOCK_VESSEL_LOGS.map((log) => log.type));
+    const types = new Set(logs.map((log) => log.type));
     return ['all', ...Array.from(types)];
-  }, []);
+  }, [logs]);
 
   const vesselFlags = useMemo(() => {
-    const flags = new Set(MOCK_VESSEL_LOGS.map((log) => log.flag));
+    const flags = new Set(logs.map((log) => log.flag));
     return ['all', ...Array.from(flags)];
-  }, []);
+  }, [logs]);
 
   // Filtered dataset
   const filteredLogs = useMemo(() => {
-    return MOCK_VESSEL_LOGS.filter((log) => {
+    return logs.filter((log) => {
       // Tab matching
       if (log.category !== activeTab) return false;
 
@@ -67,42 +96,19 @@ export const VesselLogsPage: React.FC = () => {
 
       return true;
     });
-  }, [activeTab, searchTerm, typeFilter, flagFilter]);
+  }, [logs, activeTab, searchTerm, typeFilter, flagFilter]);
 
-  // Export to CSV feature
+  // Export to CSV feature (fetches directly from API endpoint or triggers download)
   const handleExportCSV = () => {
-    if (filteredLogs.length === 0) return;
-
-    const headers = ['Log ID', 'MMSI', 'IMO', 'Vessel Name', 'Type', 'Flag', 'Port', 'Terminal', 'Berth', 'Arrival Date', 'Departure Date', 'Status', 'Cargo Details', 'Agent', 'Draft (m)'];
-    
-    const rows = filteredLogs.map((log) => [
-      log.id,
-      log.mmsi,
-      log.imo,
-      `"${log.name}"`,
-      log.type,
-      `"${log.flag}"`,
-      `"${log.port}"`,
-      `"${log.terminal}"`,
-      log.berth,
-      log.arrivalDate,
-      log.departureDate,
-      log.status,
-      `"${log.cargo}"`,
-      `"${log.agent}"`,
-      log.draft,
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Vessel_${activeTab}_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const exportUrl = getVesselLogsExportUrl({
+      category: activeTab,
+      search: searchTerm,
+      type: typeFilter,
+      flag: flagFilter
+    });
+    window.open(exportUrl, '_blank');
   };
+
 
   const getStatusBadge = (status: VesselLogEntry['status']) => {
     switch (status) {
@@ -223,7 +229,7 @@ export const VesselLogsPage: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <div className="flex items-center gap-2">
               {(['Arrivals', 'Departures', 'Expected'] as const).map((tab) => {
-                const count = MOCK_VESSEL_LOGS.filter((l) => l.category === tab).length;
+                const count = logs.filter((l) => l.category === tab).length;
                 const isActive = activeTab === tab;
                 return (
                   <button
@@ -248,9 +254,12 @@ export const VesselLogsPage: React.FC = () => {
               })}
             </div>
 
-            <span className="text-xs text-slate-400 font-mono hidden sm:block">
-              Showing <strong className="text-white">{filteredLogs.length}</strong> records
-            </span>
+            <div className="flex items-center gap-3 text-xs text-slate-400 font-mono hidden sm:flex">
+              {isLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />}
+              <span>
+                Showing <strong className="text-white">{filteredLogs.length}</strong> records
+              </span>
+            </div>
           </div>
 
           {/* FILTERS ROW */}

@@ -11,7 +11,7 @@ from app.database import init_db
 from app.services.ais_stream_client import AISStreamClient
 from app.services.vessel_handler import handle_vessel_update
 from app.services.port_services import seed_sample_ports
-from app.routers import auth_router, ports_router
+from app.routers import auth_router, ports_router, vessels_router, vessel_logs_router, admin_router
 from app.database import SessionLocal
 
 load_dotenv()
@@ -72,8 +72,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth_router)
-app.include_router(ports_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(ports_router, prefix="/api")
+app.include_router(vessels_router, prefix="/api")
+app.include_router(vessel_logs_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 # ============= ROOT ENDPOINTS =============
 
@@ -86,6 +89,10 @@ async def root():
         "endpoints": {
             "auth": "/api/auth",
             "ports": "/api/ports",
+            "vessels": "/api/vessels/admin",
+            "vessel_logs": "/api/vessel-logs",
+            "admin_disruptions": "/api/admin/disruptions",
+            "admin_health": "/api/admin/health-cards",
             "docs": "/docs"
         }
     }

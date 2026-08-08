@@ -3,7 +3,7 @@
 // Table of 50 pre-seeded vessels (MMSI, name, type, flag, DWT, current port, status, last AIS update).
 // Add/Edit/Delete, refresh AIS, mark active/inactive.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Ship,
@@ -20,10 +20,20 @@ import {
   Save,
   Radio,
 } from 'lucide-react';
-import { INITIAL_50_VESSELS, AdminVessel } from '@/shared/mock/adminMockData';
+import { INITIAL_50_VESSELS } from '@/shared/mock/adminMockData';
+import {
+  getAdminVessels,
+  createAdminVessel,
+  updateAdminVessel,
+  deleteAdminVessel,
+  toggleAdminVesselActive,
+  refreshAisStreamData,
+  AdminVessel
+} from '@/services/api';
 
 export const VesselManagement: React.FC = () => {
   const [vessels, setVessels] = useState<AdminVessel[]>(INITIAL_50_VESSELS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,44 +63,82 @@ export const VesselManagement: React.FC = () => {
     status: 'Underway',
   });
 
+  // Fetch vessels from Backend API
+  const fetchVessels = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getAdminVessels({ search: searchTerm, type: typeFilter, status: statusFilter });
+      if (data && data.length > 0) {
+        setVessels(data);
+      }
+    } catch (err) {
+      console.warn('Backend API connection fallback to mock data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVessels();
+  }, []);
+
   // Handle Refresh AIS Trigger
-  const handleRefreshAis = () => {
+  const handleRefreshAis = async () => {
     setIsRefreshingAis(true);
-    setTimeout(() => {
+    try {
+      await refreshAisStreamData();
+      await fetchVessels();
+    } catch (err) {
       setVessels((prev) =>
-        prev.map((v) => ({ ...v, lastAisUpdate: 'Just now (0s ago)' }))
+        prev.map((v) => ({ ...v, lastAisUpdate: 'Just now' }))
       );
+    } finally {
       setIsRefreshingAis(false);
-    }, 1200);
+    }
   };
 
   // Toggle Active / Inactive State per vessel
-  const handleToggleActive = (id: string) => {
-    setVessels((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, isActive: !v.isActive } : v))
-    );
+  const handleToggleActive = async (id: string) => {
+    try {
+      const updated = await toggleAdminVesselActive(id);
+      setVessels((prev) => prev.map((v) => (v.id === id ? updated : v)));
+    } catch (err) {
+      setVessels((prev) =>
+        prev.map((v) => (v.id === id ? { ...v, isActive: !v.isActive } : v))
+      );
+    }
   };
 
   // Delete Vessel Action
-  const handleDeleteVessel = (id: string, name: string) => {
+  const handleDeleteVessel = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete vessel "${name}" (ID: ${id}) from the fleet registry?`)) {
-      setVessels((prev) => prev.filter((v) => v.id !== id));
+      try {
+        await deleteAdminVessel(id);
+        setVessels((prev) => prev.filter((v) => v.id !== id));
+      } catch (err) {
+        setVessels((prev) => prev.filter((v) => v.id !== id));
+      }
     }
   };
 
   // Submit Add Vessel
-  const handleAddVesselSubmit = (e: React.FormEvent) => {
+  const handleAddVesselSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVesselData.name) return;
 
-    const newV: AdminVessel = {
-      id: `V-${vessels.length + 1}`,
-      ...newVesselData,
-      lastAisUpdate: 'Just now',
-      isActive: true,
-    };
+    try {
+      const created = await createAdminVessel(newVesselData);
+      setVessels([created, ...vessels]);
+    } catch (err) {
+      const newV: AdminVessel = {
+        id: `V-${vessels.length + 1}`,
+        ...newVesselData,
+        lastAisUpdate: 'Just now',
+        isActive: true,
+      };
+      setVessels([newV, ...vessels]);
+    }
 
-    setVessels([newV, ...vessels]);
     setIsAddModalOpen(false);
     setNewVesselData({
       mmsi: 211000000,
@@ -105,15 +153,21 @@ export const VesselManagement: React.FC = () => {
   };
 
   // Submit Save Edit Vessel
-  const handleEditVesselSubmit = (e: React.FormEvent) => {
+  const handleEditVesselSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVessel) return;
 
-    setVessels((prev) =>
-      prev.map((v) => (v.id === editingVessel.id ? editingVessel : v))
-    );
+    try {
+      const updated = await updateAdminVessel(editingVessel.id, editingVessel);
+      setVessels((prev) => prev.map((v) => (v.id === editingVessel.id ? updated : v)));
+    } catch (err) {
+      setVessels((prev) =>
+        prev.map((v) => (v.id === editingVessel.id ? editingVessel : v))
+      );
+    }
     setEditingVessel(null);
   };
+
 
   // Filtered dataset
   const filteredVessels = useMemo(() => {

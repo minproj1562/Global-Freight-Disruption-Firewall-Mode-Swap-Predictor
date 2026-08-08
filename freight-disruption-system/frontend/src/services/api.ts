@@ -175,4 +175,314 @@ export const resolvePortDisruption = async (
   return response.json();
 };
 
+// ============= PAGE 3.3: VESSEL ARRIVAL / DEPARTURE LOGS =============
+
+export interface VesselLogEntry {
+  id: string;
+  mmsi: number;
+  imo: number;
+  name: string;
+  type: string;
+  flag: string;
+  port: string;
+  terminal: string;
+  berth: string;
+  arrivalDate: string;
+  departureDate: string;
+  eta?: string;
+  etd?: string;
+  ata?: string;
+  atd?: string;
+  status: string;
+  category: 'Arrivals' | 'Departures' | 'Expected';
+  cargo: string;
+  agent: string;
+  draft: number;
+}
+
+export const getVesselLogs = async (params?: { category?: string; search?: string; type?: string; flag?: string }): Promise<VesselLogEntry[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const query = new URLSearchParams();
+  if (params?.category) query.append('category', params.category);
+  if (params?.search) query.append('search', params.search);
+  if (params?.type && params.type !== 'All') query.append('type', params.type);
+  if (params?.flag && params.flag !== 'All') query.append('flag', params.flag);
+
+  const response = await fetch(`${API_BASE_URL}/api/vessel-logs?${query.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch vessel logs');
+  return response.json();
+};
+
+export const createVesselLog = async (logData: Partial<VesselLogEntry>): Promise<VesselLogEntry> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessel-logs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(logData)
+  });
+  if (!response.ok) throw new Error('Failed to create vessel log entry');
+  return response.json();
+};
+
+export const getVesselLogsExportUrl = (params?: { category?: string; search?: string; type?: string; flag?: string }) => {
+  const query = new URLSearchParams();
+  if (params?.category) query.append('category', params.category);
+  if (params?.search) query.append('search', params.search);
+  if (params?.type && params.type !== 'All') query.append('type', params.type);
+  if (params?.flag && params.flag !== 'All') query.append('flag', params.flag);
+  return `${API_BASE_URL}/api/vessel-logs/export-csv?${query.toString()}`;
+};
+
+// ============= PAGE 4.3: VESSEL MANAGEMENT =============
+
+export interface AdminVessel {
+  id: string;
+  mmsi: number;
+  imo: number;
+  name: string;
+  type: string;
+  flag: string;
+  dwt: number;
+  currentPort: string;
+  status: 'Underway' | 'At Anchor' | 'Moored' | 'Maintenance' | 'Inactive' | string;
+  lastAisUpdate: string;
+  isActive: boolean;
+}
+
+export const getAdminVessels = async (params?: { search?: string; type?: string; status?: string }): Promise<AdminVessel[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.type && params.type !== 'All') query.append('type', params.type);
+  if (params?.status && params.status !== 'All') query.append('status', params.status);
+
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin?${query.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch vessels');
+  return response.json();
+};
+
+export const createAdminVessel = async (vessel: Partial<AdminVessel>): Promise<AdminVessel> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(vessel)
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to create vessel');
+  }
+  return response.json();
+};
+
+export const updateAdminVessel = async (vesselId: string, vessel: Partial<AdminVessel>): Promise<AdminVessel> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin/${vesselId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(vessel)
+  });
+  if (!response.ok) throw new Error('Failed to update vessel');
+  return response.json();
+};
+
+export const deleteAdminVessel = async (vesselId: string): Promise<void> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin/${vesselId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to delete vessel');
+};
+
+export const toggleAdminVesselActive = async (vesselId: string): Promise<AdminVessel> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin/${vesselId}/toggle-active`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to toggle vessel active state');
+  return response.json();
+};
+
+export const refreshAisStreamData = async (): Promise<{ message: string; updatedCount: number }> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/vessels/admin/refresh-ais`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to refresh AIS stream data');
+  return response.json();
+};
+
+// ============= PAGE 4.2: DISRUPTION MANAGEMENT =============
+
+export interface ManagedDisruption {
+  id: string;
+  type: string;
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  startDate: string;
+  endDate: string;
+  severity: 'low' | 'medium' | 'high' | 'critical' | string;
+  radiusNm: number;
+  description: string;
+  affectedVesselsCount: number;
+  resolved: boolean;
+}
+
+export const getAdminDisruptions = async (params?: { search?: string; severity?: string }): Promise<ManagedDisruption[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const query = new URLSearchParams();
+  if (params?.search) query.append('search', params.search);
+  if (params?.severity && params.severity !== 'All') query.append('severity', params.severity);
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/disruptions?${query.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch disruptions');
+  return response.json();
+};
+
+export const createAdminDisruption = async (disruption: Partial<ManagedDisruption>): Promise<ManagedDisruption> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/disruptions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(disruption)
+  });
+  if (!response.ok) throw new Error('Failed to create disruption event');
+  return response.json();
+};
+
+export const updateAdminDisruption = async (disruptionId: string, disruption: Partial<ManagedDisruption>): Promise<ManagedDisruption> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/disruptions/${disruptionId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(disruption)
+  });
+  if (!response.ok) throw new Error('Failed to update disruption event');
+  return response.json();
+};
+
+export const deleteAdminDisruption = async (disruptionId: string): Promise<void> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/disruptions/${disruptionId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to delete disruption event');
+};
+
+export const toggleDisruptionResolve = async (disruptionId: string): Promise<ManagedDisruption> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/disruptions/${disruptionId}/toggle-resolve`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to toggle disruption resolve status');
+  return response.json();
+};
+
+// ============= PAGE 4.1: SYSTEM HEALTH MONITOR =============
+
+export interface SystemHealthCardData {
+  id: string;
+  name: string;
+  status: 'Operational' | 'Degraded' | 'Offline' | 'Maintenance' | string;
+  uptimePct: number;
+  latencyMs: number;
+  lastSync: string;
+  details: string;
+  metrics: { label: string; value: string }[];
+}
+
+export interface SystemErrorLogData {
+  id: string;
+  timestamp: string;
+  service: string;
+  severity: 'CRITICAL' | 'ERROR' | 'WARNING' | 'INFO' | string;
+  code: string;
+  message: string;
+  stackTrace: string;
+  resolved: boolean;
+}
+
+export interface ApiUsageDataPoint {
+  time: string;
+  totalRequests: number;
+  aisRequests: number;
+  weatherRequests: number;
+  portRequests: number;
+  errorCount: number;
+}
+
+export const getSystemHealthCards = async (): Promise<SystemHealthCardData[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/health-cards`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch system health cards');
+  return response.json();
+};
+
+export const syncSystemPollerCard = async (cardId: string): Promise<SystemHealthCardData> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/health-cards/${cardId}/sync`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to sync system poller card');
+  return response.json();
+};
+
+export const getApiUsageHistory = async (): Promise<ApiUsageDataPoint[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/api-usage`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch API usage analytics');
+  return response.json();
+};
+
+export const getSystemErrorLogs = async (): Promise<SystemErrorLogData[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/error-logs`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch system error logs');
+  return response.json();
+};
+
+export const toggleErrorLogResolve = async (logId: string): Promise<SystemErrorLogData> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/error-logs/${logId}/toggle-resolve`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to toggle error log resolve state');
+  return response.json();
+};
+
 export default api;

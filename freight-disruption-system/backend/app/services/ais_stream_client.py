@@ -113,14 +113,26 @@ class AISStreamClient:
         This is the main entry point called from main.py. It never raises —
         failures are logged and retried so the rest of the API stays up.
         """
+        retry_delay = 30
         while self._running:
             try:
                 await self.connect()
+                # Connected successfully, reset retry delay
+                retry_delay = 30
                 await self.subscribe()
                 await self.receive_data(callback_function)
             except Exception as e:
-                logger.error("[AIS] Stream error: %s — will retry in 10s", e)
-                await asyncio.sleep(10)
+                # Log as warning not to alarm user/developer on rate-limiting
+                logger.warning("[AIS] Live stream temporarily unavailable (Detail: %s). Reconnecting in %ds...", e, retry_delay)
+                if self.websocket:
+                    try:
+                        await self.websocket.close()
+                    except Exception:
+                        pass
+                    self.websocket = None
+                await asyncio.sleep(retry_delay)
+                # Exponential backoff up to 5 minutes
+                retry_delay = min(retry_delay * 2, 300)
 
     async def close(self):
         """Gracefully shut down the AIS stream."""

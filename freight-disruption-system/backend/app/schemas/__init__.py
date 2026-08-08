@@ -16,6 +16,21 @@ from app.schemas.port import (
     PortDisruptionCreate,
     PortDisruptionResponse
 )
+from app.schemas.vessels import (
+    AdminVesselCreate,
+    AdminVesselUpdate,
+    AdminVesselResponse,
+    VesselLogCreate,
+    VesselLogResponse
+)
+from app.schemas.admin import (
+    GlobalDisruptionCreate,
+    GlobalDisruptionUpdate,
+    GlobalDisruptionResponse,
+    SystemHealthCardResponse,
+    SystemErrorLogResponse,
+    ApiUsageDataPointResponse
+)
 
 __all__ = [
     "UserCreate",
@@ -30,5 +45,16 @@ __all__ = [
     "VesselArrivalResponse",
     "PortCongestionHistoryResponse",
     "PortDisruptionCreate",
-    "PortDisruptionResponse"
+    "PortDisruptionResponse",
+    "AdminVesselCreate",
+    "AdminVesselUpdate",
+    "AdminVesselResponse",
+    "VesselLogCreate",
+    "VesselLogResponse",
+    "GlobalDisruptionCreate",
+    "GlobalDisruptionUpdate",
+    "GlobalDisruptionResponse",
+    "SystemHealthCardResponse",
+    "SystemErrorLogResponse",
+    "ApiUsageDataPointResponse"
 ]
