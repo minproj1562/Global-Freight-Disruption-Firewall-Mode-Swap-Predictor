@@ -200,3 +200,84 @@ export interface SearchResult {
   item: Vessel | Port | Disruption;
 }
 
+export type TransportMode = 'sea' | 'rail' | 'air' | 'multimodal';
+export type RouteStatus = 'On Schedule' | 'Delayed' | 'Rerouted' | 'Critical Hazard' | 'At Anchor';
+export type CongestionTimeHorizon = 'now' | 'plus_24h' | 'plus_48h' | 'plus_72h';
+export type CongestionTrend = 'up' | 'down' | 'stable';
+
+export interface ActiveRoute {
+  id: string;
+  vessel_id: string;
+  vessel_name: string;
+  vessel_imo: number;
+  vessel_flag: string;
+  vessel_type: VesselType;
+  origin_port_name: string;
+  origin_port_code: string;
+  destination_port_name: string;
+  destination_port_code: string;
+  current_location_name: string;
+  current_coordinates: [number, number]; // [longitude, latitude]
+  mode: TransportMode;
+  multimodal_modes?: ('sea' | 'rail' | 'air' | 'road')[];
+  eta: string;
+  status: RouteStatus;
+  risk_level: DisruptionSeverity;
+  risk_reason?: string;
+  cargo_summary: string;
+  waypoints: [number, number][]; // Array of [lon, lat] pairs
+  progress_percent: number;
+  avg_speed_knots: number;
+  distance_remaining_nm: number;
+}
+
+export interface NearbyAlternativePort {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  region: string;
+  latitude: number;
+  longitude: number;
+  congestion_scores: {
+    now: number;
+    plus_24h: number;
+    plus_48h: number;
+    plus_72h: number;
+  };
+  trend: CongestionTrend;
+  avg_wait_hours: number;
+}
+
+export interface PortCongestionForecast {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  region: string;
+  latitude: number;
+  longitude: number;
+  congestion_scores: {
+    now: number;
+    plus_24h: number;
+    plus_48h: number;
+    plus_72h: number;
+  };
+  trend: CongestionTrend;
+  waiting_vessels_count: number;
+  berth_utilization_percent: number;
+  waiting_vessels_forecast: {
+    now: number;
+    plus_24h: number;
+    plus_48h: number;
+    plus_72h: number;
+  };
+  alternative_ports: NearbyAlternativePort[];
+}
+
+export interface CongestionTrendPoint {
+  horizonLabel: string;
+  horizonKey: CongestionTimeHorizon;
+  selectedPortScore: number;
+  [altPortName: string]: string | number;
+}
+
+

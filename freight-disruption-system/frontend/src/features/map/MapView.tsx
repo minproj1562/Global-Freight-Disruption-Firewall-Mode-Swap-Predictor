@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { Vessel, Port, Disruption, Route, SecondaryInfrastructure, VesselType } from '../../types';
+import { Vessel, Port, Disruption, Route, SecondaryInfrastructure, VesselType, PortCongestionForecast, CongestionTimeHorizon, ActiveRoute } from '../../types';
 import { useTheme } from '../../shared/hooks/useTheme';
 import { LayerVisibilityState } from './MapToolbar';
 
@@ -22,6 +22,11 @@ interface MapViewProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   className?: string;
+  // Congestion Heatmap & Active Route Highlighting extensions
+  showHeatOverlay?: boolean;
+  congestionForecasts?: PortCongestionForecast[];
+  selectedTimeHorizon?: CongestionTimeHorizon;
+  highlightedActiveRoute?: ActiveRoute | null;
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -44,7 +49,12 @@ export const MapView: React.FC<MapViewProps> = ({
   initialCenter = [45.0, 20.0],
   initialZoom = 3,
   className = 'w-full h-full min-h-screen',
+  showHeatOverlay = false,
+  congestionForecasts = [],
+  selectedTimeHorizon = 'now',
+  highlightedActiveRoute = null,
 }) => {
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<{ [id: string]: mapboxgl.Marker }>({});
@@ -591,6 +601,185 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [selectedVessel, selectedPort, selectedDisruption]);
 
+  // Render Heatmap Overlay for Port Congestion Forecast
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const sourceId = 'port-congestion-heatmap-source';
+    const layerId = 'port-congestion-heatmap-layer';
+
+    const updateHeatmap = () => {
+      if (!showHeatOverlay || !congestionForecasts || congestionForecasts.length === 0) {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'none');
+        }
+        return;
+      }
+
+      const horizon = selectedTimeHorizon || 'now';
+      const features = congestionForecasts.map((f) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [f.longitude, f.latitude],
+        },
+        properties: {
+          score: f.congestion_scores[horizon] || 50,
+          name: f.port_name,
+        },
+      }));
+
+      const geojson: any = {
+        type: 'FeatureCollection',
+        features,
+      };
+
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: geojson,
+        });
+
+        map.addLayer(
+          {
+            id: layerId,
+            type: 'heatmap',
+            source: sourceId,
+            maxzoom: 9,
+            paint: {
+              'heatmap-weight': [
+                'interpolate',
+                ['linear'],
+                ['get', 'score'],
+                0, 0,
+                50, 0.5,
+                100, 1,
+              ],
+              'heatmap-intensity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 1,
+                9, 3,
+              ],
+              'heatmap-color': [
+                'interpolate',
+                ['linear'],
+                ['heatmap-density'],
+                0, 'rgba(16, 185, 129, 0)',
+                0.2, 'rgba(56, 176, 248, 0.6)',
+                0.4, 'rgba(245, 158, 11, 0.75)',
+                0.7, 'rgba(239, 68, 68, 0.85)',
+                1.0, 'rgba(168, 85, 247, 0.95)',
+              ],
+              'heatmap-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 25,
+                5, 55,
+                9, 90,
+              ],
+              'heatmap-opacity': 0.8,
+            },
+          },
+          map.getLayer('vessel-clusters') ? 'vessel-clusters' : undefined
+        );
+      } else {
+        (map.getSource(sourceId) as mapboxgl.GeoJSONSource).setData(geojson);
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'visible');
+        }
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      updateHeatmap();
+    } else {
+      map.once('style.load', updateHeatmap);
+    }
+  }, [showHeatOverlay, congestionForecasts, selectedTimeHorizon]);
+
+  // Render Highlighted Active Route Line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const sourceId = 'active-route-highlight-source';
+    const layerId = 'active-route-highlight-line';
+
+    const updateActiveRoute = () => {
+      if (!highlightedActiveRoute || !highlightedActiveRoute.waypoints || highlightedActiveRoute.waypoints.length === 0) {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'none');
+        }
+        return;
+      }
+
+      const geojson: any = {
+        type: 'Feature',
+        properties: {
+          status: highlightedActiveRoute.status,
+          risk: highlightedActiveRoute.risk_level,
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: highlightedActiveRoute.waypoints,
+        },
+      };
+
+      const lineColor =
+        highlightedActiveRoute.risk_level === 'critical'
+          ? '#ef4444'
+          : highlightedActiveRoute.risk_level === 'high'
+          ? '#f59e0b'
+          : '#10b981';
+
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: geojson,
+        });
+
+        map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: sourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': lineColor,
+            'line-width': 4,
+            'line-opacity': 0.9,
+            'line-dasharray': [3, 2],
+          },
+        });
+      } else {
+        (map.getSource(sourceId) as mapboxgl.GeoJSONSource).setData(geojson);
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'visible');
+          map.setPaintProperty(layerId, 'line-color', lineColor);
+        }
+      }
+
+      if (highlightedActiveRoute.waypoints.length > 1) {
+        const bounds = new mapboxgl.LngLatBounds();
+        highlightedActiveRoute.waypoints.forEach((pt) => bounds.extend(pt as [number, number]));
+        map.fitBounds(bounds, { padding: 50, duration: 1200 });
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      updateActiveRoute();
+    } else {
+      map.once('style.load', updateActiveRoute);
+    }
+  }, [highlightedActiveRoute]);
+
   return <div ref={mapContainerRef} className={className} />;
 };
+
 

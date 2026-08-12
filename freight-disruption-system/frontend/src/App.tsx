@@ -12,6 +12,8 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AdminAuthPage } from './pages/AdminAuthPage';
 import { DisruptionAlertCenterPage } from './pages/DisruptionAlertCenterPage';
 import { RerouteRecommendationPage } from './pages/RerouteRecommendationPage';
+import { ActiveRoutesMonitorPage } from './pages/ActiveRoutesMonitorPage';
+import { CongestionForecastPage } from './pages/CongestionForecastPage';
 import { Toaster } from '@/components/ui/toaster';
 
 function App() {
@@ -41,8 +43,17 @@ function App() {
           <Route path="/dashboard/reroute-planner" element={<RerouteRecommendationPage />} />
           <Route path="/dashboard/reroute" element={<RerouteRecommendationPage />} />
 
+          {/* Page 1.4 — Active Routes Monitor */}
+          <Route path="/dashboard/active-routes" element={<ActiveRoutesMonitorPage />} />
+          <Route path="/dashboard/routes" element={<ActiveRoutesMonitorPage />} />
+
+          {/* Page 1.5 — Congestion Forecast (Ripple-Heat) Map */}
+          <Route path="/dashboard/congestion-forecast" element={<CongestionForecastPage />} />
+          <Route path="/dashboard/heat-map" element={<CongestionForecastPage />} />
+
           {/* Page 3.1 — Port Overview */}
           <Route path="/dashboard/ports" element={<PortOverviewPage />} />
+
 
           {/* Page 3.2 — Single Port Detail */}
           <Route path="/dashboard/ports/:portId" element={<SinglePortDetailPage />} />

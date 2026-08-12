@@ -993,3 +993,7 @@ export const MOCK_SECONDARY_INFRASTRUCTURE: SecondaryInfrastructure[] = [
   { id: 'aton-6', name: 'Marina Del Rey Harbor', type: 'Marina', latitude: 33.97, longitude: -118.45, status: 'Operational' },
   { id: 'aton-7', name: 'Jebel Ali Anchorage South', type: 'Anchorage', latitude: 24.9, longitude: 54.95, status: 'Operational' },
 ];
+
+export { MOCK_ACTIVE_ROUTES } from './activeRoutesMockData';
+export { MOCK_CONGESTION_FORECASTS } from './congestionForecastMockData';
+
