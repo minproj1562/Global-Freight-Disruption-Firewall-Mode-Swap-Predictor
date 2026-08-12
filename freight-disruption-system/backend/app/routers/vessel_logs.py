@@ -11,7 +11,7 @@ from app.models.vessels import VesselLog
 from app.schemas.vessels import VesselLogCreate, VesselLogResponse
 from app.core.security import get_current_active_user
 
-router = APIRouter(prefix="/vessel-logs", tags=["Vessel Logs"])
+router = APIRouter(prefix="/api/vessel-logs", tags=["Vessel Logs"])
 
 @router.get("", response_model=List[VesselLogResponse])
 def get_vessel_logs(

@@ -17,7 +17,7 @@ from app.schemas.admin import (
 )
 from app.core.security import get_current_active_user, get_current_admin_user
 
-router = APIRouter(prefix="/admin", tags=["Admin Services"])
+router = APIRouter(prefix="/api/admin", tags=["Admin Services"])
 
 # =====================================================================
 # PAGE 4.1: SYSTEM HEALTH MONITOR ENDPOINTS

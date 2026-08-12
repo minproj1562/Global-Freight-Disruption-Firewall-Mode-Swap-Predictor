@@ -13,7 +13,7 @@ from app.schemas.vessels import (
 )
 from app.core.security import get_current_active_user, get_current_admin_user
 
-router = APIRouter(prefix="/vessels", tags=["Vessel Management"])
+router = APIRouter(prefix="/api/vessels", tags=["Vessel Management"])
 
 @router.get("/admin", response_model=List[AdminVesselResponse])
 def get_admin_vessels(

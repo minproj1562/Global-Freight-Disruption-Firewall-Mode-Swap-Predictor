@@ -24,7 +24,6 @@ import {
   X,
   XCircle,
   ArrowRight,
-  Filter,
   Sparkles,
   Search,
   BellRing,
@@ -32,12 +31,11 @@ import {
   CheckCheck,
   ArrowLeft,
   Info,
-  ChevronRight,
   Compass,
 } from 'lucide-react';
 
 import { MapView } from '../features/map/MapView';
-import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { useToast } from '@/components/ui/use-toast';
 import { Disruption, Vessel, DisruptionSeverity, DisruptionCategory, AcknowledgementStatus } from '../types';
@@ -56,7 +54,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<'all' | DisruptionCategory>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | AcknowledgementStatus>('all');
   const [sortBy, setSortBy] = useState<'severity' | 'time' | 'vessels'>('severity');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
@@ -252,7 +250,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col overflow-x-hidden transition-colors duration-300">
-      <PortManagerSidebar />
+      <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / HEADER */}
@@ -378,7 +376,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
               {(
                 [
-                  { id: 'all', label: 'All' },
+                  { id: 'all', label: 'All', icon: undefined },
                   { id: 'geopolitical', label: 'Geopolitical', icon: ShieldAlert },
                   { id: 'canal', label: 'Canal & Locks', icon: Anchor },
                   { id: 'weather', label: 'Weather', icon: CloudLightning },

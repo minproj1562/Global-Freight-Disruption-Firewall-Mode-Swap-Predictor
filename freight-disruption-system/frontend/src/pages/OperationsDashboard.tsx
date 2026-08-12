@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ship, User, LogOut, Layers, X, ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { MapView } from '../features/map/MapView';
 import { MapSearch } from '../features/map/MapSearch';
 import { MapToolbar, LayerVisibilityState } from '../features/map/MapToolbar';
@@ -115,7 +115,7 @@ export const OperationsDashboard: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-      <PortManagerSidebar />
+      <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / NAV HEADER */}

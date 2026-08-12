@@ -45,7 +45,7 @@ const generateStars = (): StarData[] => {
 export const AnimatedBackground: React.FC = () => {
   const [stars] = useState(generateStars);
   const [waterSparkles] = useState(() =>
-    [...Array(35)].map(() => ({
+    [...Array(45)].map(() => ({
       left: Math.random() * 100,
       top: 55 + Math.random() * 40,
       duration: 1.5 + Math.random() * 2.5,
@@ -59,38 +59,52 @@ export const AnimatedBackground: React.FC = () => {
       {/* ====== DEEP NIGHT SKY GRADIENT ====== */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#010511] via-[#030f26] to-[#071d3a]" />
 
-      {/* ====== HIGH-INTENSITY VISIBLE AURORA BOREALIS ====== */}
-      {/* Aurora Band 1 — Radiant Emerald Green Curtain */}
+      {/* ====== AURORA BOREALIS — BAND 1: Wide Emerald Sweep ====== */}
       <div
         className="absolute pointer-events-none"
         style={{
-          top: '-5%',
-          left: '-20%',
-          width: '140%',
-          height: '55%',
-          background: 'radial-gradient(ellipse at top, rgba(16,185,129,0.55) 0%, rgba(52,211,153,0.45) 25%, rgba(45,212,191,0.35) 45%, rgba(56,189,248,0.2) 65%, transparent 85%)',
-          filter: 'blur(30px)',
+          top: '-8%',
+          left: '-25%',
+          width: '150%',
+          height: '60%',
+          background: 'radial-gradient(ellipse at 50% 20%, rgba(16,185,129,0.6) 0%, rgba(52,211,153,0.5) 20%, rgba(45,212,191,0.4) 40%, rgba(56,189,248,0.25) 60%, transparent 82%)',
+          filter: 'blur(28px)',
           animation: 'auroraDance1 14s ease-in-out infinite alternate',
           mixBlendMode: 'screen',
         }}
       />
 
-      {/* Aurora Band 2 — Violet & Electric Cyan Cosmic Shift */}
+      {/* ====== AURORA BOREALIS — BAND 2: Violet & Electric Cyan ====== */}
       <div
         className="absolute pointer-events-none"
         style={{
-          top: '0%',
-          left: '-10%',
-          width: '130%',
-          height: '48%',
-          background: 'linear-gradient(160deg, transparent 5%, rgba(139,92,246,0.45) 20%, rgba(168,85,247,0.5) 35%, rgba(6,182,212,0.45) 55%, rgba(16,185,129,0.3) 75%, transparent 95%)',
-          filter: 'blur(35px)',
+          top: '-2%',
+          left: '-15%',
+          width: '135%',
+          height: '52%',
+          background: 'linear-gradient(155deg, transparent 3%, rgba(139,92,246,0.5) 18%, rgba(168,85,247,0.55) 32%, rgba(6,182,212,0.5) 52%, rgba(16,185,129,0.35) 72%, transparent 92%)',
+          filter: 'blur(32px)',
           animation: 'auroraDance2 18s ease-in-out infinite alternate',
           mixBlendMode: 'screen',
         }}
       />
 
-      {/* Aurora Band 3 — Glowing Vertical Rays / Curtains */}
+      {/* ====== AURORA BOREALIS — BAND 3: Pink / Magenta Glow ====== */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: '2%',
+          left: '10%',
+          width: '80%',
+          height: '38%',
+          background: 'radial-gradient(ellipse at 60% 30%, rgba(236,72,153,0.35) 0%, rgba(168,85,247,0.3) 30%, rgba(56,189,248,0.2) 55%, transparent 80%)',
+          filter: 'blur(40px)',
+          animation: 'auroraDance3 22s ease-in-out infinite alternate',
+          mixBlendMode: 'screen',
+        }}
+      />
+
+      {/* ====== AURORA CURTAIN RAYS ====== */}
       <div
         className="absolute pointer-events-none"
         style={{
@@ -101,17 +115,20 @@ export const AnimatedBackground: React.FC = () => {
           background: `repeating-linear-gradient(
             90deg,
             transparent,
-            transparent 4%,
-            rgba(52,211,153,0.28) 4.5%,
-            transparent 5%,
+            transparent 3.5%,
+            rgba(52,211,153,0.3) 4%,
+            transparent 4.5%,
+            transparent 8%,
+            rgba(45,212,191,0.28) 8.5%,
             transparent 9%,
-            rgba(45,212,191,0.25) 9.5%,
-            transparent 10%,
-            transparent 15%,
-            rgba(168,85,247,0.22) 15.5%,
-            transparent 16%
+            transparent 13%,
+            rgba(168,85,247,0.24) 13.5%,
+            transparent 14%,
+            transparent 19%,
+            rgba(236,72,153,0.18) 19.5%,
+            transparent 20%
           )`,
-          filter: 'blur(8px)',
+          filter: 'blur(6px)',
           animation: 'auroraCurtain 10s ease-in-out infinite alternate',
           mixBlendMode: 'screen',
         }}
@@ -151,7 +168,7 @@ export const AnimatedBackground: React.FC = () => {
         ))}
       </div>
 
-      {/* ====== DISTINGUISHABLE BEAUTIFUL OCEAN WATER (BOTTOM 48%) ====== */}
+      {/* ====== OCEAN — BOTTOM 48% WITH GRADIENT WAVES ====== */}
       <div className="absolute bottom-0 left-0 right-0 h-[48%] z-10">
         {/* Horizon Dividing Line & Atmosphere Glow */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-teal-400/40 via-cyan-300/80 to-emerald-400/40 shadow-[0_0_15px_4px_rgba(45,212,191,0.6)]" />
@@ -189,7 +206,7 @@ export const AnimatedBackground: React.FC = () => {
           />
         ))}
 
-        {/* Layer 1: Deep Ocean Navy Wave */}
+        {/* ====== WAVE LAYER 1: Deep Navy with Indigo-Violet Gradient ====== */}
         <svg
           className="absolute bottom-0 w-[200%]"
           style={{ height: '100%', animation: 'oceanWave1 22s ease-in-out infinite' }}
@@ -197,16 +214,17 @@ export const AnimatedBackground: React.FC = () => {
           preserveAspectRatio="none"
         >
           <defs>
-            <linearGradient id="oceanGrad1" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0b3866" />
-              <stop offset="60%" stopColor="#082b52" />
-              <stop offset="100%" stopColor="#051c36" />
+            <linearGradient id="waveGrad1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#1e1b4b" />
+              <stop offset="35%" stopColor="#0b3866" />
+              <stop offset="65%" stopColor="#082b52" />
+              <stop offset="100%" stopColor="#312e81" />
             </linearGradient>
           </defs>
-          <path fill="url(#oceanGrad1)" opacity="0.95" d="M0,120 C350,210 650,60 1200,130 C1750,200 2050,60 2400,120 L2400,400 L0,400 Z" />
+          <path fill="url(#waveGrad1)" opacity="0.95" d="M0,120 C350,210 650,60 1200,130 C1750,200 2050,60 2400,120 L2400,400 L0,400 Z" />
         </svg>
 
-        {/* Layer 2: Radiant Cyan & Teal Mid Wave */}
+        {/* ====== WAVE LAYER 2: Teal-to-Cyan Gradient ====== */}
         <svg
           className="absolute bottom-0 w-[200%]"
           style={{ height: '78%', animation: 'oceanWave2 16s ease-in-out infinite reverse', animationDelay: '-3s' }}
@@ -214,16 +232,17 @@ export const AnimatedBackground: React.FC = () => {
           preserveAspectRatio="none"
         >
           <defs>
-            <linearGradient id="oceanGrad2" x1="0" y1="0" x2="0.5" y2="1">
+            <linearGradient id="waveGrad2" x1="0" y1="0" x2="1" y2="0.8">
               <stop offset="0%" stopColor="#0e7490" />
-              <stop offset="50%" stopColor="#0284c7" />
-              <stop offset="100%" stopColor="#075985" />
+              <stop offset="30%" stopColor="#0891b2" />
+              <stop offset="60%" stopColor="#0284c7" />
+              <stop offset="100%" stopColor="#6366f1" />
             </linearGradient>
           </defs>
-          <path fill="url(#oceanGrad2)" opacity="0.9" d="M0,150 C400,70 700,230 1200,150 C1700,70 2000,230 2400,150 L2400,350 L0,350 Z" />
+          <path fill="url(#waveGrad2)" opacity="0.88" d="M0,150 C400,70 700,230 1200,150 C1700,70 2000,230 2400,150 L2400,350 L0,350 Z" />
         </svg>
 
-        {/* Layer 3: Emerald Foam Wave with White Crest */}
+        {/* ====== WAVE LAYER 3: Emerald-to-Teal with white foam crest ====== */}
         <svg
           className="absolute bottom-0 w-[200%]"
           style={{ height: '54%', animation: 'oceanWave3 12s ease-in-out infinite', animationDelay: '-1.5s' }}
@@ -231,25 +250,51 @@ export const AnimatedBackground: React.FC = () => {
           preserveAspectRatio="none"
         >
           <defs>
-            <linearGradient id="oceanGrad3" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="waveGrad3" x1="0" y1="0" x2="1" y2="0.5">
               <stop offset="0%" stopColor="#14b8a6" />
-              <stop offset="50%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#047857" />
+              <stop offset="40%" stopColor="#10b981" />
+              <stop offset="70%" stopColor="#0d9488" />
+              <stop offset="100%" stopColor="#0891b2" />
             </linearGradient>
           </defs>
           {/* Foam Crest Highlight Line */}
-          <path fill="none" stroke="#ffffff" strokeWidth="2" opacity="0.6" d="M0,105 C350,185 650,45 1200,115 C1750,185 2050,45 2400,105" />
-          <path fill="url(#oceanGrad3)" opacity="0.85" d="M0,108 C350,188 650,48 1200,118 C1750,188 2050,48 2400,108 L2400,280 L0,280 Z" />
+          <path fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.7" d="M0,105 C350,185 650,45 1200,115 C1750,185 2050,45 2400,105" />
+          <path fill="url(#waveGrad3)" opacity="0.85" d="M0,108 C350,188 650,48 1200,118 C1750,188 2050,48 2400,108 L2400,280 L0,280 Z" />
         </svg>
 
-        {/* Layer 4: Front Seafoam Shimmer */}
+        {/* ====== WAVE LAYER 4: Violet-Rose-to-Emerald Gradient Shimmer ====== */}
         <svg
           className="absolute bottom-0 w-[200%]"
-          style={{ height: '30%', animation: 'oceanWave1 9s ease-in-out infinite', animationDelay: '-0.5s' }}
+          style={{ height: '40%', animation: 'oceanWave4 14s ease-in-out infinite', animationDelay: '-2s' }}
+          viewBox="0 0 2400 220"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="waveGrad4" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.5" />
+              <stop offset="30%" stopColor="#06b6d4" stopOpacity="0.5" />
+              <stop offset="60%" stopColor="#10b981" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.5" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#waveGrad4)" d="M0,90 C300,140 600,50 1200,100 C1800,150 2100,50 2400,90 L2400,220 L0,220 Z" />
+        </svg>
+
+        {/* ====== WAVE LAYER 5: Front Seafoam Shimmer ====== */}
+        <svg
+          className="absolute bottom-0 w-[200%]"
+          style={{ height: '28%', animation: 'oceanWave1 9s ease-in-out infinite', animationDelay: '-0.5s' }}
           viewBox="0 0 2400 180"
           preserveAspectRatio="none"
         >
-          <path fill="rgba(255,255,255,0.22)" d="M0,75 C400,115 600,35 1200,75 C1800,115 2100,35 2400,75 L2400,180 L0,180 Z" />
+          <defs>
+            <linearGradient id="waveGrad5" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="rgba(255,255,255,0.22)" />
+              <stop offset="50%" stopColor="rgba(186,230,253,0.28)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0.22)" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#waveGrad5)" d="M0,75 C400,115 600,35 1200,75 C1800,115 2100,35 2400,75 L2400,180 L0,180 Z" />
         </svg>
       </div>
 
@@ -275,21 +320,29 @@ export const AnimatedBackground: React.FC = () => {
           0%, 100% { transform: translateX(0) translateY(0); }
           50% { transform: translateX(-15%) translateY(-4px); }
         }
+        @keyframes oceanWave4 {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          50% { transform: translateX(12%) translateY(-3px); }
+        }
         @keyframes moonBeam {
           0%, 100% { opacity: 0.6; transform: scaleX(1); }
           50% { opacity: 0.9; transform: scaleX(1.1); }
         }
         @keyframes auroraDance1 {
           0% { transform: translateX(-5%) rotate(0deg) scaleY(1); opacity: 0.8; }
-          100% { transform: translateX(8%) rotate(2deg) scaleY(1.2); opacity: 1; }
+          100% { transform: translateX(8%) rotate(2deg) scaleY(1.25); opacity: 1; }
         }
         @keyframes auroraDance2 {
           0% { transform: translateX(5%) rotate(0deg) scaleY(1); opacity: 0.7; }
-          100% { transform: translateX(-8%) rotate(-2deg) scaleY(1.15); opacity: 0.95; }
+          100% { transform: translateX(-8%) rotate(-2deg) scaleY(1.2); opacity: 0.95; }
+        }
+        @keyframes auroraDance3 {
+          0% { transform: translateX(-3%) rotate(1deg) scaleY(1); opacity: 0.5; }
+          100% { transform: translateX(6%) rotate(-1deg) scaleY(1.15); opacity: 0.85; }
         }
         @keyframes auroraCurtain {
-          0% { opacity: 0.5; transform: scaleX(1); }
-          100% { opacity: 0.85; transform: scaleX(1.15); }
+          0% { opacity: 0.45; transform: scaleX(1); }
+          100% { opacity: 0.8; transform: scaleX(1.15); }
         }
       `}</style>
     </div>

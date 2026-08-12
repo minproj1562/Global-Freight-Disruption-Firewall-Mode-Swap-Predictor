@@ -4,12 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Globe, 
   Anchor, 
-  Map, 
-  AlertTriangle,
-  Compass,
   FileText,
-  Route,
-  Flame,
   LogOut, 
   Menu, 
   ChevronLeft 
@@ -27,11 +22,6 @@ export const PortManagerSidebar: React.FC<PortManagerSidebarProps> = ({ currentP
   const { user, logout } = useAuthStore(); 
 
   const navItems = [
-    { name: 'Operations Map', icon: Map, route: '/dashboard/operations' },
-    { name: 'Alert Center', icon: AlertTriangle, route: '/dashboard/disruptions' },
-    { name: 'Reroute Planner', icon: Compass, route: '/dashboard/reroute-planner' },
-    { name: 'Active Routes', icon: Route, route: '/dashboard/active-routes' },
-    { name: 'Congestion Heatmap', icon: Flame, route: '/dashboard/congestion-forecast' },
     { name: 'Port Overview', icon: Globe, route: '/dashboard/ports' },
     { name: 'Vessel Logs', icon: FileText, route: '/dashboard/vessel-logs' },
     { name: 'Port Detail', icon: Anchor, route: `/dashboard/ports/${currentPortId || 'port-rotterdam'}` },

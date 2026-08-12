@@ -72,11 +72,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth_router, prefix="/api")
-app.include_router(ports_router, prefix="/api")
-app.include_router(vessels_router, prefix="/api")
-app.include_router(vessel_logs_router, prefix="/api")
-app.include_router(admin_router, prefix="/api")
+app.include_router(auth_router)
+app.include_router(ports_router)
+app.include_router(vessels_router)
+app.include_router(vessel_logs_router)
+app.include_router(admin_router)
 
 # ============= ROOT ENDPOINTS =============
 

@@ -18,37 +18,26 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceDot,
   CartesianGrid,
 } from 'recharts';
 import {
   Compass,
   ArrowLeft,
-  Ship,
   Sparkles,
   Check,
-  RotateCcw,
   Download,
   Scale,
   Leaf,
-  DollarSign,
-  Clock,
-  ShieldCheck,
-  AlertTriangle,
   Layers,
   ArrowRight,
-  TrendingDown,
-  FileText,
-  HelpCircle,
   BarChart3,
   CheckCircle2,
   X,
-  Info,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -91,7 +80,7 @@ export const RerouteRecommendationPage: React.FC = () => {
   });
 
   // Simulation & Results State
-  const [simulationResult, setSimulationResult] = useState<SimulationResult>(
+  const [simulationResult] = useState<SimulationResult>(
     MOCK_INITIAL_SIMULATION_RESULT
   );
   const [selectedRouteId, setSelectedRouteId] = useState<string>(
@@ -319,7 +308,7 @@ export const RerouteRecommendationPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col overflow-x-hidden">
-      <PortManagerSidebar />
+      <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP HEADER BAR */}

@@ -6,7 +6,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ResponsiveContainer,
   LineChart,
@@ -24,24 +23,15 @@ import {
   TrendingDown,
   Minus,
   Anchor,
-  Clock,
-  Globe,
-  Layers,
-  MapPin,
   RefreshCw,
-  Info,
-  Compass,
-  AlertTriangle,
   ChevronRight,
-  ShieldCheck,
-  CheckCircle2,
 } from 'lucide-react';
 
-import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { ConnectionIndicator } from '../shared/components/ConnectionIndicator';
 import { MapView } from '../features/map/MapView';
-import { MapToolbar, LayerVisibilityState } from '../features/map/MapToolbar';
+import { LayerVisibilityState } from '../features/map/MapToolbar';
 import { useToast } from '@/components/ui/use-toast';
 import {
   PortCongestionForecast,
@@ -57,10 +47,11 @@ export const CongestionForecastPage: React.FC = () => {
   const { toast } = useToast();
 
   // State
-  const [forecasts, setForecasts] = useState<PortCongestionForecast[]>(MOCK_CONGESTION_FORECASTS);
+  const [forecasts] = useState<PortCongestionForecast[]>(MOCK_CONGESTION_FORECASTS);
   const [selectedHorizon, setSelectedHorizon] = useState<CongestionTimeHorizon>('now');
   const [selectedPortId, setSelectedPortId] = useState<string>(MOCK_CONGESTION_FORECASTS[0].port_id);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  void isLoading;
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Map Layer Toggles State (reusing existing layer toggle pattern)
@@ -121,9 +112,10 @@ export const CongestionForecastPage: React.FC = () => {
   }, [selectedPortForecast]);
 
   // Toggle Layer Visibility
-  const handleToggleLayer = (layerKey: keyof LayerVisibilityState) => {
+  const _handleToggleLayer = (layerKey: keyof LayerVisibilityState) => {
     setLayers((prev) => ({ ...prev, [layerKey]: !prev[layerKey] }));
   };
+  void _handleToggleLayer;
 
   // Refresh handler
   const handleRefresh = () => {
@@ -176,7 +168,7 @@ export const CongestionForecastPage: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-      <PortManagerSidebar />
+      <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / NAV HEADER */}
@@ -422,7 +414,7 @@ export const CongestionForecastPage: React.FC = () => {
             </h4>
 
             <div className="space-y-2">
-              {selectedPortForecast.alternative_ports.map((alt, idx) => (
+              {selectedPortForecast.alternative_ports.map((alt) => (
                 <div
                   key={alt.port_id}
                   className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-mono"

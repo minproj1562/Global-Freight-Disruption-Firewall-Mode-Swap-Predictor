@@ -34,6 +34,7 @@ import {
 export const VesselManagement: React.FC = () => {
   const [vessels, setVessels] = useState<AdminVessel[]>(INITIAL_50_VESSELS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  void isLoading;
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');

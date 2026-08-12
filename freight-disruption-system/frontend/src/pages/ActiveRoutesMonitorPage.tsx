@@ -23,24 +23,17 @@ import {
   ChevronRight,
   Compass,
   AlertTriangle,
-  Clock,
   MapPin,
   RefreshCw,
-  Info,
-  CheckCircle2,
   AlertCircle,
-  XCircle,
-  Anchor,
-  Globe,
-  SlidersHorizontal,
 } from 'lucide-react';
 
-import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
+import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { ConnectionIndicator } from '../shared/components/ConnectionIndicator';
 import { MapView } from '../features/map/MapView';
 import { useToast } from '@/components/ui/use-toast';
-import { ActiveRoute, TransportMode, RouteStatus, DisruptionSeverity } from '../types';
+import { ActiveRoute, RouteStatus, DisruptionSeverity } from '../types';
 import { MOCK_ACTIVE_ROUTES } from '../shared/mock/activeRoutesMockData';
 import { MOCK_PORTS, MOCK_VESSELS, MOCK_DISRUPTIONS, MOCK_SECONDARY_INFRASTRUCTURE } from '../shared/mock/mockData';
 
@@ -52,7 +45,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
   const { toast } = useToast();
 
   // Data & Loading States
-  const [routes, setRoutes] = useState<ActiveRoute[]>(MOCK_ACTIVE_ROUTES);
+  const [routes] = useState<ActiveRoute[]>(MOCK_ACTIVE_ROUTES);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -240,7 +233,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col transition-colors duration-300">
-      <PortManagerSidebar />
+      <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP COMMAND BAR / NAV HEADER */}

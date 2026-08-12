@@ -15,25 +15,27 @@ import { RerouteRecommendationPage } from './pages/RerouteRecommendationPage';
 import { ActiveRoutesMonitorPage } from './pages/ActiveRoutesMonitorPage';
 import { CongestionForecastPage } from './pages/CongestionForecastPage';
 import { Toaster } from '@/components/ui/toaster';
+import { ForceDarkMode } from '@/components/ForceDarkMode';
 
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          {/* Landing, Login, Register — always forced dark mode */}
+          <Route path="/" element={<ForceDarkMode><LandingPage /></ForceDarkMode>} />
+          <Route path="/login" element={<ForceDarkMode><LoginPage /></ForceDarkMode>} />
+          <Route path="/register" element={<ForceDarkMode><RegisterPage /></ForceDarkMode>} />
 
-          {/* System Administrator Dedicated Auth */}
-          <Route path="/auth/admin" element={<AdminAuthPage />} />
-          <Route path="/admin-login" element={<AdminAuthPage />} />
+          {/* System Administrator Dedicated Auth — forced dark */}
+          <Route path="/auth/admin" element={<ForceDarkMode><AdminAuthPage /></ForceDarkMode>} />
+          <Route path="/admin-login" element={<ForceDarkMode><AdminAuthPage /></ForceDarkMode>} />
 
-          {/* Port Manager Dedicated Auth */}
-          <Route path="/auth/port-manager" element={<PortManagerAuthPage />} />
-          <Route path="/port-manager" element={<PortManagerAuthPage />} />
-          <Route path="/port-login" element={<PortManagerAuthPage />} />
-          <Route path="/port-register" element={<PortManagerAuthPage />} />
+          {/* Port Manager Dedicated Auth — forced dark */}
+          <Route path="/auth/port-manager" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
+          <Route path="/port-manager" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
+          <Route path="/port-login" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
+          <Route path="/port-register" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
 
           {/* Page 1.2 — Disruption Alert Center */}
           <Route path="/dashboard/disruptions" element={<DisruptionAlertCenterPage />} />
@@ -53,7 +55,6 @@ function App() {
 
           {/* Page 3.1 — Port Overview */}
           <Route path="/dashboard/ports" element={<PortOverviewPage />} />
-
 
           {/* Page 3.2 — Single Port Detail */}
           <Route path="/dashboard/ports/:portId" element={<SinglePortDetailPage />} />

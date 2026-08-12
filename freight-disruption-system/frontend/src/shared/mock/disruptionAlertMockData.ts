@@ -6,7 +6,7 @@
 // POST /api/v1/disruptions/{id}/resolve
 // GET /api/v1/disruptions/{id}/affected-vessels
 
-import { Disruption, Vessel } from '../../types';
+import { Disruption } from '../../types';
 import { MOCK_VESSELS } from './mockData';
 
 export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
