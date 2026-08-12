@@ -4,6 +4,7 @@ from app.models.vessels import Vessel, VesselLog
 from app.models.ports import Port, BerthSlot, PortCongestionHistory, VesselArrival, PortDisruption
 from app.models.disruptions import GlobalDisruption
 from app.models.system import SystemErrorLog, SystemHealthCard
+from app.models.data_management import DataUploadLog, DataCleanupLog
 
 __all__ = [
     "User",
@@ -17,5 +18,7 @@ __all__ = [
     "PortDisruption",
     "GlobalDisruption",
     "SystemErrorLog",
-    "SystemHealthCard"
+    "SystemHealthCard",
+    "DataUploadLog",
+    "DataCleanupLog"
 ]

@@ -93,6 +93,8 @@ async def root():
             "vessel_logs": "/api/vessel-logs",
             "admin_disruptions": "/api/admin/disruptions",
             "admin_health": "/api/admin/health-cards",
+            "admin_users": "/api/admin/users",
+            "admin_data": "/api/admin/data/stats",
             "docs": "/docs"
         }
     }

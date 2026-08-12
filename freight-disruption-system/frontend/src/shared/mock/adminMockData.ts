@@ -1,4 +1,6 @@
 // frontend/src/shared/mock/adminMockData.ts
+import { AdminUser, DatabaseStats, UploadHistoryItem, CleanupOperationLog } from '@/types/adminUserTypes';
+
 
 export interface AdminVessel {
   id: string;
@@ -317,3 +319,226 @@ export const INITIAL_DISRUPTIONS: ManagedDisruption[] = [
     resolved: false,
   },
 ];
+
+// User Management Mock Data
+
+export const INITIAL_ADMIN_USERS: AdminUser[] = [
+  {
+    id: 'USR-101',
+    name: 'Sarah Jenkins',
+    email: 'sarah.j@freightfirewall.com',
+    role: 'Admin',
+    lastLogin: '2026-08-12 10:45 AM',
+    status: 'Active',
+    createdAt: '2025-01-15',
+    assignedPort: 'Global Control HQ',
+    department: 'System Architecture',
+    phone: '+1 (555) 019-2834',
+  },
+  {
+    id: 'USR-102',
+    name: 'Captain Alex Morgan',
+    email: 'a.morgan@portofrotterdam.com',
+    role: 'Port Manager',
+    lastLogin: '2026-08-12 09:12 AM',
+    status: 'Active',
+    createdAt: '2025-03-20',
+    assignedPort: 'Port of Rotterdam',
+    department: 'Port Operations',
+    phone: '+31 10 252 1000',
+  },
+  {
+    id: 'USR-103',
+    name: 'Elena Rostova',
+    email: 'e.rostova@globalmaritime.io',
+    role: 'Logistics Manager',
+    lastLogin: '2026-08-11 04:30 PM',
+    status: 'Active',
+    createdAt: '2025-04-10',
+    assignedPort: 'Hamburg Hub',
+    department: 'Supply Chain Logistics',
+    phone: '+49 40 3770 0',
+  },
+  {
+    id: 'USR-104',
+    name: 'Marcus Vance',
+    email: 'm.vance@supplychain.ai',
+    role: 'Analyst',
+    lastLogin: '2026-08-09 02:15 PM',
+    status: 'Inactive',
+    createdAt: '2025-06-05',
+    assignedPort: 'Analytics Unit',
+    department: 'Risk & Prediction',
+    phone: '+1 (555) 432-8765',
+  },
+  {
+    id: 'USR-105',
+    name: 'David Chen',
+    email: 'd.chen@singaporeport.gov.sg',
+    role: 'Port Manager',
+    lastLogin: '2026-08-12 11:02 AM',
+    status: 'Active',
+    createdAt: '2025-02-28',
+    assignedPort: 'Port of Singapore',
+    department: 'Maritime Authority',
+    phone: '+65 6375 1600',
+  },
+  {
+    id: 'USR-106',
+    name: 'Amira Al-Mansoor',
+    email: 'amira@dubaisupply.ae',
+    role: 'Viewer',
+    lastLogin: '2026-07-28 01:20 PM',
+    status: 'Suspended',
+    createdAt: '2025-09-12',
+    assignedPort: 'Jebel Ali Port',
+    department: 'External Audit',
+    phone: '+971 4 881 1111',
+  },
+  {
+    id: 'USR-107',
+    name: 'Henrik Visser',
+    email: 'h.visser@maersk-tech.com',
+    role: 'Logistics Manager',
+    lastLogin: '2026-08-12 08:05 AM',
+    status: 'Active',
+    createdAt: '2025-11-01',
+    assignedPort: 'Antwerp Gateway',
+    department: 'Fleet Dispatch',
+    phone: '+45 33 63 33 63',
+  },
+];
+
+// Page 4.5 Data Management Mock Data
+export const INITIAL_DATABASE_STATS: DatabaseStats = {
+  totalRecords: 14850230,
+  totalSizeGb: 4.82,
+  engine: 'PostgreSQL 16.2 / TimescaleDB 2.14 (HA Cluster)',
+  status: 'Healthy',
+  activeConnections: 18,
+  maxConnections: 100,
+  lastBackup: '2026-08-12 03:00 AM (Automated Snapshot)',
+  tables: [
+    {
+      tableName: 'ais_telemetry_logs',
+      description: 'High-frequency vessel coordinate, speed, course & MMSI satellite telemetry',
+      recordCount: 12450000,
+      sizeMb: 3480.5,
+      lastUpdated: '2 seconds ago',
+      category: 'Telemetry',
+    },
+    {
+      tableName: 'congestion_history',
+      description: 'Historical and predicted port waiting times & berth bottleneck metrics',
+      recordCount: 1840000,
+      sizeMb: 920.2,
+      lastUpdated: '1 minute ago',
+      category: 'Analytics',
+    },
+    {
+      tableName: 'simulated_routes',
+      description: 'Monte Carlo stochastic route simulations & Dijkstra mode-swap candidates',
+      recordCount: 520000,
+      sizeMb: 450.8,
+      lastUpdated: '15 minutes ago',
+      category: 'Analytics',
+    },
+    {
+      tableName: 'vessels',
+      description: 'Global fleet index, IMO/MMSI details, dimensions & draught specs',
+      recordCount: 50,
+      sizeMb: 1.4,
+      lastUpdated: '2 hours ago',
+      category: 'Core Entities',
+    },
+    {
+      tableName: 'ports',
+      description: 'Major global ports, berth capacity, coordinates & infrastructure metadata',
+      recordCount: 24,
+      sizeMb: 0.6,
+      lastUpdated: 'Yesterday',
+      category: 'Core Entities',
+    },
+    {
+      tableName: 'active_disruptions',
+      description: 'Geopolitical hazards, typhoons, strikes & chokepoint blockades',
+      recordCount: 16,
+      sizeMb: 0.2,
+      lastUpdated: '10 minutes ago',
+      category: 'Telemetry',
+    },
+    {
+      tableName: 'users',
+      description: 'System admin, port manager & logistics operator credentials & RBAC roles',
+      recordCount: 7,
+      sizeMb: 0.1,
+      lastUpdated: 'Just now',
+      category: 'System',
+    },
+  ],
+};
+
+export const INITIAL_UPLOAD_HISTORY: UploadHistoryItem[] = [
+  {
+    id: 'UPL-901',
+    fileName: 'ais_telemetry_2026_q3_batch1.csv',
+    datasetType: 'AIS Telemetry',
+    uploadedBy: 'Sarah Jenkins',
+    uploadedAt: '2026-08-11 16:45',
+    recordsIngested: 250000,
+    fileSizeBytes: 28400000, // ~28.4 MB
+    status: 'Success',
+  },
+  {
+    id: 'UPL-902',
+    fileName: 'global_port_berth_capacities_2026.json',
+    datasetType: 'Ports Database',
+    uploadedBy: 'Captain Alex Morgan',
+    uploadedAt: '2026-08-10 11:20',
+    recordsIngested: 24,
+    fileSizeBytes: 142000, // ~142 KB
+    status: 'Success',
+  },
+  {
+    id: 'UPL-903',
+    fileName: 'imo_fleet_vessels_update.csv',
+    datasetType: 'Vessel Directory',
+    uploadedBy: 'David Chen',
+    uploadedAt: '2026-08-08 09:15',
+    recordsIngested: 50,
+    fileSizeBytes: 380000,
+    status: 'Success',
+  },
+  {
+    id: 'UPL-904',
+    fileName: 'suez_canal_congestion_feed_aug.csv',
+    datasetType: 'Congestion CSV',
+    uploadedBy: 'Elena Rostova',
+    uploadedAt: '2026-08-05 14:02',
+    recordsIngested: 12500,
+    fileSizeBytes: 1850000,
+    status: 'Success',
+  },
+];
+
+export const INITIAL_CLEANUP_LOGS: CleanupOperationLog[] = [
+  {
+    id: 'CLN-501',
+    operationType: 'Delete Old AIS',
+    executedBy: 'Sarah Jenkins',
+    executedAt: '2026-08-01 02:00',
+    recordsAffected: 1500000,
+    sizeFreedMb: 420.5,
+    details: 'Purged raw AIS telemetry points older than 30 days.',
+  },
+  {
+    id: 'CLN-502',
+    operationType: 'Delete Old Simulations',
+    executedBy: 'System Auto-Maintenance',
+    executedAt: '2026-08-05 03:00',
+    recordsAffected: 320000,
+    sizeFreedMb: 280.0,
+    details: 'Pruned expired Monte Carlo route simulation cache.',
+  },
+];
+

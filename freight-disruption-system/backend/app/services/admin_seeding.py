@@ -455,8 +455,157 @@ INITIAL_ERROR_LOGS_DATA = [
     },
 ]
 
+from app.models.users import User
+from app.models.data_management import DataUploadLog, DataCleanupLog
+from app.core.security import get_password_hash
+
+INITIAL_ADMIN_USERS_DATA = [
+    {
+        "name": "Sarah Jenkins",
+        "email": "sarah.j@freightfirewall.com",
+        "username": "sarah_jenkins",
+        "role": "Admin",
+        "last_login": "2026-08-12 10:45 AM",
+        "status_label": "Active",
+        "is_active": True,
+        "assigned_port": "Global Control HQ",
+        "department": "System Architecture",
+        "phone": "+1 (555) 019-2834",
+    },
+    {
+        "name": "Captain Alex Morgan",
+        "email": "a.morgan@portofrotterdam.com",
+        "username": "alex_morgan",
+        "role": "Port Manager",
+        "last_login": "2026-08-12 09:12 AM",
+        "status_label": "Active",
+        "is_active": True,
+        "assigned_port": "Port of Rotterdam",
+        "department": "Port Operations",
+        "phone": "+31 10 252 1000",
+    },
+    {
+        "name": "Elena Rostova",
+        "email": "e.rostova@globalmaritime.io",
+        "username": "elena_rostova",
+        "role": "Logistics Manager",
+        "last_login": "2026-08-11 04:30 PM",
+        "status_label": "Active",
+        "is_active": True,
+        "assigned_port": "Hamburg Hub",
+        "department": "Supply Chain Logistics",
+        "phone": "+49 40 3770 0",
+    },
+    {
+        "name": "Marcus Vance",
+        "email": "m.vance@supplychain.ai",
+        "username": "marcus_vance",
+        "role": "Analyst",
+        "last_login": "2026-08-09 02:15 PM",
+        "status_label": "Inactive",
+        "is_active": False,
+        "assigned_port": "Analytics Unit",
+        "department": "Risk & Prediction",
+        "phone": "+1 (555) 432-8765",
+    },
+    {
+        "name": "David Chen",
+        "email": "d.chen@singaporeport.gov.sg",
+        "username": "david_chen",
+        "role": "Port Manager",
+        "last_login": "2026-08-12 11:02 AM",
+        "status_label": "Active",
+        "is_active": True,
+        "assigned_port": "Port of Singapore",
+        "department": "Maritime Authority",
+        "phone": "+65 6375 1600",
+    },
+    {
+        "name": "Amira Al-Mansoor",
+        "email": "amira@dubaisupply.ae",
+        "username": "amira_mansoor",
+        "role": "Viewer",
+        "last_login": "2026-07-28 01:20 PM",
+        "status_label": "Suspended",
+        "is_active": False,
+        "assigned_port": "Jebel Ali Port",
+        "department": "External Audit",
+        "phone": "+971 4 881 1111",
+    },
+    {
+        "name": "Henrik Visser",
+        "email": "h.visser@maersk-tech.com",
+        "username": "henrik_visser",
+        "role": "Logistics Manager",
+        "last_login": "2026-08-12 08:05 AM",
+        "status_label": "Active",
+        "is_active": True,
+        "assigned_port": "Antwerp Gateway",
+        "department": "Fleet Dispatch",
+        "phone": "+45 33 63 33 63",
+    },
+]
+
+INITIAL_UPLOAD_LOGS_DATA = [
+    {
+        "file_name": "ais_telemetry_2026_q3_batch1.csv",
+        "dataset_type": "AIS Telemetry",
+        "uploaded_by": "Sarah Jenkins",
+        "uploaded_at_str": "2026-08-11 16:45",
+        "records_ingested": 250000,
+        "file_size_bytes": 28400000,
+        "status": "Success",
+    },
+    {
+        "file_name": "global_port_berth_capacities_2026.json",
+        "dataset_type": "Ports Database",
+        "uploaded_by": "Captain Alex Morgan",
+        "uploaded_at_str": "2026-08-10 11:20",
+        "records_ingested": 24,
+        "file_size_bytes": 142000,
+        "status": "Success",
+    },
+    {
+        "file_name": "imo_fleet_vessels_update.csv",
+        "dataset_type": "Vessel Directory",
+        "uploaded_by": "David Chen",
+        "uploaded_at_str": "2026-08-08 09:15",
+        "records_ingested": 50,
+        "file_size_bytes": 380000,
+        "status": "Success",
+    },
+    {
+        "file_name": "suez_canal_congestion_feed_aug.csv",
+        "dataset_type": "Congestion CSV",
+        "uploaded_by": "Elena Rostova",
+        "uploaded_at_str": "2026-08-05 14:02",
+        "records_ingested": 12500,
+        "file_size_bytes": 1850000,
+        "status": "Success",
+    },
+]
+
+INITIAL_CLEANUP_LOGS_DATA = [
+    {
+        "operation_type": "Delete Old AIS",
+        "executed_by": "Sarah Jenkins",
+        "executed_at_str": "2026-08-01 02:00",
+        "records_affected": 1500000,
+        "size_freed_mb": 420.5,
+        "details": "Purged raw AIS telemetry points older than 30 days.",
+    },
+    {
+        "operation_type": "Delete Old Simulations",
+        "executed_by": "System Auto-Maintenance",
+        "executed_at_str": "2026-08-05 03:00",
+        "records_affected": 320000,
+        "size_freed_mb": 280.0,
+        "details": "Pruned expired Monte Carlo route simulation cache.",
+    },
+]
+
 def seed_admin_datasets(db: Session):
-    """Seed initial datasets for Vessels, Vessel Logs, Disruptions, and System Health if empty."""
+    """Seed initial datasets for Vessels, Vessel Logs, Disruptions, Users, Uploads, and System Health if empty."""
     # 1. Seed Vessels (50 pre-seeded vessels)
     if db.query(Vessel).count() == 0:
         print("[DB] Seeding 50 pre-seeded vessels...")
@@ -496,3 +645,41 @@ def seed_admin_datasets(db: Session):
             err = SystemErrorLog(**item)
             db.add(err)
         db.commit()
+
+    # 6. Seed Additional Users if user count is low
+    if db.query(User).count() <= 1:
+        print("[DB] Seeding system users directory...")
+        hashed_pwd = get_password_hash("password123")
+        for u_data in INITIAL_ADMIN_USERS_DATA:
+            existing = db.query(User).filter(User.email == u_data["email"]).first()
+            if not existing:
+                u = User(
+                    email=u_data["email"],
+                    username=u_data["username"],
+                    full_name=u_data["name"],
+                    hashed_password=hashed_pwd,
+                    role=u_data["role"],
+                    is_active=u_data["is_active"],
+                    status_label=u_data["status_label"],
+                    assigned_port=u_data["assigned_port"],
+                    department=u_data["department"],
+                    phone=u_data["phone"],
+                    last_login=u_data["last_login"]
+                )
+                db.add(u)
+        db.commit()
+
+    # 7. Seed Upload History Logs
+    if db.query(DataUploadLog).count() == 0:
+        print("[DB] Seeding upload audit history logs...")
+        for u_log in INITIAL_UPLOAD_LOGS_DATA:
+            db.add(DataUploadLog(**u_log))
+        db.commit()
+
+    # 8. Seed Cleanup Logs
+    if db.query(DataCleanupLog).count() == 0:
+        print("[DB] Seeding cleanup maintenance logs...")
+        for c_log in INITIAL_CLEANUP_LOGS_DATA:
+            db.add(DataCleanupLog(**c_log))
+        db.commit()
+

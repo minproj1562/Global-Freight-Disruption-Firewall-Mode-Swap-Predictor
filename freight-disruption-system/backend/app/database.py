@@ -45,6 +45,13 @@ def init_db():
         conn.execute(text("ALTER TABLE vessels ADD COLUMN IF NOT EXISTS last_ais_update_str VARCHAR DEFAULT 'Just now';"))
         conn.execute(text("ALTER TABLE vessels ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
 
+        # Migrations for users table
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR DEFAULT '';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR DEFAULT 'Operations';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_port VARCHAR DEFAULT 'Global Control HQ';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login VARCHAR DEFAULT 'Just now';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS status_label VARCHAR DEFAULT 'Active';"))
+
     # Seed Default Admin User if not present
     db = SessionLocal()
     try:

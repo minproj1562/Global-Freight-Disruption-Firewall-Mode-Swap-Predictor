@@ -13,8 +13,13 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
-    role = Column(String, nullable=False)  # "port", "fleet_operator", "admin"
+    role = Column(String, nullable=False)  # "Admin", "Port Manager", "Logistics Manager", "Analyst", "Viewer", "port", "admin"
     is_active = Column(Boolean, default=True)
+    status_label = Column(String, default="Active")  # Active, Inactive, Suspended
+    assigned_port = Column(String, default="Global Control HQ")
+    department = Column(String, default="Operations")
+    phone = Column(String, default="")
+    last_login = Column(String, default="Just now")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

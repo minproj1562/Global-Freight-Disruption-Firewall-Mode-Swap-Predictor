@@ -24,9 +24,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
-import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { EXTENDED_PORTS_DATA } from '@/shared/mock/portMockData';
 import { fetchAllPorts } from '@/services/portManagerApi';
+import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 
 export const PortManagerAuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'register' | 'login'>('register');
@@ -197,7 +197,8 @@ export const PortManagerAuthPage: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between transition-colors duration-300">
+    <div className="relative min-h-screen overflow-x-hidden bg-transparent text-slate-100 flex flex-col justify-between">
+      <AnimatedBackground />
       
       {/* Header bar */}
       <header className="relative z-20 flex items-center justify-between px-6 py-4 max-w-7xl w-full mx-auto">
@@ -217,7 +218,6 @@ export const PortManagerAuthPage: React.FC = () => {
             <Anchor className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
             Guest Port Overview
           </Link>
-          <ThemeToggle />
         </div>
       </header>
 

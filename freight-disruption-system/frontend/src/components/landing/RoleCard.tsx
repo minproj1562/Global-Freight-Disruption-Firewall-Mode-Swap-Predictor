@@ -1,7 +1,6 @@
 // frontend/src/components/ui/landing/RoleCard.tsx
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 
 interface RoleCardProps {
@@ -29,9 +28,9 @@ export const RoleCard: React.FC<RoleCardProps> = ({
       whileHover={{ scale: 1.05, y: -12 }}
       whileTap={{ scale: 0.98 }}
     >
-      <Card
+      <div
         onClick={onClick}
-        className="group relative cursor-pointer overflow-hidden border-2 border-white/10 bg-white/5 backdrop-blur-xl transition-all duration-500 hover:border-white/30 hover:bg-white/10"
+        className="group relative cursor-pointer overflow-hidden rounded-3xl border-2 border-white/10 bg-slate-900/60 backdrop-blur-xl transition-all duration-500 hover:border-white/30 hover:bg-slate-900/80"
         style={{
           boxShadow: `0 10px 40px ${color}15, 0 0 80px ${color}10`,
         }}
@@ -53,7 +52,7 @@ export const RoleCard: React.FC<RoleCardProps> = ({
           }}
         />
 
-        <CardContent className="relative p-10 text-center">
+        <div className="relative p-10 text-center">
           {/* Icon Container */}
           <div className="mb-8 flex justify-center">
             <motion.div
@@ -120,7 +119,7 @@ export const RoleCard: React.FC<RoleCardProps> = ({
               </svg>
             </div>
           </div>
-        </CardContent>
+        </div>
 
         {/* Corner Accent */}
         <div
@@ -129,7 +128,7 @@ export const RoleCard: React.FC<RoleCardProps> = ({
             background: `radial-gradient(circle at 100% 100%, ${color} 0%, transparent 70%)`,
           }}
         />
-      </Card>
+      </div>
     </motion.div>
   );
 };

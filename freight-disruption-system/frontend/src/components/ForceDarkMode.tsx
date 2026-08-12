@@ -1,21 +1,34 @@
 // frontend/src/components/ForceDarkMode.tsx
 // Wrapper that forces dark mode on mount and restores previous theme on unmount.
-// Used for Landing, Login, Register pages that should always appear in dark mode.
-import { useEffect } from 'react';
+// Uses ThemeContext to properly coordinate with the theme system.
+import React, { useEffect, useRef } from 'react';
+import { useTheme, Theme } from '@/shared/context/ThemeContext';
 
 export const ForceDarkMode: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  useEffect(() => {
-    const html = document.documentElement;
-    const hadDark = html.classList.contains('dark');
+  const { theme, setTheme } = useTheme();
+  const previousTheme = useRef<Theme>(theme);
+  const hasSetRef = useRef(false);
 
-    // Force dark mode
-    if (!hadDark) html.classList.add('dark');
+  useEffect(() => {
+    // Save the current theme only on first mount
+    if (!hasSetRef.current) {
+      previousTheme.current = theme;
+      hasSetRef.current = true;
+    }
+
+    // Force dark mode through the context (not DOM)
+    if (theme !== 'dark') {
+      setTheme('dark');
+    }
 
     return () => {
-      // Restore previous state when leaving these pages
-      if (!hadDark) html.classList.remove('dark');
+      // Restore the previous theme when leaving these pages
+      const saved = previousTheme.current;
+      if (saved && saved !== 'dark') {
+        setTheme(saved);
+      }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <>{children}</>;
 };

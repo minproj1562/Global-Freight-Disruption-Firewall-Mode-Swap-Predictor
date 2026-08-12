@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { useAuthStore, UserRole } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
-import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
 export const LoginPage: React.FC = () => {
   const location = useLocation();
@@ -86,7 +85,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col justify-between">
+    <div className="relative min-h-screen overflow-hidden bg-transparent text-slate-100 flex flex-col justify-between">
       <AnimatedBackground />
 
       {/* Header bar with Back Link & Theme Toggle */}
@@ -104,7 +103,6 @@ export const LoginPage: React.FC = () => {
             <Anchor className="w-3.5 h-3.5 text-emerald-400" />
             Port Manager Dedicated Registration & Login
           </Link>
-          <ThemeToggle />
         </div>
       </header>
 

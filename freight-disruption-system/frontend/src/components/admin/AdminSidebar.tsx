@@ -6,6 +6,8 @@ import {
   Activity, 
   AlertTriangle, 
   Ship, 
+  Users,
+  Database,
   LogOut, 
   Menu, 
   ChevronLeft,
@@ -14,8 +16,8 @@ import {
 import { useAuthStore } from '@/store/authStore';
 
 export interface AdminSidebarProps {
-  activeTab: '4.1' | '4.2' | '4.3';
-  onSelectTab: (tab: '4.1' | '4.2' | '4.3') => void;
+  activeTab: '4.1' | '4.2' | '4.3' | '4.4' | '4.5';
+  onSelectTab: (tab: '4.1' | '4.2' | '4.3' | '4.4' | '4.5') => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onSelectTab }) => {
@@ -23,10 +25,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, onSelectT
   const navigate = useNavigate();
   const { user, logout } = useAuthStore(); 
 
-  const navItems: Array<{ id: '4.1' | '4.2' | '4.3'; name: string; icon: React.ElementType }> = [
+  const navItems: Array<{ id: '4.1' | '4.2' | '4.3' | '4.4' | '4.5'; name: string; icon: React.ElementType }> = [
     { id: '4.1', name: '4.1 System Health', icon: Activity },
     { id: '4.2', name: '4.2 Disruptions', icon: AlertTriangle },
     { id: '4.3', name: '4.3 Vessel Fleet', icon: Ship },
+    { id: '4.4', name: '4.4 User Management', icon: Users },
+    { id: '4.5', name: '4.5 Data Management', icon: Database },
   ];
 
   const handleLogout = () => {

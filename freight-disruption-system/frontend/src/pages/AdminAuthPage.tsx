@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 import { loginAdmin } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { useToast } from '@/components/ui/use-toast';
+import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 
 export const AdminAuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -77,7 +77,8 @@ export const AdminAuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col justify-between relative overflow-hidden">
+    <div className="min-h-screen bg-transparent text-slate-100 font-sans flex flex-col justify-between relative overflow-hidden">
+      <AnimatedBackground />
       {/* Grid Pattern & Glow Accent */}
       <div className="absolute inset-0 bg-[radial-gradient(#3b0764_1px,transparent_1px)] [background-size:24px_24px] opacity-20 pointer-events-none" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -93,7 +94,6 @@ export const AdminAuthPage: React.FC = () => {
             <span className="text-[10px] text-purple-400 font-mono">SYSTEM ADMINISTRATOR PORTAL</span>
           </div>
         </Link>
-        <ThemeToggle />
       </header>
 
       {/* Main Login Form Container */}

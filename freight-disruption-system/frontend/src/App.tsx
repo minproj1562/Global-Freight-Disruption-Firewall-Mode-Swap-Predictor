@@ -20,7 +20,7 @@ import { ForceDarkMode } from '@/components/ForceDarkMode';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+      <div className="min-h-screen text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         <Routes>
           {/* Landing, Login, Register — always forced dark mode */}
           <Route path="/" element={<ForceDarkMode><LandingPage /></ForceDarkMode>} />
@@ -67,9 +67,13 @@ function App() {
           <Route path="/dashboard/operations" element={<OperationsDashboard />} />
           <Route path="/dashboard/port" element={<OperationsDashboard />} />
 
-          {/* DASHBOARD 3: ADMIN DASHBOARD (Page 4.1 System Health, Page 4.2 Disruptions, Page 4.3 Vessels) */}
+          {/* DASHBOARD 3: ADMIN DASHBOARD (Page 4.1 System Health, Page 4.2 Disruptions, Page 4.3 Vessels, Page 4.4 Users, Page 4.5 Data) */}
           <Route path="/dashboard/admin" element={<AdminDashboardPage />} />
+          <Route path="/dashboard/admin/users" element={<AdminDashboardPage />} />
+          <Route path="/dashboard/admin/data" element={<AdminDashboardPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/users" element={<AdminDashboardPage />} />
+          <Route path="/admin/data" element={<AdminDashboardPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
