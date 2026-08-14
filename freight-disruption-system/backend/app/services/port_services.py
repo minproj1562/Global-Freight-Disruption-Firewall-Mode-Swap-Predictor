@@ -1,9 +1,89 @@
 # backend/app/services/port_service.py
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from app.models.ports import Port, PortCongestionHistory
+from app.models.ports import Port, PortCongestionHistory, PortNetwork
 from typing import List
 import random
+import math
+
+def calculate_haversine_distance_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance in nautical miles between two lat/lon coordinates."""
+    R_nm = 3440.065  # Earth radius in nautical miles
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R_nm * c, 1)
+
+def ensure_network_connections_for_port(port_id: str, db: Session) -> List[PortNetwork]:
+    """
+    Dynamically generates and saves 4 to 6 realistic trading partner network connections 
+    for ANY port in the database using geographic proximity and global trade hubs.
+    """
+    port = db.query(Port).filter(Port.id == port_id).first()
+    if not port:
+        return []
+        
+    existing = db.query(PortNetwork).filter(PortNetwork.source_port_id == port_id).all()
+    if len(existing) >= 3:
+        return existing
+        
+    all_ports = db.query(Port).filter(Port.id != port_id).all()
+    if not all_ports:
+        return []
+        
+    # Calculate distance to all other ports
+    port_distances = []
+    for other in all_ports:
+        dist_nm = calculate_haversine_distance_nm(port.latitude, port.longitude, other.latitude, other.longitude)
+        port_distances.append((other, dist_nm))
+        
+    # Sort by distance
+    port_distances.sort(key=lambda x: x[1])
+    
+    # Major global hub IDs
+    global_hubs = {"port-rotterdam", "port-singapore", "port-shanghai", "port-la", "port-jebel-ali", "port-hamburg", "port-busan", "port-ningbo", "port-santos", "port-tokyo"}
+    
+    selected_dest_ids = set()
+    
+    # 1. Select 3 closest regional ports
+    for p_other, _ in port_distances:
+        if len(selected_dest_ids) >= 3:
+            break
+        selected_dest_ids.add(p_other.id)
+        
+    # 2. Select 2-3 major global hubs that are not the port itself
+    for hub_id in global_hubs:
+        if len(selected_dest_ids) >= 5:
+            break
+        if hub_id != port_id and any(p.id == hub_id for p, _ in port_distances):
+            selected_dest_ids.add(hub_id)
+            
+    # Save network connections to DB
+    new_networks = []
+    for dest_id in selected_dest_ids:
+        already_exists = db.query(PortNetwork).filter(
+            PortNetwork.source_port_id == port_id,
+            PortNetwork.dest_port_id == dest_id
+        ).first()
+        if not already_exists:
+            dest_p = next((p for p, _ in port_distances if p.id == dest_id), None)
+            dist_nm = calculate_haversine_distance_nm(port.latitude, port.longitude, dest_p.latitude, dest_p.longitude) if dest_p else 1500.0
+            avg_transit = max(1.5, round(dist_nm / 450.0, 1))
+            
+            nw = PortNetwork(
+                source_port_id=port_id,
+                dest_port_id=dest_id,
+                distance_nautical_miles=dist_nm,
+                avg_transit_days=avg_transit
+            )
+            db.add(nw)
+            new_networks.append(nw)
+            
+    db.commit()
+    return db.query(PortNetwork).filter(PortNetwork.source_port_id == port_id).all()
+
 
 def calculate_port_congestion(port: Port, db: Session) -> dict:
     """

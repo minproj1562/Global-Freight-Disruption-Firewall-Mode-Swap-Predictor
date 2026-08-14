@@ -67,14 +67,9 @@ async def get_all_ports(
         owner_port = ports[0]
     
     if owner_port:
-        from app.models.ports import PortNetwork
-        network_corridors = db.query(PortNetwork).filter(PortNetwork.source_port_id == owner_port.id).all()
+        from app.services.port_services import ensure_network_connections_for_port
+        network_corridors = ensure_network_connections_for_port(owner_port.id, db)
         network_port_ids = {c.dest_port_id for c in network_corridors}
-
-        # Guaranteed fallback network hubs if port_networks is sparse
-        if len(network_port_ids) < 4:
-            default_hubs = {"port-rotterdam", "port-singapore", "port-shanghai", "port-la", "port-dubai", "port-hamburg", "port-antwerp", "port-ningbo"}
-            network_port_ids.update(default_hubs - {owner_port.id})
 
     for p in ports:
         if owner_port and p.id == owner_port.id:

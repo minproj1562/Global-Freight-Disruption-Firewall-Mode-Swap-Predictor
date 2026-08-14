@@ -56,16 +56,10 @@ const getCongestionStyle = (pct: number) => {
   return { color: 'text-rose-500', bar: 'bg-rose-500', ring: 'ring-rose-500/30 animate-pulse', badge: 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300', label: 'CRITICAL', hex: '#ef4444' };
 };
 
-const NETWORK_PORT_IDS = new Set([
-  'port-rotterdam', 'port-singapore', 'port-shanghai', 'port-la',
-  'port-dubai', 'port-hamburg', 'port-antwerp', 'port-ningbo', 'port-busan'
-]);
-
 const checkIsNetworkPort = (port: BackendPort, assignedPortId?: string): boolean => {
   if (!port) return false;
   if (port.relation === 'self' || port.relation === 'network') return true;
   if (assignedPortId && port.id === assignedPortId) return true;
-  if (NETWORK_PORT_IDS.has(port.id)) return true;
   return false;
 };
 
