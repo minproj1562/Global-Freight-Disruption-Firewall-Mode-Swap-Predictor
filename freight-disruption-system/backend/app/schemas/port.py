@@ -23,6 +23,7 @@ class PortResponse(BaseModel):
     congestion_updated_by: Optional[str] = None
     congestion_updated_at: Optional[datetime] = None
     congestion_source: Optional[str] = "api"  # "api" | "manual"
+    relation: Optional[str] = "other"  # "self" | "network" | "other"
 
     class Config:
         from_attributes = True

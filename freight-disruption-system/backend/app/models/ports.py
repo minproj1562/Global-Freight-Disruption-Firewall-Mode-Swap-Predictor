@@ -152,3 +152,13 @@ class PortDisruption(Base):
     
     # Relationships
     port = relationship("Port", back_populates="disruptions")
+
+class PortNetwork(Base):
+    __tablename__ = "port_networks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_port_id = Column(String, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    dest_port_id = Column(String, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    distance_nautical_miles = Column(Float)
+    avg_transit_days = Column(Float)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

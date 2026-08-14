@@ -19,6 +19,7 @@ export interface BackendPort {
   congestion_updated_by?: string;
   congestion_updated_at?: string;
   congestion_source?: string; // "api" | "manual"
+  relation?: 'self' | 'network' | 'other';
 }
 
 export interface BackendBerthSlot {
@@ -86,10 +87,11 @@ export interface BackendPortDetail extends BackendPort {
 
 // ============= READ API CALLS =============
 
-export const fetchAllPorts = async (search?: string, congestionLevel?: string): Promise<BackendPort[]> => {
+export const fetchAllPorts = async (search?: string, congestionLevel?: string, assignedPortId?: string): Promise<BackendPort[]> => {
   const params: Record<string, string> = {};
   if (search) params.search = search;
   if (congestionLevel && congestionLevel !== 'all') params.congestion_level = congestionLevel;
+  if (assignedPortId) params.assigned_port_id = assignedPortId;
 
   const response = await api.get<BackendPort[]>('/api/ports/', { params });
   return response.data;
@@ -229,3 +231,75 @@ export const markVesselDepartedApi = async (
   const response = await api.patch<BackendVesselArrival>(`/api/ports/${portId}/arrivals/${arrivalId}/departed`);
   return response.data;
 };
+
+// ============= NETWORK TELEMETRY TYPES =============
+
+export interface VesselScheduleEntry {
+  id: string;
+  vessel_name: string;
+  mmsi: string;
+  departure_time: string;
+  arrival_time: string;
+  status: string;
+  status_code: 'ON_TIME' | 'DELAYED' | 'CANCELLED';
+  cargo: string;
+}
+
+export interface RouteStatus {
+  corridor_name: string;
+  route_status: string;
+  weather_condition: string;
+  sea_state: string;
+  est_travel_days: string;
+  chokepoint_impact: string;
+  alternative_route: string;
+}
+
+export interface AIImpactPrediction {
+  surge_pct: number;
+  days_out: number;
+  risk_level: 'CRITICAL_RIPPLE' | 'HIGH_RIPPLE' | 'STABLE_CORRIDOR';
+  risk_badge: string;
+  ai_recommendation: string;
+  ai_insight_narrative: string;
+  confidence_score_pct: number;
+}
+
+export interface PortManagerContact {
+  manager_name: string;
+  role: string;
+  email: string;
+  phone: string;
+  vhf_channel: string;
+}
+
+export interface NetworkPortTelemetry {
+  dest_port_id: string;
+  dest_port_name: string;
+  dest_port_code: string;
+  dest_country: string;
+  congestion_percent: number;
+  avg_wait_hours: number;
+  waiting_vessels: number;
+  trade_volume_teu_monthly: string;
+  voyage_frequency: string;
+  historical_reliability_pct: number;
+  vessel_schedule: VesselScheduleEntry[];
+  route_status: RouteStatus;
+  ai_impact_prediction: AIImpactPrediction;
+  manager_contact: PortManagerContact;
+  last_sync_timestamp: string;
+}
+
+// ============= NETWORK TELEMETRY API CALL =============
+
+export const fetchNetworkPortTelemetry = async (
+  portId: string,
+  assignedPortId?: string
+): Promise<NetworkPortTelemetry> => {
+  const params: Record<string, string> = {};
+  if (assignedPortId) params.assigned_port_id = assignedPortId;
+  const response = await api.get<NetworkPortTelemetry>(`/api/ports/${portId}/network-telemetry`, { params });
+  return response.data;
+};
+

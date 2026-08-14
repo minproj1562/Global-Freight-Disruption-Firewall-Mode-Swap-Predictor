@@ -263,7 +263,7 @@ export const VesselLogsPage: React.FC = () => {
           </div>
 
           {/* FILTERS ROW */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-900/70 p-4 rounded-xl border border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none">
             
             {/* Search Input */}
             <div className="relative">
@@ -273,7 +273,7 @@ export const VesselLogsPage: React.FC = () => {
                 placeholder="Search Vessel, MMSI, Port..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
               />
             </div>
 
@@ -282,7 +282,7 @@ export const VesselLogsPage: React.FC = () => {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 capitalize"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50 capitalize"
               >
                 <option value="all">All Vessel Types</option>
                 {vesselTypes.filter((t) => t !== 'all').map((t) => (
@@ -298,7 +298,7 @@ export const VesselLogsPage: React.FC = () => {
               <select
                 value={flagFilter}
                 onChange={(e) => setFlagFilter(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50"
               >
                 <option value="all">All Flag Registries</option>
                 {vesselFlags.filter((f) => f !== 'all').map((f) => (
@@ -317,7 +317,7 @@ export const VesselLogsPage: React.FC = () => {
                   setTypeFilter('all');
                   setFlagFilter('all');
                 }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Reset Filters
@@ -327,82 +327,84 @@ export const VesselLogsPage: React.FC = () => {
         </div>
 
         {/* ======== VESSEL LOGS TABLE ======== */}
-        <div className="bg-slate-900/80 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xl shadow-slate-100 dark:shadow-none overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase font-mono text-[11px] border-b border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-200 uppercase font-mono text-[11px] border-b border-slate-900 dark:border-slate-800">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">Vessel / MMSI</th>
-                  <th className="py-3.5 px-4 font-semibold">Type & Flag</th>
-                  <th className="py-3.5 px-4 font-semibold">Port & Terminal</th>
-                  <th className="py-3.5 px-4 font-semibold">Berth / Quay</th>
-                  <th className="py-3.5 px-4 font-semibold">Arrival (ATA/ETA)</th>
-                  <th className="py-3.5 px-4 font-semibold">Departure (ATD/ETD)</th>
-                  <th className="py-3.5 px-4 font-semibold">Cargo Manifest</th>
-                  <th className="py-3.5 px-4 font-semibold">Status</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Vessel / MMSI</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Type & Flag</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Port & Terminal</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Berth / Quay</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Arrival (ATA/ETA)</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Departure (ATD/ETD)</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Cargo Manifest</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900/60">
                 {filteredLogs.length > 0 ? (
                   filteredLogs.map((log) => (
                     <motion.tr
                       key={log.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="hover:bg-slate-800/40 transition-colors"
+                      className="hover:bg-amber-50/40 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800"
                     >
                       {/* Vessel / MMSI */}
                       <td className="py-4 px-4">
-                        <div className="font-bold text-white text-sm flex items-center gap-2">
-                          <Ship className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                          <Ship className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <span>{log.name}</span>
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                           MMSI: {log.mmsi} | IMO: {log.imo}
                         </div>
                       </td>
 
                       {/* Type & Flag */}
                       <td className="py-4 px-4">
-                        <div className="font-semibold text-slate-200">{log.type}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{log.flag}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{log.type}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{log.flag}</div>
                       </td>
 
                       {/* Port & Terminal */}
                       <td className="py-4 px-4">
-                        <div className="font-medium text-slate-200">{log.port}</div>
-                        <div className="text-[10px] text-slate-400 truncate max-w-[180px]">{log.terminal}</div>
+                        <div className="font-bold text-slate-900 dark:text-slate-100">{log.port}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{log.terminal}</div>
                       </td>
 
                       {/* Berth / Quay */}
-                      <td className="py-4 px-4 font-mono font-medium text-amber-300">
-                        {log.berth}
+                      <td className="py-4 px-4">
+                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded-lg border border-amber-200/80 dark:border-amber-800/60 inline-block text-[11px]">
+                          {log.berth}
+                        </span>
                       </td>
 
                       {/* Arrival */}
-                      <td className="py-4 px-4 font-mono text-slate-200">
+                      <td className="py-4 px-4 font-mono text-slate-800 dark:text-slate-200">
                         {log.ata ? (
-                          <div className="text-emerald-400 font-semibold">{log.ata} <span className="text-[9px] text-slate-500 block">(ATA Actual)</span></div>
+                          <div className="text-emerald-700 dark:text-emerald-400 font-bold">{log.ata} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ATA Actual)</span></div>
                         ) : (
-                          <div className="text-slate-300">{log.arrivalDate} <span className="text-[9px] text-slate-500 block">(ETA Estimated)</span></div>
+                          <div className="text-slate-700 dark:text-slate-300">{log.arrivalDate} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ETA Estimated)</span></div>
                         )}
                       </td>
 
                       {/* Departure */}
-                      <td className="py-4 px-4 font-mono text-slate-200">
+                      <td className="py-4 px-4 font-mono text-slate-800 dark:text-slate-200">
                         {log.atd ? (
-                          <div className="text-purple-400 font-semibold">{log.atd} <span className="text-[9px] text-slate-500 block">(ATD Actual)</span></div>
+                          <div className="text-purple-700 dark:text-purple-400 font-bold">{log.atd} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ATD Actual)</span></div>
                         ) : (
-                          <div className="text-slate-300">{log.departureDate} <span className="text-[9px] text-slate-500 block">(ETD Estimated)</span></div>
+                          <div className="text-slate-700 dark:text-slate-300">{log.departureDate} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ETD Estimated)</span></div>
                         )}
                       </td>
 
                       {/* Cargo Manifest */}
                       <td className="py-4 px-4">
-                        <div className="text-slate-300 max-w-[200px] truncate" title={log.cargo}>
+                        <div className="text-slate-800 dark:text-slate-200 font-medium max-w-[200px] truncate" title={log.cargo}>
                           {log.cargo}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">Agent: {log.agent}</div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Agent: {log.agent}</div>
                       </td>
 
                       {/* Status */}
@@ -419,7 +421,7 @@ export const VesselLogsPage: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500 font-mono">
+                    <td colSpan={8} className="py-12 text-center text-slate-400 font-mono">
                       No vessel records found matching your filters.
                     </td>
                   </tr>
@@ -428,7 +430,7 @@ export const VesselLogsPage: React.FC = () => {
             </table>
           </div>
 
-          <div className="bg-slate-950/90 px-6 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+          <div className="bg-slate-50 dark:bg-slate-950/90 px-6 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
             <span>Showing {filteredLogs.length} of {MOCK_VESSEL_LOGS.length} Vessel Log Entries</span>
             <span>Last Terminal Log Sync: Just Now (Live AIS Ingest)</span>
           </div>

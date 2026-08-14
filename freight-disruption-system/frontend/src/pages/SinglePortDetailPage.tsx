@@ -37,9 +37,12 @@ import {
   UserCheck,
   Navigation,
   Trash2,
+  Lock,
+  Globe,
 } from 'lucide-react';
 
 import { useToast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/authStore';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,9 +69,22 @@ export const SinglePortDetailPage: React.FC = () => {
   const { portId } = useParams<{ portId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, role } = useAuthStore();
+
+  const userPortName = user?.portName || 'Port of Rotterdam';
 
   const [allPortsList, setAllPortsList] = useState<BackendPort[]>([]);
   const [portDetail, setPortDetail] = useState<BackendPortDetail | null>(null);
+
+  // Permission check: Admin manages all, Port Manager manages only their assigned port
+  const isManagedPort = React.useMemo(() => {
+    if (role === 'admin') return true;
+    if (!portDetail) return false;
+    const userP = userPortName.toLowerCase().replace(/port\s+of\s+/i, '').trim();
+    const portN = portDetail.name.toLowerCase().replace(/port\s+of\s+/i, '').trim();
+    const portI = portDetail.id.toLowerCase().replace(/^port-/, '').trim();
+    return portN.includes(userP) || userP.includes(portN) || portI.includes(userP) || userP.includes(portI);
+  }, [role, userPortName, portDetail]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -454,10 +470,25 @@ export const SinglePortDetailPage: React.FC = () => {
             <Download className="w-3.5 h-3.5 text-amber-500" />
             <span className="hidden sm:inline">Export PDF</span>
           </Button>
-          <Button onClick={() => setIsDisruptionModalOpen(true)} disabled={!portDetail}
-            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-rose-500/20 flex items-center gap-1.5">
-            <ShieldAlert className="w-4 h-4" />
-            Flag Disruption
+          <Button
+            onClick={() => {
+              if (!isManagedPort) {
+                toast({
+                  title: "Operational Access Restricted",
+                  description: `You are assigned to ${userPortName}. You can monitor other ports in the network, but operational changes are restricted to your assigned station.`,
+                  variant: "destructive"
+                });
+                return;
+              }
+              setIsDisruptionModalOpen(true);
+            }}
+            disabled={!portDetail}
+            className={isManagedPort
+              ? "bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-lg shadow-rose-500/20 flex items-center gap-1.5 opacity-100"
+              : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 opacity-70 cursor-not-allowed"}
+          >
+            {isManagedPort ? <ShieldAlert className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5" />}
+            {isManagedPort ? "Flag Disruption" : "Flag Disruption (Read-Only)"}
           </Button>
           <ThemeToggle />
         </div>
@@ -482,23 +513,44 @@ export const SinglePortDetailPage: React.FC = () => {
 
         {portDetail && !loading && (
           <>
+            {/* ===== ACCESS PERMISSION BANNER ===== */}
+            {isManagedPort ? (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span><strong>ASSIGNED MANAGED STATION:</strong> Full operational controls active for <strong>{portDetail.name}</strong>. Terminal berths, congestion overrides, arrivals & departures are editable.</span>
+                </div>
+                <span className="font-mono text-[11px] bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">OPERATIONAL AUTHORITY ACTIVE</span>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 shrink-0 text-amber-500" />
+                  <span><strong>GLOBAL NETWORK MONITORING VIEW:</strong> You are observing <strong>{portDetail.name}</strong> in Read-Only Mode. Assigned operational station: <strong>{userPortName}</strong>.</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-[11px] bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30 shrink-0 text-amber-800 dark:text-amber-300">
+                  <Lock className="w-3 h-3 text-amber-500" />
+                  <span>READ-ONLY TELEMETRY</span>
+                </div>
+              </div>
+            )}
             {/* ===== PORT HEADER BANNER ===== */}
-            <div className="relative bg-white dark:bg-gradient-to-r dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/30 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="relative bg-gradient-to-br from-white via-slate-50 to-amber-50/50 dark:bg-gradient-to-r dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/30 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300">
+                  <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-300">
                     UN/LOCODE: {portDetail.code}
                   </span>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                     {portDetail.country} • {portDetail.latitude}° | {portDetail.longitude}°
                   </span>
                 </div>
-                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{portDetail.name}</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{portDetail.name}</h2>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
                   Primary Exports: {portDetail.primary_exports?.join(', ') || 'General Cargo'}.
                 </p>
               </div>
-              <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-950/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-xs font-mono">
+              <div className="flex items-center gap-4 bg-white/90 dark:bg-slate-950/80 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/80 text-xs font-mono shadow-sm">
                 <div className="space-y-1">
                   <span className="text-slate-500 dark:text-slate-400 block text-[11px]">Port Status</span>
                   <span className="font-bold text-amber-600 dark:text-amber-300 text-sm uppercase">{portDetail.status_label || portDetail.congestion_level}</span>
@@ -598,11 +650,24 @@ export const SinglePortDetailPage: React.FC = () => {
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manually override congestion data. Overrides API data immediately.</p>
                 </div>
                 <Button
-                  onClick={() => { setCongestionValue(portDetail.congestion_percent); setShowCongestionModal(true); }}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shadow-md shadow-amber-500/20 flex items-center gap-2"
+                  onClick={() => {
+                    if (!isManagedPort) {
+                      toast({
+                        title: "Operational Access Restricted",
+                        description: `You are assigned to ${userPortName}. You cannot override congestion metrics for ${portDetail.name}.`,
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    setCongestionValue(portDetail.congestion_percent);
+                    setShowCongestionModal(true);
+                  }}
+                  className={isManagedPort
+                    ? "bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shadow-md shadow-amber-500/20 flex items-center gap-2"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 cursor-not-allowed opacity-70"}
                 >
-                  <Edit3 className="w-4 h-4" />
-                  UPDATE CONGESTION
+                  {isManagedPort ? <Edit3 className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5" />}
+                  {isManagedPort ? "UPDATE CONGESTION" : "UPDATE CONGESTION (Read-Only)"}
                 </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -706,10 +771,19 @@ export const SinglePortDetailPage: React.FC = () => {
                               </div>
                               {/* FREE BERTH button */}
                               <button
-                                onClick={() => setFreeBerthTarget(berth)}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all"
+                                onClick={() => {
+                                  if (!isManagedPort) {
+                                    toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot modify berths at ${portDetail.name}.`, variant: "destructive" });
+                                    return;
+                                  }
+                                  setFreeBerthTarget(berth);
+                                }}
+                                className={isManagedPort
+                                  ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all"
+                                  : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
                               >
-                                <XCircle className="w-3.5 h-3.5" /> FREE BERTH
+                                {isManagedPort ? <XCircle className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
+                                {isManagedPort ? "FREE BERTH" : "FREE BERTH (Read-Only)"}
                               </button>
                             </div>
                           ) : (
@@ -720,10 +794,19 @@ export const SinglePortDetailPage: React.FC = () => {
                               </div>
                               {/* ASSIGN VESSEL button */}
                               <button
-                                onClick={() => setAssignBerth(berth)}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all"
+                                onClick={() => {
+                                  if (!isManagedPort) {
+                                    toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot assign berths at ${portDetail.name}.`, variant: "destructive" });
+                                    return;
+                                  }
+                                  setAssignBerth(berth);
+                                }}
+                                className={isManagedPort
+                                  ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all"
+                                  : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
                               >
-                                <UserCheck className="w-3.5 h-3.5" /> ASSIGN VESSEL
+                                {isManagedPort ? <UserCheck className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
+                                {isManagedPort ? "ASSIGN VESSEL" : "ASSIGN VESSEL (Read-Only)"}
                               </button>
                             </div>
                           )}
@@ -731,18 +814,18 @@ export const SinglePortDetailPage: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
+                        <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
                           <tr>
-                            <th className="p-3">Berth #</th>
-                            <th className="p-3">Docked Vessel</th>
-                            <th className="p-3">MMSI</th>
-                            <th className="p-3">Type</th>
-                            <th className="p-3">Progress</th>
-                            <th className="p-3">ETD</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Actions</th>
+                            <th className="p-3 text-white">Berth #</th>
+                            <th className="p-3 text-white">Docked Vessel</th>
+                            <th className="p-3 text-white">MMSI</th>
+                            <th className="p-3 text-white">Type</th>
+                            <th className="p-3 text-white">Progress</th>
+                            <th className="p-3 text-white">ETD</th>
+                            <th className="p-3 text-white">Status</th>
+                            <th className="p-3 text-white">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
@@ -764,14 +847,20 @@ export const SinglePortDetailPage: React.FC = () => {
                                 </span>
                               </td>
                               <td className="p-3">
-                                {berth.is_occupied ? (
-                                  <button onClick={() => setFreeBerthTarget(berth)} className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-bold hover:bg-rose-500/25 transition-all border border-rose-500/20">
-                                    Free Berth
-                                  </button>
+                                {isManagedPort ? (
+                                  berth.is_occupied ? (
+                                    <button onClick={() => setFreeBerthTarget(berth)} className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-bold hover:bg-rose-500/25 transition-all border border-rose-500/20">
+                                      Free Berth
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => setAssignBerth(berth)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/25 transition-all border border-emerald-500/20">
+                                      Assign Vessel
+                                    </button>
+                                  )
                                 ) : (
-                                  <button onClick={() => setAssignBerth(berth)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/25 transition-all border border-emerald-500/20">
-                                    Assign Vessel
-                                  </button>
+                                  <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                    <Lock className="w-3 h-3 text-slate-400" /> Read-Only
+                                  </span>
                                 )}
                               </td>
                             </tr>
@@ -803,31 +892,40 @@ export const SinglePortDetailPage: React.FC = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => setShowAddArrivalModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+                      onClick={() => {
+                        if (!isManagedPort) {
+                          toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot add arrivals for ${portDetail.name}.`, variant: "destructive" });
+                          return;
+                        }
+                        setShowAddArrivalModal(true);
+                      }}
+                      className={isManagedPort
+                        ? "flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+                        : "flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold transition-all cursor-not-allowed opacity-70"}
                     >
-                      <Plus className="w-4 h-4" /> ADD ARRIVAL
+                      {isManagedPort ? <Plus className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5" />}
+                      {isManagedPort ? "ADD ARRIVAL" : "ADD ARRIVAL (Read-Only)"}
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
+                      <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
                         <tr>
-                          <th className="p-3">ETA</th>
-                          <th className="p-3">Vessel Name</th>
-                          <th className="p-3">MMSI / Type</th>
-                          <th className="p-3">Cargo</th>
-                          <th className="p-3">Berth</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Actions</th>
+                          <th className="p-3 text-white">ETA</th>
+                          <th className="p-3 text-white">Vessel Name</th>
+                          <th className="p-3 text-white">MMSI / Type</th>
+                          <th className="p-3 text-white">Cargo</th>
+                          <th className="p-3 text-white">Berth</th>
+                          <th className="p-3 text-white">Status</th>
+                          <th className="p-3 text-white">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
                         {filteredArrivals.length === 0 ? (
                           <tr><td colSpan={7} className="p-6 text-center text-slate-500 font-mono text-xs">No arrivals in 72h window.</td></tr>
                         ) : filteredArrivals.map((arr) => (
-                          <tr key={arr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr key={arr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
                             <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-300">
                               <div className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-amber-500" />{new Date(arr.eta).toLocaleString()}</div>
                             </td>
@@ -841,21 +939,29 @@ export const SinglePortDetailPage: React.FC = () => {
                               </span>
                             </td>
                             <td className="p-3">
-                              {arr.status !== 'Cancelled' && arr.status !== 'Docked' && arr.status !== 'Departed' && (
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => setMarkArrivedTarget(arr)} title="Mark Arrived"
-                                    className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all">
-                                    <CheckCircle className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button onClick={() => { setEditEtaArrival(arr); setEditEtaValue(arr.eta.slice(0, 16)); }} title="Edit ETA"
-                                    className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/20 transition-all">
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button onClick={() => setCancelArrivalTarget(arr)} title="Cancel"
-                                    className="p-1.5 rounded-lg bg-slate-500/15 hover:bg-rose-500/20 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 transition-all">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                              {isManagedPort ? (
+                                arr.status !== 'Cancelled' && arr.status !== 'Docked' && arr.status !== 'Departed' ? (
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => setMarkArrivedTarget(arr)} title="Mark Arrived"
+                                      className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all">
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => { setEditEtaArrival(arr); setEditEtaValue(arr.eta.slice(0, 16)); }} title="Edit ETA"
+                                      className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/20 transition-all">
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button onClick={() => setCancelArrivalTarget(arr)} title="Cancel"
+                                      className="p-1.5 rounded-lg bg-slate-500/15 hover:bg-rose-500/20 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 transition-all">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 font-mono">—</span>
+                                )
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                  <Lock className="w-3 h-3 text-slate-400" /> Read-Only
+                                </span>
                               )}
                             </td>
                           </tr>
@@ -877,24 +983,24 @@ export const SinglePortDetailPage: React.FC = () => {
                     <p className="text-xs text-slate-500 dark:text-slate-400">Marking a vessel as departed will automatically free its berth.</p>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 font-mono uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
+                      <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
                         <tr>
-                          <th className="p-3">Vessel Name</th>
-                          <th className="p-3">MMSI</th>
-                          <th className="p-3">Type</th>
-                          <th className="p-3">Berth Assignment</th>
-                          <th className="p-3">Arrived (ATA)</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Actions</th>
+                          <th className="p-3 text-white">Vessel Name</th>
+                          <th className="p-3 text-white">MMSI</th>
+                          <th className="p-3 text-white">Type</th>
+                          <th className="p-3 text-white">Berth Assignment</th>
+                          <th className="p-3 text-white">Arrived (ATA)</th>
+                          <th className="p-3 text-white">Status</th>
+                          <th className="p-3 text-white">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
                         {(portDetail.docked_vessels || []).length === 0 ? (
                           <tr><td colSpan={7} className="p-6 text-center text-slate-500 font-mono text-xs">No vessels currently docked.</td></tr>
                         ) : (portDetail.docked_vessels || []).map((vessel) => (
-                          <tr key={vessel.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr key={vessel.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
                             <td className="p-3 font-bold text-slate-900 dark:text-white">{vessel.vessel_name}</td>
                             <td className="p-3 font-mono text-slate-600 dark:text-slate-400">{vessel.vessel_mmsi}</td>
                             <td className="p-3 text-slate-700 dark:text-slate-300">{vessel.vessel_type || 'Container'}</td>
@@ -906,12 +1012,18 @@ export const SinglePortDetailPage: React.FC = () => {
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300">Docked</span>
                             </td>
                             <td className="p-3">
-                              <button
-                                onClick={() => setDepartTarget(vessel)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold shadow-sm transition-all"
-                              >
-                                <Navigation className="w-3 h-3" /> MARK DEPARTED
-                              </button>
+                              {isManagedPort ? (
+                                <button
+                                  onClick={() => setDepartTarget(vessel)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold shadow-sm transition-all"
+                                >
+                                  <Navigation className="w-3 h-3" /> MARK DEPARTED
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                  <Lock className="w-3 h-3 text-slate-400" /> Read-Only
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}

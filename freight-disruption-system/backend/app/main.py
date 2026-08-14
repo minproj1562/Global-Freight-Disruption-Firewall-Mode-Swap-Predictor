@@ -34,8 +34,8 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     from app.models.ports import Port
     port_count = db.query(Port).count()
-    if port_count == 0:
-        print("📦 Seeding sample ports...")
+    if port_count < 50:
+        print(f"📦 Seeding sample ports (current count: {port_count})...")
         seed_sample_ports(db)
     db.close()
     

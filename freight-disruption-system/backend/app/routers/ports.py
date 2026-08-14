@@ -2,9 +2,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
 from app.database import get_db
+from app.services.ai_telemetry_engine import get_full_network_telemetry
 from app.schemas.port import (
     PortResponse,
     PortDetailResponse,
@@ -32,6 +33,7 @@ router = APIRouter(prefix="/api/ports", tags=["Ports"])
 async def get_all_ports(
     search: Optional[str] = Query(None, description="Search by port name, code, or country"),
     congestion_level: Optional[str] = Query(None, description="Filter by congestion level"),
+    assigned_port_id: Optional[str] = Query(None, description="Assigned port ID of the current manager to map network connections"),
     db: Session = Depends(get_db)
 ):
     """
@@ -52,6 +54,36 @@ async def get_all_ports(
         query = query.filter(Port.congestion_level == congestion_level)
 
     ports = query.all()
+
+    # Calculate network relation context
+    owner_port = None
+    network_port_ids = set()
+
+    if assigned_port_id:
+        owner_port = db.query(Port).filter(Port.id == assigned_port_id).first()
+
+    if not owner_port and ports:
+        # Default to first port (Rotterdam) if assigned_port_id not specified
+        owner_port = ports[0]
+    
+    if owner_port:
+        from app.models.ports import PortNetwork
+        network_corridors = db.query(PortNetwork).filter(PortNetwork.source_port_id == owner_port.id).all()
+        network_port_ids = {c.dest_port_id for c in network_corridors}
+
+        # Guaranteed fallback network hubs if port_networks is sparse
+        if len(network_port_ids) < 4:
+            default_hubs = {"port-rotterdam", "port-singapore", "port-shanghai", "port-la", "port-dubai", "port-hamburg", "port-antwerp", "port-ningbo"}
+            network_port_ids.update(default_hubs - {owner_port.id})
+
+    for p in ports:
+        if owner_port and p.id == owner_port.id:
+            p.relation = "self"
+        elif p.id in network_port_ids:
+            p.relation = "network"
+        else:
+            p.relation = "other"
+
     return ports
 
 # ============= PAGE 3.2: SINGLE PORT DETAIL =============
@@ -543,3 +575,36 @@ async def get_port_berths(
     """
     berth_slots = db.query(BerthSlot).filter(BerthSlot.port_id == port_id).all()
     return berth_slots
+
+
+# ============= REAL-TIME AI NETWORK CORRIDOR TELEMETRY =============
+
+@router.get("/{port_id}/network-telemetry")
+async def get_network_corridor_telemetry(
+    port_id: str,
+    assigned_port_id: Optional[str] = Query(None, description="The home port ID of the requesting port manager"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Real-time AI Network Corridor Telemetry & Disruption Prediction Engine.
+
+    Returns comprehensive monitoring data for a specific network partner port:
+    - 7-day vessel arrival & departure schedule
+    - Maritime route status & alternative rerouting paths
+    - AI-powered downstream congestion surge prediction
+    - Trade volume & reliability metrics
+    - Direct port manager contact information
+    """
+    port = db.query(Port).filter(Port.id == port_id).first()
+    if not port:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Port '{port_id}' not found."
+        )
+
+    telemetry = get_full_network_telemetry(
+        dest_port_id=port_id,
+        assigned_port_id=assigned_port_id or "",
+        db=db
+    )
+    return telemetry
