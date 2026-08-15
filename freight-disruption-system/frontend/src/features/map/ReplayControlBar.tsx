@@ -8,6 +8,8 @@ interface ReplayControlBarProps {
   onSeek: (progress: number) => void;
   speed: number;
   onChangeSpeed: (speed: number) => void;
+  replayRange?: '24h' | '7d';
+  onChangeRange?: (range: '24h' | '7d') => void;
   className?: string;
 }
 
@@ -18,12 +20,15 @@ export const ReplayControlBar: React.FC<ReplayControlBarProps> = ({
   onSeek,
   speed,
   onChangeSpeed,
+  replayRange = '24h',
+  onChangeRange,
   className = '',
 }) => {
 
-  // Compute timestamp string based on progress (past 24h)
+  // Compute timestamp string based on progress (24h or 7d)
   const getTimestampForProgress = (pct: number) => {
-    const totalMinutesAgo = (100 - pct) * 14.4; // 24h = 1440 mins
+    const totalMins = replayRange === '7d' ? 7 * 24 * 60 : 24 * 60;
+    const totalMinutesAgo = (100 - pct) * (totalMins / 100);
     const date = new Date(Date.now() - totalMinutesAgo * 60 * 1000);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
@@ -42,20 +47,41 @@ export const ReplayControlBar: React.FC<ReplayControlBarProps> = ({
           <span className="text-slate-200">{currentTimestamp} UTC</span>
         </div>
 
-        {/* Speed Multiplier Buttons */}
-        <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
-          {[1, 2, 4].map((s) => (
-            <button
-              key={s}
-              onClick={() => onChangeSpeed(s)}
-              type="button"
-              className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors ${
-                speed === s ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {s}x
-            </button>
-          ))}
+        {/* Controls: Speed & Range Toggle */}
+        <div className="flex items-center gap-2">
+          {/* 24h / 7d Range Selector */}
+          {onChangeRange && (
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+              {(['24h', '7d'] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => onChangeRange(r)}
+                  type="button"
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors ${
+                    replayRange === r ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Speed Multiplier Buttons */}
+          <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-lg border border-slate-800">
+            {[1, 2, 4].map((s) => (
+              <button
+                key={s}
+                onClick={() => onChangeSpeed(s)}
+                type="button"
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors ${
+                  speed === s ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

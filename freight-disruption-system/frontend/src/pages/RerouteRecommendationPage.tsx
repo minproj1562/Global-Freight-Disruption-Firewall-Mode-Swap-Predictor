@@ -33,6 +33,9 @@ import {
   BarChart3,
   CheckCircle2,
   X,
+  PlayCircle,
+  ShieldCheck,
+  Search,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -77,7 +80,11 @@ export const RerouteRecommendationPage: React.FC = () => {
     cargo_type: navState?.cargoType || 'High-Tech Consumer Electronics',
     priority: 'Balanced',
     disruption_to_avoid: navState?.disruptionToAvoid || 'disruption-red-sea-critical',
+    cargo_value_usd: 42000000,
   });
+
+  // Vessel Dropdown Search Filter State for 200+ vessels
+  const [vesselSearchFilter, setVesselSearchFilter] = useState('');
 
   // Simulation & Results State
   const [simulationResult] = useState<SimulationResult>(
@@ -344,6 +351,22 @@ export const RerouteRecommendationPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Launch in Simulator Trigger Button */}
+          <button
+            onClick={() => {
+              // FASTAPI / DASHBOARD 2 INTEGRATION POINT: Hand-off route parameters to Supply Chain Simulator & Digital Twin
+              console.log('Dispatching parameters to Dashboard 2:', formData);
+              toast({
+                title: 'Dispatching to Simulator',
+                description: 'Would send parameters to Dashboard 2 (Supply Chain Simulator & Digital Twin).',
+              });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold transition-all shadow-sm"
+          >
+            <PlayCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Launch in Simulator</span>
+          </button>
+
           {/* Compare with Dijkstra Trigger Button */}
           <button
             onClick={() => setShowDijkstraModal(true)}
@@ -422,22 +445,51 @@ export const RerouteRecommendationPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* 3. Target Vessel Selectable Dropdown */}
+                {/* 3. Target Vessel Selectable Dropdown with Search */}
                 <div>
                   <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    TARGET VESSEL <span className="text-rose-400">*</span>
+                    TARGET VESSEL ({MOCK_VESSELS.length} FLEET) <span className="text-rose-400">*</span>
                   </label>
-                  <select
-                    value={formData.vessel_id}
-                    onChange={(e) => setFormData({ ...formData, vessel_id: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
-                  >
-                    {MOCK_VESSELS.map((vessel) => (
-                      <option key={vessel.id} value={vessel.id}>
-                        {vessel.name} ({vessel.vessel_type} — {vessel.flag})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search 200+ vessels by name..."
+                        value={vesselSearchFilter}
+                        onChange={(e) => setVesselSearchFilter(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1 text-[11px] text-slate-200 font-mono focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+                    <select
+                      value={formData.vessel_id}
+                      onChange={(e) => setFormData({ ...formData, vessel_id: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                    >
+                      {MOCK_VESSELS.filter((v) =>
+                        v.name.toLowerCase().includes(vesselSearchFilter.toLowerCase()) ||
+                        v.vessel_type.toLowerCase().includes(vesselSearchFilter.toLowerCase())
+                      ).map((vessel) => (
+                        <option key={vessel.id} value={vessel.id}>
+                          {vessel.name} ({vessel.vessel_type} — {vessel.flag})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 4. Cargo Value Input ($USD) */}
+                <div>
+                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
+                    CARGO VALUE ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 42000000"
+                    value={formData.cargo_value_usd || ''}
+                    onChange={(e) => setFormData({ ...formData, cargo_value_usd: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80"
+                  />
                 </div>
 
                 {/* 4. Cargo Type Dropdown */}
@@ -458,13 +510,13 @@ export const RerouteRecommendationPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* 5. Priority Segmented Control */}
+                {/* 6. Priority Segmented Control (4 Options: Cost, Time, Balanced, Carbon) */}
                 <div>
                   <label className="block text-xs font-mono font-semibold text-slate-300 mb-1.5">
                     OPTIMIZATION PRIORITY
                   </label>
-                  <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                    {(['Cost', 'Time', 'Balanced'] as const).map((p) => (
+                  <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    {(['Cost', 'Time', 'Balanced', 'Carbon'] as const).map((p) => (
                       <button
                         key={p}
                         type="button"
@@ -592,16 +644,19 @@ export const RerouteRecommendationPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Header Row: Rank, Title, Carrier, Confidence */}
+                    {/* Header Row: Rank, Title, Strategy Label, Carrier, Confidence */}
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-mono font-bold text-amber-400 text-xs shadow-inner">
                             #{route.rank}
                           </span>
                           <h3 className="text-sm font-bold font-mono text-white">
                             {route.title}
                           </h3>
+                          <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono text-[10px] font-bold uppercase">
+                            Strategy: {route.strategy_label || (route.rank === 1 ? 'Most Resilient' : route.rank === 2 ? 'Cheapest' : 'Fastest')}
+                          </span>
                         </div>
                         <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                           Carrier: <strong className="text-slate-200">{route.carrier_name}</strong>
@@ -667,15 +722,15 @@ export const RerouteRecommendationPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Metrics Grid (Cost, Time, Carbon, Savings) */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-xs font-mono">
+                    {/* Metrics Grid (Cost, Time, Carbon, ML Risk Score, Savings) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-4 text-xs font-mono">
                       <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
                         <span className="text-[10px] text-slate-400 block mb-0.5">TOTAL COST</span>
                         <span className="text-white font-bold text-sm">${route.total_cost_usd.toLocaleString()}</span>
                       </div>
 
                       <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block mb-0.5">TOTAL TRANSIT TIME</span>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">TRANSIT TIME</span>
                         <span className="text-white font-bold text-sm">{route.total_time_days} Days</span>
                       </div>
 
@@ -686,10 +741,17 @@ export const RerouteRecommendationPage: React.FC = () => {
                         <span className="text-emerald-400 font-bold text-sm">{route.co2_carbon_footprint_tons} t CO₂</span>
                       </div>
 
-                      <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/30">
-                        <span className="text-[10px] text-emerald-400 font-bold block mb-0.5">SAVINGS VS ORIGINAL</span>
+                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block mb-0.5">ML RISK SCORE</span>
+                        <span className="text-amber-400 font-bold text-sm">
+                          {route.ml_risk_score ?? (route.risk_level === 'low' ? 0.12 : 0.35)}
+                        </span>
+                      </div>
+
+                      <div className="col-span-2 sm:col-span-1 bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/30">
+                        <span className="text-[10px] text-emerald-400 font-bold block mb-0.5">SAVINGS VS ORIG</span>
                         <span className="text-emerald-300 font-extrabold text-xs">
-                          Saves ${route.savings_vs_original.cost_usd.toLocaleString()} &amp; {route.savings_vs_original.time_days}d
+                          Saves ${route.savings_vs_original.cost_usd.toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -735,6 +797,11 @@ export const RerouteRecommendationPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4 text-xs font-mono text-slate-300 bg-slate-950 p-2.5 rounded-2xl border border-slate-800 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 bg-emerald-400 border-t border-emerald-300" />
+                <span className="text-emerald-400 font-bold">Pareto Frontier Line</span>
+              </div>
+
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-400 border border-slate-950" />
                 <span>Top 3 Sweet Spot</span>
@@ -813,12 +880,20 @@ export const RerouteRecommendationPage: React.FC = () => {
                       <Cell
                         key={`cell-${index}`}
                         fill={fill}
-                        stroke={entry.isTop3 ? '#f59e0b' : '#0f172a'}
-                        strokeWidth={entry.isTop3 ? 2 : 1}
+                        stroke={entry.isTop3 ? '#f59e0b' : entry.isParetoOptimal ? '#10b981' : '#0f172a'}
+                        strokeWidth={entry.isTop3 ? 2 : entry.isParetoOptimal ? 2 : 1}
                       />
                     );
                   })}
                 </Scatter>
+                {/* Pareto Frontier Line connecting optimal non-dominated boundary points */}
+                <Scatter
+                  data={[...simulationResult.scatter_cloud]
+                    .filter((p) => p.isTop3 || p.isParetoOptimal)
+                    .sort((a, b) => a.time - b.time)}
+                  line={{ stroke: '#10b981', strokeWidth: 2, strokeDasharray: '4 4' }}
+                  shape={() => null}
+                />
               </ScatterChart>
             </ResponsiveContainer>
           </div>

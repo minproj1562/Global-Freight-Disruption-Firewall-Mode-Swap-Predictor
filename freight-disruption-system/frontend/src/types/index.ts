@@ -29,6 +29,8 @@ export interface Vessel {
   draught_meters?: number;
   current_risk_reason?: string;
   cargo_summary?: string;
+  /** True when Isolation Forest anomaly model flags route deviation. BACKEND INTEGRATION: Populate from ML pipeline output */
+  isAnomalous?: boolean;
 }
 
 export interface Port {
@@ -62,6 +64,13 @@ export interface RecommendedAction {
   confidence_score: number; // 0 to 100
 }
 
+export interface RipplePrediction {
+  port_code: string;
+  port_name: string;
+  congestion_increase_pct: number;
+  delay_days: { d3: number; d7: number; d14: number };
+}
+
 export interface Disruption {
   id: string;
   name: string;
@@ -80,6 +89,10 @@ export interface Disruption {
   affected_vessels_list?: Vessel[];
   recommended_action?: RecommendedAction;
   is_new?: boolean;
+  /** AI-predicted ripple port impacts */
+  predicted_ripple_ports?: string[];
+  ripple_predictions?: RipplePrediction[];
+  financial_impact_usd?: number;
 }
 
 export interface ModeSwapOption {
@@ -110,8 +123,9 @@ export interface RouteRequest {
   destination_port: string;
   vessel_id: string;
   cargo_type: string;
-  priority: 'Cost' | 'Time' | 'Balanced';
+  priority: 'Cost' | 'Time' | 'Balanced' | 'Carbon';
   disruption_to_avoid: string;
+  cargo_value_usd?: number;
 }
 
 export interface RouteResult {
@@ -138,6 +152,8 @@ export interface RouteResult {
   };
   transit_summary: string;
   carrier_name: string;
+  strategy_label?: 'Fastest' | 'Cheapest' | 'Most Resilient';
+  ml_risk_score?: number;
 }
 
 export interface SimulatedPoint {
@@ -150,6 +166,7 @@ export interface SimulatedPoint {
   rank?: number;
   routeName?: string;
   modeLabel?: string;
+  isParetoOptimal?: boolean;
 }
 
 export interface SimulationResult {
@@ -179,6 +196,7 @@ export interface KPISnapshot {
   vessels_affected: number;
   routes_needing_reroute: number;
   last_updated: string;
+  cost_saved_mtd?: string;
 }
 
 export interface SecondaryInfrastructure {

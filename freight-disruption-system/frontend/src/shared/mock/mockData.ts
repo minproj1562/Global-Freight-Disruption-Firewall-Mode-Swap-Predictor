@@ -333,6 +333,7 @@ export const MOCK_VESSELS: Vessel[] = [
     draught_meters: 15.7,
     current_risk_reason: 'Red Sea Houthi Threat Zone — Reroute Action Required',
     cargo_summary: '20,000 TEU High-Tech Consumer Electronics & Automotive Components',
+    isAnomalous: true,
   },
   {
     id: 'vessel-maersk-mc-kinney',
@@ -402,8 +403,9 @@ export const MOCK_VESSELS: Vessel[] = [
     length_meters: 274,
     capacity_teu: 0,
     draught_meters: 14.8,
-    current_risk_reason: 'Strait of Hormuz Security Alert Level 3',
-    cargo_summary: '130,000 Tonnes Crude Oil',
+    current_risk_reason: 'Strait of Hormuz Security Advisory — GPS Interference Zone',
+    cargo_summary: '285,000 DWT Crude Oil — Arabian Gulf to East Asia',
+    isAnomalous: true,
   },
   {
     id: 'vessel-berge-stahl',
@@ -840,6 +842,7 @@ export const MOCK_VESSELS: Vessel[] = [
     capacity_teu: 19224,
     draught_meters: 16.0,
     current_risk_reason: 'Rerouting due to Red Sea Disruption Zone',
+    isAnomalous: true,
   },
   {
     id: 'vessel-cap-san-diego',
@@ -887,6 +890,73 @@ export const MOCK_VESSELS: Vessel[] = [
     cargo_summary: '8,500 Car Equivalent Units (Vehicles)',
   },
 ];
+
+// Generate additional vessels to reach 200+ for performance/clustering verification
+const VESSEL_NAMES_POOL = [
+  'PACIFIC VOYAGER', 'ATLANTIC SPIRIT', 'NORDIC PIONEER', 'EASTERN DRAGON', 'WESTERN STAR',
+  'GOLDEN BRIDGE', 'SILVER WAVE', 'CRYSTAL DAWN', 'EMERALD SEA', 'RUBY CARGO',
+  'DIAMOND PRINCESS', 'SAPPHIRE TRADER', 'CORAL QUEEN', 'PEARL HARBOR', 'JADE WIND',
+  'IRON FORTUNE', 'STEEL TITAN', 'BRONZE EAGLE', 'COPPER COAST', 'CHROME VOYAGER',
+  'OCEAN LIBERTY', 'SEA MONARCH', 'WAVE RIDER', 'TIDE RUNNER', 'STORM CHASER',
+  'TRADE WIND', 'CARGO KING', 'FREIGHT MASTER', 'PORT ROYAL', 'HARBOR LIGHT',
+  'NEPTUNE GLORY', 'POSEIDON FORCE', 'TRITON EXPRESS', 'ATLAS CARRIER', 'ZEUS POWER',
+  'ORIENT EXPRESS', 'SILK ROAD', 'SPICE ROUTE', 'TEA CLIPPER', 'COTTON TRADER',
+];
+const FLAGS_POOL = [
+  'Liberia \u{1F1F1}\u{1F1F7}', 'Marshall Islands \u{1F1F2}\u{1F1ED}', 'Panama \u{1F1F5}\u{1F1E6}', 'Hong Kong \u{1F1ED}\u{1F1F0}', 'Singapore \u{1F1F8}\u{1F1EC}',
+  'Bahamas \u{1F1E7}\u{1F1F8}', 'Malta \u{1F1F2}\u{1F1F9}', 'Cyprus \u{1F1E8}\u{1F1FE}', 'Greece \u{1F1EC}\u{1F1F7}', 'Norway \u{1F1F3}\u{1F1F4}',
+];
+const VESSEL_TYPES_POOL: ('Container' | 'Tanker' | 'Bulk Carrier' | 'Cargo' | 'Special')[] = ['Container', 'Tanker', 'Bulk Carrier', 'Cargo', 'Special'];
+const STATUSES_POOL: ('normal' | 'at-risk' | 'disrupted')[] = ['normal', 'normal', 'normal', 'at-risk', 'disrupted'];
+const DEST_PORTS = [
+  { name: 'Port of Rotterdam', lat: 51.948, lon: 4.142 },
+  { name: 'Port of Singapore', lat: 1.264, lon: 103.84 },
+  { name: 'Port of Shanghai', lat: 30.63, lon: 122.06 },
+  { name: 'Port of Los Angeles', lat: 33.74, lon: -118.27 },
+  { name: 'Port of Hamburg', lat: 53.54, lon: 9.96 },
+  { name: 'Port of Busan', lat: 35.1, lon: 129.04 },
+  { name: 'Port of Jebel Ali', lat: 25.0, lon: 55.06 },
+  { name: 'Port of Santos', lat: -23.96, lon: -46.3 },
+];
+
+for (let i = 1; i <= 180; i++) {
+  const nameIdx = (i - 1) % VESSEL_NAMES_POOL.length;
+  const suffix = Math.ceil(i / VESSEL_NAMES_POOL.length);
+  const vesselName = suffix > 1 ? `${VESSEL_NAMES_POOL[nameIdx]} ${suffix}` : VESSEL_NAMES_POOL[nameIdx];
+  const flag = FLAGS_POOL[i % FLAGS_POOL.length];
+  const vType = VESSEL_TYPES_POOL[i % VESSEL_TYPES_POOL.length];
+  const status = STATUSES_POOL[i % STATUSES_POOL.length];
+  const dest = DEST_PORTS[i % DEST_PORTS.length];
+  const lat = -50 + (((i * 7 + 13) * 31) % 1100) / 10; // Deterministic spread -50 to 60
+  const lon = -170 + (((i * 11 + 7) * 29) % 3400) / 10; // Deterministic spread -170 to 170
+  const speed = 10 + ((i * 3) % 120) / 10;
+  const heading = (i * 17) % 360;
+
+  MOCK_VESSELS.push({
+    id: `vessel-gen-${i}`,
+    mmsi: 200000000 + i * 1000 + ((i * 7) % 999),
+    imo: 9000000 + i * 100 + ((i * 3) % 99),
+    name: vesselName,
+    flag,
+    vessel_type: vType,
+    speed: parseFloat(speed.toFixed(1)),
+    heading,
+    course: (heading + ((i * 3) % 5) - 2 + 360) % 360,
+    latitude: parseFloat(lat.toFixed(2)),
+    longitude: parseFloat(lon.toFixed(2)),
+    destination_port: dest.name,
+    eta: `2026-08-${String(3 + (i % 12)).padStart(2, '0')} ${String(6 + (i % 16)).padStart(2, '0')}:00`,
+    status,
+    destination_lat: dest.lat,
+    destination_lon: dest.lon,
+    speed_history: [speed + 0.5, speed],
+    length_meters: 200 + ((i * 13) % 200),
+    capacity_teu: vType === 'Container' ? 5000 + ((i * 37) % 15000) : undefined,
+    draught_meters: 10 + ((i * 7) % 70) / 10,
+    // BACKEND INTEGRATION: isAnomalous would be populated from Isolation Forest model output
+    isAnomalous: i % 23 === 0 || i % 37 === 0, // ~10 anomalous vessels out of 180
+  });
+}
 
 export const MOCK_ROUTES: Route[] = [
   {
@@ -982,6 +1052,7 @@ export const MOCK_KPIS: KPISnapshot = {
   vessels_affected: 18,
   routes_needing_reroute: 3,
   last_updated: new Date().toISOString(),
+  cost_saved_mtd: '$3.42M',
 };
 
 export const MOCK_SECONDARY_INFRASTRUCTURE: SecondaryInfrastructure[] = [

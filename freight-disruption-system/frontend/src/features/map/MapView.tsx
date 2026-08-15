@@ -254,6 +254,138 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   }, [disruptions, layers.disruptions]);
 
+  // Render Weather, Piracy, and Ice Coverage Overlays
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateAddonOverlays = () => {
+      // 1. Weather Overlay (Storm cells / Wave Swells)
+      const weatherGeoJSON: any = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'North Atlantic Gale Warning (Wave Height 8.5m)' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[-45.0, 52.0], [-25.0, 58.0], [-15.0, 48.0], [-35.0, 42.0], [-45.0, 52.0]]],
+            },
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Typhoon Gaemi Wave Swell Zone' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[120.0, 20.0], [130.0, 25.0], [128.0, 32.0], [118.0, 28.0], [120.0, 20.0]]],
+            },
+          },
+        ],
+      };
+
+      if (!map.getSource('source-weather-overlay')) {
+        map.addSource('source-weather-overlay', { type: 'geojson', data: weatherGeoJSON });
+        map.addLayer({
+          id: 'fill-weather-overlay',
+          type: 'fill',
+          source: 'source-weather-overlay',
+          paint: { 'fill-color': '#06b6d4', 'fill-opacity': 0.18 },
+        });
+        map.addLayer({
+          id: 'line-weather-overlay',
+          type: 'line',
+          source: 'source-weather-overlay',
+          paint: { 'line-color': '#0891b2', 'line-width': 2, 'line-dasharray': [4, 2] },
+        });
+      }
+      const weatherVis = layers.weather ? 'visible' : 'none';
+      if (map.getLayer('fill-weather-overlay')) map.setLayoutProperty('fill-weather-overlay', 'visibility', weatherVis);
+      if (map.getLayer('line-weather-overlay')) map.setLayoutProperty('line-weather-overlay', 'visibility', weatherVis);
+
+      // 2. Piracy High-Risk Zones (Somali Basin & Gulf of Guinea)
+      const piracyGeoJSON: any = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Gulf of Guinea Piracy High Risk Area' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[-2.0, 4.0], [8.0, 4.0], [8.0, -2.0], [-2.0, -2.0], [-2.0, 4.0]]],
+            },
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Somali Basin HRA' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[48.0, 12.0], [60.0, 12.0], [58.0, -2.0], [45.0, 2.0], [48.0, 12.0]]],
+            },
+          },
+        ],
+      };
+
+      if (!map.getSource('source-piracy-overlay')) {
+        map.addSource('source-piracy-overlay', { type: 'geojson', data: piracyGeoJSON });
+        map.addLayer({
+          id: 'fill-piracy-overlay',
+          type: 'fill',
+          source: 'source-piracy-overlay',
+          paint: { 'fill-color': '#f97316', 'fill-opacity': 0.2 },
+        });
+        map.addLayer({
+          id: 'line-piracy-overlay',
+          type: 'line',
+          source: 'source-piracy-overlay',
+          paint: { 'line-color': '#ea580c', 'line-width': 2, 'line-dasharray': [2, 2] },
+        });
+      }
+      const piracyVis = layers.piracy ? 'visible' : 'none';
+      if (map.getLayer('fill-piracy-overlay')) map.setLayoutProperty('fill-piracy-overlay', 'visibility', piracyVis);
+      if (map.getLayer('line-piracy-overlay')) map.setLayoutProperty('line-piracy-overlay', 'visibility', piracyVis);
+
+      // 3. Ice Coverage Overlay (Arctic & Baltic Sea Pack Ice)
+      const iceGeoJSON: any = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Arctic Drift Pack Ice Shelf' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[[-170.0, 72.0], [170.0, 72.0], [170.0, 85.0], [-170.0, 85.0], [-170.0, 72.0]]],
+            },
+          },
+        ],
+      };
+
+      if (!map.getSource('source-ice-overlay')) {
+        map.addSource('source-ice-overlay', { type: 'geojson', data: iceGeoJSON });
+        map.addLayer({
+          id: 'fill-ice-overlay',
+          type: 'fill',
+          source: 'source-ice-overlay',
+          paint: { 'fill-color': '#bae6fd', 'fill-opacity': 0.3 },
+        });
+        map.addLayer({
+          id: 'line-ice-overlay',
+          type: 'line',
+          source: 'source-ice-overlay',
+          paint: { 'line-color': '#38bdf8', 'line-width': 2, 'line-dasharray': [6, 3] },
+        });
+      }
+      const iceVis = layers.iceCoverage ? 'visible' : 'none';
+      if (map.getLayer('fill-ice-overlay')) map.setLayoutProperty('fill-ice-overlay', 'visibility', iceVis);
+      if (map.getLayer('line-ice-overlay')) map.setLayoutProperty('line-ice-overlay', 'visibility', iceVis);
+    };
+
+    if (map.isStyleLoaded()) {
+      updateAddonOverlays();
+    } else {
+      map.once('style.load', updateAddonOverlays);
+    }
+  }, [layers.weather, layers.piracy, layers.iceCoverage]);
+
   // Render Transit Route Lines with Animated Dash Effect
   useEffect(() => {
     const map = mapRef.current;
@@ -424,12 +556,20 @@ export const MapView: React.FC<MapViewProps> = ({
           if (vessel.vessel_type === 'Special') colorClass = 'text-purple-400';
 
           const isAlert = vessel.status !== 'normal';
+          // BACKEND INTEGRATION: isAnomalous flag is populated from Isolation Forest model output (POST /api/v1/ml/anomaly-detect)
+          const isAnomalous = Boolean((vessel as any).isAnomalous);
 
           el.innerHTML = `
             <div class="relative flex items-center justify-center">
               ${
                 isAlert
                   ? `<div class="absolute -inset-2 rounded-full bg-rose-500/40 animate-ping"></div>`
+                  : ''
+              }
+              ${
+                isAnomalous
+                  ? `<div class="absolute -inset-2.5 rounded-full border-2 border-rose-500 animate-pulse"></div>
+                     <div class="absolute -top-3 -right-3 w-4 h-4 rounded-full bg-rose-600 border border-slate-950 flex items-center justify-center text-white text-[8px] font-bold shadow-md z-10" title="Anomaly Detected (Isolation Forest ML)">!</div>`
                   : ''
               }
               <div style="transform: rotate(${vessel.heading}deg);" class="transition-transform duration-300">
@@ -440,7 +580,7 @@ export const MapView: React.FC<MapViewProps> = ({
               <div class="vessel-label-box absolute top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-950/90 text-[10px] font-mono text-white whitespace-nowrap border border-slate-800 pointer-events-none shadow-md ${
                 layers.vesselNames ? 'block' : 'hidden'
               }">
-                ${vessel.name}
+                ${vessel.name}${isAnomalous ? ' <span class="text-rose-400 font-bold">⚠</span>' : ''}
               </div>
             </div>
           `;

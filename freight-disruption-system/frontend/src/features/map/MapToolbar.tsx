@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Layers, Filter, Play, Eye, EyeOff, Ship, Anchor, AlertTriangle, Route as RouteIcon, Tag, Radio, X } from 'lucide-react';
+import { Search, Layers, Filter, Play, Eye, EyeOff, Ship, Anchor, AlertTriangle, Route as RouteIcon, Tag, Radio, X, CloudRain, Skull, Snowflake } from 'lucide-react';
 
 export interface LayerVisibilityState {
   vessels: boolean;
@@ -9,6 +9,9 @@ export interface LayerVisibilityState {
   routes: boolean;
   vesselNames: boolean;
   secondaryInfra: boolean;
+  weather?: boolean;
+  piracy?: boolean;
+  iceCoverage?: boolean;
 }
 
 interface MapToolbarProps {
@@ -37,6 +40,9 @@ export const MapToolbar: React.FC<MapToolbarProps> = ({
     { key: 'routes', label: 'Transit Routes', icon: RouteIcon, color: 'text-indigo-400' },
     { key: 'vesselNames', label: 'Vessel Call Names', icon: Tag, color: 'text-emerald-400' },
     { key: 'secondaryInfra', label: 'Lighthouses & AtoN', icon: Radio, color: 'text-purple-400' },
+    { key: 'weather', label: 'Weather (Storms/Waves)', icon: CloudRain, color: 'text-cyan-400' },
+    { key: 'piracy', label: 'Piracy High-Risk Zones', icon: Skull, color: 'text-orange-400' },
+    { key: 'iceCoverage', label: 'Ice Coverage Overlay', icon: Snowflake, color: 'text-blue-300' },
   ];
 
   return (

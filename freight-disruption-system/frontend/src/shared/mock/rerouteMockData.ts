@@ -30,6 +30,7 @@ const generateScatterCloud = (): SimulatedPoint[] => {
       rank: 1,
       routeName: '#1 Multimodal Sea-Rail Express',
       modeLabel: 'Sea (75%) + Rail (20%) + Air (5%)',
+      isParetoOptimal: true,
     },
     {
       id: 'pt-top-2',
@@ -41,6 +42,7 @@ const generateScatterCloud = (): SimulatedPoint[] => {
       rank: 2,
       routeName: '#2 Sea Cape Bypass via South Africa',
       modeLabel: 'Pure Sea (100%)',
+      isParetoOptimal: true,
     },
     {
       id: 'pt-top-3',
@@ -52,6 +54,7 @@ const generateScatterCloud = (): SimulatedPoint[] => {
       rank: 3,
       routeName: '#3 Sea-Air Hybrid Airlift (Dubai DWC)',
       modeLabel: 'Sea (40%) + Air (60%)',
+      isParetoOptimal: true,
     },
   ];
 
@@ -83,6 +86,7 @@ const generateScatterCloud = (): SimulatedPoint[] => {
       confidence,
       risk,
       isTop3: false,
+      isParetoOptimal: i % 12 === 0,
       routeName: `Simulated Scenario #${100 + i}`,
       modeLabel: i % 3 === 0 ? 'Sea-Rail' : i % 5 === 0 ? 'Sea-Air' : 'Maritime Bypass',
     });
@@ -131,6 +135,8 @@ export const MOCK_INITIAL_SIMULATION_RESULT: SimulationResult = {
       },
       transit_summary: 'Discharge at Salalah Hub -> High-speed container feeder to Adriatic Trieste -> Block-train express to Benelux logistics hub.',
       carrier_name: 'Maersk / DB Cargo Intermodal Alliance',
+      strategy_label: 'Most Resilient',
+      ml_risk_score: 0.12,
     },
     {
       id: 'route-rec-2',
@@ -161,6 +167,8 @@ export const MOCK_INITIAL_SIMULATION_RESULT: SimulationResult = {
       },
       transit_summary: 'Pure ocean voyage circumnavigating African continent. Completely bypasses Red Sea & Suez chokepoint hazards.',
       carrier_name: 'MSC Global Ocean Express',
+      strategy_label: 'Cheapest',
+      ml_risk_score: 0.18,
     },
     {
       id: 'route-rec-3',
@@ -191,6 +199,8 @@ export const MOCK_INITIAL_SIMULATION_RESULT: SimulationResult = {
       },
       transit_summary: 'Sea transport to Dubai -> Rapid offload & air charter via Boeing 77F to Frankfurt -> Express trucking to Rotterdam.',
       carrier_name: 'Emirates SkyCargo & CMA CGM Air Cargo',
+      strategy_label: 'Fastest',
+      ml_risk_score: 0.09,
     },
   ],
   scatter_cloud: generateScatterCloud(),

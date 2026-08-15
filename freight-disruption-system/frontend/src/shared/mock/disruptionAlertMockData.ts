@@ -33,6 +33,14 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '14 days remaining',
     mitigation_advice: 'Reroute vessels via Cape of Good Hope or trigger multimodal Sea -> Air transfer at Jebel Ali / Salalah.',
     is_new: true,
+    predicted_ripple_ports: ['ZADUR', 'EGPSD', 'OMSLL', 'AEJEA'],
+    ripple_predictions: [
+      { port_code: 'ZADUR', port_name: 'Port of Durban', congestion_increase_pct: 35, delay_days: { d3: 2, d7: 3, d14: 4.5 } },
+      { port_code: 'EGPSD', port_name: 'Port Said', congestion_increase_pct: 18, delay_days: { d3: 1.5, d7: 5, d14: 7 } },
+      { port_code: 'OMSLL', port_name: 'Port of Salalah', congestion_increase_pct: 28, delay_days: { d3: 1, d7: 2.5, d14: 4 } },
+      { port_code: 'AEJEA', port_name: 'Jebel Ali Port', congestion_increase_pct: 22, delay_days: { d3: 0.5, d7: 2, d14: 3.5 } },
+    ],
+    financial_impact_usd: 48500000,
     affected_vessels_list: [
       MOCK_VESSELS[0], // EVER GIVEN
       MOCK_VESSELS[7], // MSC GULSUN
@@ -73,6 +81,13 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '28 days remaining',
     mitigation_advice: 'Unload non-essential TEUs at Balboa terminal for Panama Canal Railway land-bridge transshipment.',
     is_new: true,
+    predicted_ripple_ports: ['USLAX', 'COBUN', 'MXMAN'],
+    ripple_predictions: [
+      { port_code: 'USLAX', port_name: 'Port of Los Angeles', congestion_increase_pct: 25, delay_days: { d3: 1.5, d7: 3, d14: 5 } },
+      { port_code: 'COBUN', port_name: 'Port of Buenaventura', congestion_increase_pct: 15, delay_days: { d3: 1, d7: 2, d14: 3 } },
+      { port_code: 'MXMAN', port_name: 'Port of Manzanillo', congestion_increase_pct: 12, delay_days: { d3: 0.5, d7: 1.5, d14: 2.5 } },
+    ],
+    financial_impact_usd: 32100000,
     affected_vessels_list: [
       MOCK_VESSELS[2], // CMA CGM ANTOINE
       MOCK_VESSELS[14], // SANTOS EXPRESS
@@ -110,6 +125,12 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '3 days remaining',
     mitigation_advice: 'Hold anchorage at Ningbo-Zhoushan protected deepwater bay or delay departure by 36 hours.',
     is_new: false,
+    predicted_ripple_ports: ['CNNGB', 'KRPUS'],
+    ripple_predictions: [
+      { port_code: 'CNNGB', port_name: 'Port of Ningbo-Zhoushan', congestion_increase_pct: 40, delay_days: { d3: 2.5, d7: 4, d14: 5.5 } },
+      { port_code: 'KRPUS', port_name: 'Port of Busan', congestion_increase_pct: 15, delay_days: { d3: 1, d7: 2, d14: 3 } },
+    ],
+    financial_impact_usd: 21800000,
     affected_vessels_list: [
       MOCK_VESSELS[3], // FRONT ALTAIR
       MOCK_VESSELS[13], // GLOBE TROTTER
@@ -147,6 +168,12 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '5 days remaining',
     mitigation_advice: 'Divert intermodal cargo to Port of Oakland or Prince Rupert for US Midwest BNSF/UP rail connection.',
     is_new: false,
+    predicted_ripple_ports: ['USOAK', 'CAPRR'],
+    ripple_predictions: [
+      { port_code: 'USOAK', port_name: 'Port of Oakland', congestion_increase_pct: 30, delay_days: { d3: 2, d7: 3.5, d14: 5 } },
+      { port_code: 'CAPRR', port_name: 'Port of Prince Rupert', congestion_increase_pct: 18, delay_days: { d3: 1, d7: 2, d14: 3 } },
+    ],
+    financial_impact_usd: 15200000,
     affected_vessels_list: [
       MOCK_VESSELS[5], // COSCO SHIPPING UNIVERSE
       MOCK_VESSELS[11], // OCEAN GUARDIAN
@@ -184,6 +211,12 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '10 days remaining',
     mitigation_advice: 'Maintain maximum sea speed (18+ kts) and engage continuous visual and radar lookout.',
     is_new: false,
+    predicted_ripple_ports: ['AEJEA', 'INMUN'],
+    ripple_predictions: [
+      { port_code: 'AEJEA', port_name: 'Jebel Ali Port', congestion_increase_pct: 20, delay_days: { d3: 1, d7: 2, d14: 3 } },
+      { port_code: 'INMUN', port_name: 'Port of Mumbai', congestion_increase_pct: 12, delay_days: { d3: 0.5, d7: 1.5, d14: 2 } },
+    ],
+    financial_impact_usd: 18700000,
     affected_vessels_list: [
       MOCK_VESSELS[9], // SIRIUS STAR
     ],
@@ -220,6 +253,11 @@ export const MOCK_DISRUPTION_ALERTS: Disruption[] = [
     estimated_duration_remaining: '12 hours remaining',
     mitigation_advice: 'Reduce speed to safe navigation rate (10 kts) and maintain radar plotting.',
     is_new: false,
+    predicted_ripple_ports: ['GBFXT'],
+    ripple_predictions: [
+      { port_code: 'GBFXT', port_name: 'Port of Felixstowe', congestion_increase_pct: 8, delay_days: { d3: 0.2, d7: 0.3, d14: 0.4 } },
+    ],
+    financial_impact_usd: 2400000,
     affected_vessels_list: [
       MOCK_VESSELS[12], // ATLANTIC SEA
     ],

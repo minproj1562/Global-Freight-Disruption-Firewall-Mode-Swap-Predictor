@@ -2,6 +2,8 @@
 // Flagship Operations Command Center — Live Global Freight Disruption Firewall & Mode-Swap Predictor
 // FASTAPI REPLACEMENT POINT: Replace mock dataset imports with live REST & WebSocket hooks:
 // REST: GET /api/v1/vessels, GET /api/v1/ports, GET /api/v1/disruptions, GET /api/v1/routes, GET /api/v1/kpis
+// WEBSOCKET TELEMETRY POINT:
+// Note: Page 1.1 is designed to eventually consume a WebSocket stream (ws://backend:8000/api/v1/ws/telemetry with 15-sec live AIS updates) instead of static mock polling.
 // WEBSOCKET: ws://backend:8000/api/v1/ws/telemetry
 
 import React, { useState, useEffect } from 'react';
@@ -44,10 +46,15 @@ export const OperationsDashboard: React.FC = () => {
     routes: true,
     vesselNames: true,
     secondaryInfra: false,
+    weather: false,
+    piracy: false,
+    iceCoverage: false,
   });
 
   // Filter State
   const [selectedVesselTypes, setSelectedVesselTypes] = useState<VesselType[]>([]);
+  const [selectedFlags, setSelectedFlags] = useState<string[]>([]);
+  const [selectedRiskLevels, setSelectedRiskLevels] = useState<('normal' | 'at-risk' | 'disrupted')[]>([]);
 
   // Toolbar Tab & Panel State
   const [activeToolbarTab, setActiveToolbarTab] = useState<'none' | 'search' | 'layers' | 'filters' | 'replay'>('none');
@@ -56,6 +63,7 @@ export const OperationsDashboard: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [replayProgress, setReplayProgress] = useState(100);
   const [replaySpeed, setReplaySpeed] = useState<1 | 2 | 4>(1);
+  const [replayRange, setReplayRange] = useState<'24h' | '7d'>('24h');
 
   // Selection & Details State
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
@@ -73,6 +81,20 @@ export const OperationsDashboard: React.FC = () => {
   const handleToggleVesselType = (type: VesselType) => {
     setSelectedVesselTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  // Toggle single flag filter
+  const handleToggleFlag = (flag: string) => {
+    setSelectedFlags((prev) =>
+      prev.includes(flag) ? prev.filter((f) => f !== flag) : [...prev, flag]
+    );
+  };
+
+  // Toggle single risk level filter
+  const handleToggleRiskLevel = (level: 'normal' | 'at-risk' | 'disrupted') => {
+    setSelectedRiskLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
     );
   };
 
@@ -209,7 +231,11 @@ export const OperationsDashboard: React.FC = () => {
       {/* ========================================================================= */}
       <main className="w-full h-full">
         <MapView
-          vessels={MOCK_VESSELS}
+          vessels={MOCK_VESSELS.filter((v) => {
+            const flagMatch = selectedFlags.length === 0 || selectedFlags.includes(v.flag);
+            const riskMatch = selectedRiskLevels.length === 0 || selectedRiskLevels.includes(v.status);
+            return flagMatch && riskMatch;
+          })}
           ports={MOCK_PORTS}
           disruptions={MOCK_DISRUPTIONS}
           routes={MOCK_ROUTES}
@@ -256,7 +282,7 @@ export const OperationsDashboard: React.FC = () => {
             className="absolute left-16 top-44 z-25 glass-panel rounded-2xl p-4 border border-slate-700/80 shadow-2xl w-72"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-              <span className="text-xs font-bold font-mono text-amber-400">FILTER BY VESSEL TYPE</span>
+              <span className="text-xs font-bold font-mono text-amber-400">FLEET FILTER DIMENSIONS</span>
               <button onClick={() => setActiveToolbarTab('none')} className="text-slate-400 hover:text-white">
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -264,6 +290,10 @@ export const OperationsDashboard: React.FC = () => {
             <VesselTypeFilters
               selectedTypes={selectedVesselTypes}
               onToggleType={handleToggleVesselType}
+              selectedFlags={selectedFlags}
+              onToggleFlag={handleToggleFlag}
+              selectedRiskLevels={selectedRiskLevels}
+              onToggleRiskLevel={handleToggleRiskLevel}
             />
           </motion.div>
         )}
@@ -292,6 +322,8 @@ export const OperationsDashboard: React.FC = () => {
               onTogglePlay={() => setIsPlaying(!isPlaying)}
               onSeek={setReplayProgress}
               onChangeSpeed={(spd: number) => setReplaySpeed(spd as 1 | 2 | 4)}
+              replayRange={replayRange}
+              onChangeRange={setReplayRange}
             />
           </div>
         )}

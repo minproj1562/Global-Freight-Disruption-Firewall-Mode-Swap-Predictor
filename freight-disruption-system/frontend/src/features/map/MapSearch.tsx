@@ -53,15 +53,17 @@ export const MapSearch: React.FC<MapSearchProps> = ({
         (v) =>
           v.name.toLowerCase().includes(q) ||
           v.imo.toString().includes(q) ||
+          v.mmsi.toString().includes(q) ||
           v.flag.toLowerCase().includes(q) ||
-          v.vessel_type.toLowerCase().includes(q)
+          v.vessel_type.toLowerCase().includes(q) ||
+          v.destination_port.toLowerCase().includes(q)
       )
       .slice(0, 5)
       .map((v) => ({
         id: v.id,
         type: 'vessel',
         name: v.name,
-        subtitle: `${v.flag} • IMO ${v.imo} • ${v.vessel_type} (${v.speed} kn)`,
+        subtitle: `${v.flag} • MMSI ${v.mmsi} • IMO ${v.imo} • Dest: ${v.destination_port}`,
         latitude: v.latitude,
         longitude: v.longitude,
         item: v,

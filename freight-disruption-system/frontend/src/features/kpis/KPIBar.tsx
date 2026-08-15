@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ship, ShieldAlert, AlertTriangle, GitPullRequest, Clock } from 'lucide-react';
+import { Ship, ShieldAlert, AlertTriangle, GitPullRequest, Clock, DollarSign } from 'lucide-react';
 import { KPISnapshot } from '../../types';
 import { useConnection } from '../../shared/hooks/useConnection';
 
@@ -60,6 +60,14 @@ export const KPIBar: React.FC<KPIBarProps> = ({ kpis, className = '' }) => {
       icon: GitPullRequest,
       color: 'text-indigo-400',
       bg: 'bg-indigo-500/10 border-indigo-500/20',
+    },
+    {
+      id: 'cost_saved_mtd',
+      label: 'COST SAVED (MTD)',
+      value: kpis.cost_saved_mtd || '$3.42M',
+      icon: DollarSign,
+      color: 'text-teal-400',
+      bg: 'bg-teal-500/10 border-teal-500/20',
     },
     {
       id: 'last_updated',
