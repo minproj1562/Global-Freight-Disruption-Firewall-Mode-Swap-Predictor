@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Ship, User, LogOut, Layers, X, ArrowLeft } from 'lucide-react';
+import { Ship, User, LogOut, Layers, X, ArrowLeft, Cpu } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { MapView } from '../features/map/MapView';
@@ -152,6 +152,27 @@ export const OperationsDashboard: React.FC = () => {
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Port Dashboard</span>
+          </button>
+
+          {/* Launch Strategic Simulation Lab Button */}
+          <button
+            onClick={() => {
+              navigate('/dashboard/analytics-simulation', {
+                state: {
+                  vesselId: selectedVessel?.name || undefined,
+                  originPort: selectedVessel?.origin_port || undefined,
+                  destinationPort: selectedVessel?.destination_port || undefined,
+                },
+              });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-sky-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 text-xs font-mono font-bold transition-all shadow-sm group"
+            title="Launch Strategic Simulation & Digital Twin Lab"
+          >
+            <Cpu className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span>Simulation Lab</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-500/40">
+              AI Twin
+            </span>
           </button>
           
           <div className="hidden sm:flex items-center gap-3 border-l border-slate-800 pl-3">

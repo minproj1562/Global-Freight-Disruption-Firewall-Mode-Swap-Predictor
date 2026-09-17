@@ -108,14 +108,19 @@ export const LogisticsManagerSidebar: React.FC = () => {
                 </div>
                 <AnimatePresence>
                   {isExpanded && (
-                    <motion.span
+                    <motion.div
                       initial={{ opacity: 0, width: 0 }}
                       animate={{ opacity: 1, width: 'auto' }}
                       exit={{ opacity: 0, width: 0 }}
-                      className="ml-3 font-mono text-xs whitespace-nowrap overflow-hidden"
+                      className="ml-3 font-mono text-xs whitespace-nowrap overflow-hidden flex items-center justify-between flex-1"
                     >
-                      {item.name}
-                    </motion.span>
+                      <span>{item.name}</span>
+                      {item.route === '/dashboard/analytics-simulation' && (
+                        <span className="text-[8px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          AI TWIN
+                        </span>
+                      )}
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </Link>

@@ -677,4 +677,85 @@ export const executeDataCleanup = async (
   };
 };
 
+// ============= DASHBOARD 2: ANALYTICS & SIMULATION LAB =============
+
+export interface ParameterSweepConfig {
+  scenario_name: string;
+  scenario_type: string;
+  origins: string[];
+  destinations: string[];
+  vessels: string[];
+  disruption_template: string;
+  fuel_price_range: { min: number; max: number; step: number };
+  congestion_range: { min: number; max: number; step: number };
+}
+
+export interface MonteCarloConfig {
+  origin: string;
+  destination: string;
+  vessel: string;
+  disruption_template: string;
+  iterations: number;
+}
+
+export interface NSGA2Config {
+  origin: string;
+  destination: string;
+  vessel: string;
+  cost_weight: number;
+  time_weight: number;
+  carbon_weight: number;
+}
+
+export const getSimulationTemplates = async (): Promise<any> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulation/templates`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch simulation templates');
+  return response.json();
+};
+
+export const runParameterSweep = async (config: ParameterSweepConfig): Promise<any[]> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulation/parameter-sweep`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(config)
+  });
+  if (!response.ok) throw new Error('Failed to run parameter sweep simulation');
+  return response.json();
+};
+
+export const runMonteCarloSimulation = async (config: MonteCarloConfig): Promise<any> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulation/monte-carlo`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(config)
+  });
+  if (!response.ok) throw new Error('Failed to run Monte Carlo simulation');
+  return response.json();
+};
+
+export const runNSGA2Optimization = async (config: NSGA2Config): Promise<any> => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulation/nsga2-optimize`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(config)
+  });
+  if (!response.ok) throw new Error('Failed to run NSGA-II optimization');
+  return response.json();
+};
+
 export default api;
