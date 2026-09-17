@@ -11,7 +11,8 @@ import {
   LogOut, 
   Menu, 
   ChevronLeft,
-  Truck
+  Truck,
+  Boxes
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +28,7 @@ export const LogisticsManagerSidebar: React.FC = () => {
     { name: 'Reroute Planner', icon: Compass, route: '/dashboard/reroute-planner' },
     { name: 'Active Routes', icon: Route, route: '/dashboard/active-routes' },
     { name: 'Congestion Heatmap', icon: Flame, route: '/dashboard/congestion-forecast' },
+    { name: 'Simulation Lab', icon: Boxes, route: '/dashboard/analytics-simulation' },
   ];
 
   const handleLogout = () => {

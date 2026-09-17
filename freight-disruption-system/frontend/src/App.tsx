@@ -14,6 +14,7 @@ import { DisruptionAlertCenterPage } from './pages/DisruptionAlertCenterPage';
 import { RerouteRecommendationPage } from './pages/RerouteRecommendationPage';
 import { ActiveRoutesMonitorPage } from './pages/ActiveRoutesMonitorPage';
 import { CongestionForecastPage } from './pages/CongestionForecastPage';
+import { AnalyticsSimulationPage } from './pages/AnalyticsSimulationPage';
 import { Toaster } from '@/components/ui/toaster';
 import { ForceDarkMode } from '@/components/ForceDarkMode';
 
@@ -52,6 +53,15 @@ function App() {
           {/* Page 1.5 — Congestion Forecast (Ripple-Heat) Map */}
           <Route path="/dashboard/congestion-forecast" element={<CongestionForecastPage />} />
           <Route path="/dashboard/heat-map" element={<CongestionForecastPage />} />
+
+          {/* DASHBOARD 2: ANALYTICS & SIMULATION LAB (Page 2.1 Scenario Studio, Page 2.2 Monte Carlo Explorer, Page 2.3 NSGA-II 3D Scatter) */}
+          <Route path="/dashboard/analytics-simulation" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation-lab" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulator" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/scenario-studio" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/monte-carlo" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/nsga-optimizer" element={<AnalyticsSimulationPage />} />
 
           {/* Page 3.1 — Port Overview */}
           <Route path="/dashboard/ports" element={<PortOverviewPage />} />

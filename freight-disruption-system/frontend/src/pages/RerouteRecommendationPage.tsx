@@ -34,7 +34,6 @@ import {
   CheckCircle2,
   X,
   PlayCircle,
-  ShieldCheck,
   Search,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -354,11 +353,17 @@ export const RerouteRecommendationPage: React.FC = () => {
           {/* Launch in Simulator Trigger Button */}
           <button
             onClick={() => {
-              // FASTAPI / DASHBOARD 2 INTEGRATION POINT: Hand-off route parameters to Supply Chain Simulator & Digital Twin
-              console.log('Dispatching parameters to Dashboard 2:', formData);
+              navigate('/dashboard/analytics-simulation', {
+                state: {
+                  vesselId: formData.vessel_id,
+                  originPort: formData.origin_port,
+                  destinationPort: formData.destination_port,
+                  tab: 'scenario-studio',
+                },
+              });
               toast({
-                title: 'Dispatching to Simulator',
-                description: 'Would send parameters to Dashboard 2 (Supply Chain Simulator & Digital Twin).',
+                title: 'Launching Simulator',
+                description: 'Transferred vessel & port parameters to Analytics & Simulation Lab.',
               });
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold transition-all shadow-sm"
