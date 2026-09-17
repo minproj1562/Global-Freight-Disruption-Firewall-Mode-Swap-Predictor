@@ -160,7 +160,7 @@ export const OperationsDashboard: React.FC = () => {
               navigate('/dashboard/analytics-simulation', {
                 state: {
                   vesselId: selectedVessel?.name || undefined,
-                  originPort: selectedVessel?.origin_port || undefined,
+                  originPort: selectedRoute?.origin_port || undefined,
                   destinationPort: selectedVessel?.destination_port || undefined,
                 },
               });

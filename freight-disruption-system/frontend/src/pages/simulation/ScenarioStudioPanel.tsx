@@ -23,7 +23,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/components/ui/use-toast';
 import { runParameterSweep } from '@/services/api';
-import { useSimulationContext, STRESS_PRESETS, MarketStressPreset } from '@/context/SimulationContext';
+import { useSimulationContext, STRESS_PRESETS } from '@/context/SimulationContext';
 import {
   formatDualCurrency,
   usdToFormattedINR,

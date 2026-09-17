@@ -55,7 +55,7 @@ export const MonteCarloExplorerPanel: React.FC = () => {
     selectedDestination, setSelectedDestination,
     selectedVessel, setSelectedVessel,
     disruptionTemplate,
-    stressPreset, setStressPreset, activePresetConfig,
+    stressPreset, setStressPreset,
     templates,
   } = useSimulationContext();
 
@@ -286,7 +286,7 @@ export const MonteCarloExplorerPanel: React.FC = () => {
           <span>STOCHASTIC SIMULATION CONFIGURATOR</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           {/* Origin Dropdown */}
           <div>
             <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1">
@@ -360,6 +360,24 @@ export const MonteCarloExplorerPanel: React.FC = () => {
                   {p.icon} {p.label.split('(')[0].trim()}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Iteration Count Dropdown */}
+          <div>
+            <label className="block text-[11px] font-mono text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1">
+              <Activity className="w-3 h-3 text-purple-500" />
+              <span>SIMULATION RUNS</span>
+            </label>
+            <select
+              value={iterations}
+              onChange={(e) => setIterations(Number(e.target.value))}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer"
+            >
+              <option value={1000}>1,000 Runs (Quick)</option>
+              <option value={2500}>2,500 Runs (Standard)</option>
+              <option value={5000}>5,000 Runs (Recommended)</option>
+              <option value={10000}>10,000 Runs (Deep Audit)</option>
             </select>
           </div>
 
