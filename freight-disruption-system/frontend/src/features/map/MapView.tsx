@@ -181,9 +181,12 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, []);
 
-  // Update Mapbox Style when Theme changes
+  // Track theme to avoid duplicate setStyle on mount
+  const prevThemeRef = useRef(theme);
   useEffect(() => {
     if (!mapRef.current) return;
+    if (prevThemeRef.current === theme) return;
+    prevThemeRef.current = theme;
     const targetStyle = theme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11';
     mapRef.current.setStyle(targetStyle);
   }, [theme]);

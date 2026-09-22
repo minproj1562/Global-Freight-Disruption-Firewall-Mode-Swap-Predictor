@@ -53,19 +53,42 @@ function App() {
           <Route path="/dashboard/congestion-forecast" element={<CongestionForecastPage />} />
           <Route path="/dashboard/heat-map" element={<CongestionForecastPage />} />
 
+<<<<<<< Updated upstream
           {/* Page 3.1 — Port Overview */}
-          <Route path="/dashboard/ports" element={<PortOverviewPage />} />
+=======
+          {/* DASHBOARD 2: ANALYTICS & SIMULATION LAB (Page 2.1 Scenario Studio, Page 2.2 Monte Carlo Explorer, Page 2.3 NSGA-II 3D Scatter) */}
+          <Route path="/dashboard/analytics-simulation" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation-lab" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulator" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/scenario-studio" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/monte-carlo" element={<AnalyticsSimulationPage />} />
+          <Route path="/dashboard/simulation/nsga-optimizer" element={<AnalyticsSimulationPage />} />
 
-          {/* Page 3.2 — Single Port Detail */}
+          {/* Page 3.1 — Port Overview Dashboard */}
+>>>>>>> Stashed changes
+          <Route path="/dashboard/ports" element={<PortOverviewPage />} />
+          <Route path="/dashboard/port-overview" element={<PortOverviewPage />} />
+          <Route path="/dashboard/port-operations" element={<PortOverviewPage />} />
+          <Route path="/ports" element={<PortOverviewPage />} />
+          <Route path="/port-overview" element={<PortOverviewPage />} />
+
+          {/* Page 3.2 — Single Port Detail & Terminal Management */}
           <Route path="/dashboard/ports/:portId" element={<SinglePortDetailPage />} />
+          <Route path="/ports/:portId" element={<SinglePortDetailPage />} />
+          <Route path="/port-detail/:portId" element={<SinglePortDetailPage />} />
 
           {/* Page 3.3 — Vessel Arrival/Departure Log */}
           <Route path="/dashboard/vessel-logs" element={<VesselLogsPage />} />
           <Route path="/dashboard/vessels/logs" element={<VesselLogsPage />} />
 
-          {/* Operations Command */}
+          {/* Page 1.1 — Operations Command / Freight Firewall */}
           <Route path="/dashboard/operations" element={<OperationsDashboard />} />
-          <Route path="/dashboard/port" element={<OperationsDashboard />} />
+          <Route path="/dashboard/firewall" element={<OperationsDashboard />} />
+          <Route path="/dashboard/freight-firewall" element={<OperationsDashboard />} />
+          <Route path="/freight-firewall" element={<OperationsDashboard />} />
+          <Route path="/firewall" element={<OperationsDashboard />} />
+          <Route path="/operations" element={<OperationsDashboard />} />
 
           {/* DASHBOARD 3: ADMIN DASHBOARD (Page 4.1 System Health, Page 4.2 Disruptions, Page 4.3 Vessels, Page 4.4 Users, Page 4.5 Data) */}
           <Route path="/dashboard/admin" element={<AdminDashboardPage />} />

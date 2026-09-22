@@ -17,6 +17,7 @@ from app.routers import (
     vessels_router,
     vessel_logs_router,
     admin_router,
+    simulation_router,
     map_router,
     disruptions_router,
     reroute_router,
@@ -83,12 +84,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all 11 routers
+# Include all 12 routers
 app.include_router(auth_router)
 app.include_router(ports_router)
 app.include_router(vessels_router)
 app.include_router(vessel_logs_router)
 app.include_router(admin_router)
+<<<<<<< Updated upstream
+=======
+app.include_router(simulation_router)
+>>>>>>> Stashed changes
 app.include_router(map_router)
 app.include_router(disruptions_router)
 app.include_router(reroute_router)
@@ -114,6 +119,15 @@ async def root():
             "risk_register": "/api/risk-register",
             "ports": "/api/ports",
             "vessels": "/api/vessels/admin",
+<<<<<<< Updated upstream
+=======
+            "vessel_logs": "/api/vessel-logs",
+            "admin_disruptions": "/api/admin/disruptions",
+            "admin_health": "/api/admin/health-cards",
+            "admin_users": "/api/admin/users",
+            "admin_data": "/api/admin/data/stats",
+            "simulation": "/api/simulation",
+>>>>>>> Stashed changes
             "docs": "/docs"
         }
     }
