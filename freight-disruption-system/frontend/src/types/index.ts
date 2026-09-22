@@ -152,8 +152,9 @@ export interface RouteResult {
   };
   transit_summary: string;
   carrier_name: string;
-  strategy_label?: 'Fastest' | 'Cheapest' | 'Most Resilient';
+  strategy_label?: 'Fastest' | 'Cheapest' | 'Most Resilient' | string;
   ml_risk_score?: number;
+  corridor_name?: string;
 }
 
 export interface SimulatedPoint {
@@ -247,6 +248,14 @@ export interface ActiveRoute {
   progress_percent: number;
   avg_speed_knots: number;
   distance_remaining_nm: number;
+  vessel_mmsi?: number;
+  delay_hours?: number;
+  recommended_action?: string | RecommendedAction;
+  eta_predicted_ml?: string;
+  delay_probability_pct?: number;
+  ml_risk_score?: number;
+  carrier_name?: string;
+  consignor_company?: string;
 }
 
 export interface NearbyAlternativePort {

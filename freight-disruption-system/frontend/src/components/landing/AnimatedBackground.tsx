@@ -1,49 +1,7 @@
 // frontend/src/components/landing/AnimatedBackground.tsx
 import React, { useState } from 'react';
 
-interface StarData {
-  left: number;
-  top: number;
-  duration: number;
-  delay: number;
-  size: number;
-  baseOpacity: number;
-  color: string;
-}
-
-const STAR_COLORS = ['#ffffff', '#e0f2fe', '#fff8e1', '#bae6fd', '#fef08a', '#e0e7ff', '#c4b5fd'];
-
-const generateStars = (): StarData[] => {
-  return [...Array(280)].map(() => {
-    const brightness = Math.random();
-    let size: number;
-    let baseOpacity: number;
-
-    if (brightness > 0.92) {
-      size = Math.random() * 3.2 + 2.8;
-      baseOpacity = 1;
-    } else if (brightness > 0.7) {
-      size = Math.random() * 2 + 1.5;
-      baseOpacity = 0.8;
-    } else {
-      size = Math.random() * 1.3 + 0.7;
-      baseOpacity = Math.random() * 0.45 + 0.3;
-    }
-
-    return {
-      left: Math.random() * 100,
-      top: Math.random() * 52,
-      duration: 2 + Math.random() * 4,
-      delay: Math.random() * 6,
-      size,
-      baseOpacity,
-      color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
-    };
-  });
-};
-
 export const AnimatedBackground: React.FC = () => {
-  const [stars] = useState(generateStars);
   const [waterSparkles] = useState(() =>
     [...Array(55)].map(() => ({
       left: Math.random() * 100,
@@ -152,41 +110,8 @@ export const AnimatedBackground: React.FC = () => {
         }}
       />
 
-      {/* ====== GLOWING CRATERED MOON ====== */}
-      <div className="absolute top-[5%] right-[8%] z-0">
-        <div className="absolute -inset-16 rounded-full bg-amber-100/20 blur-3xl" />
-        <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-[#fffeee] via-[#f7f0d0] to-[#e4d3a0] shadow-[0_0_50px_18px_rgba(255,255,210,0.4),0_0_100px_35px_rgba(255,255,180,0.2)]">
-          <div className="absolute top-5 left-6 w-7 h-7 rounded-full bg-amber-200/30" />
-          <div className="absolute bottom-6 right-7 w-5 h-5 rounded-full bg-amber-100/25" />
-          <div className="absolute top-10 right-5 w-4 h-4 rounded-full bg-amber-200/20" />
-        </div>
-      </div>
 
-      {/* ====== TWINKLING NIGHT STARS (280) ====== */}
-      <div className="absolute inset-0 z-0">
-        {stars.map((star, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              left: `${star.left}%`,
-              top: `${star.top}%`,
-              width: `${star.size}px`,
-              height: `${star.size}px`,
-              backgroundColor: star.color,
-              opacity: star.baseOpacity,
-              animation: `twinkleStar ${star.duration}s ease-in-out infinite`,
-              animationDelay: `${star.delay}s`,
-              boxShadow:
-                star.size > 2.5
-                  ? `0 0 ${star.size * 4}px ${star.size * 1.2}px ${star.color}a0, 0 0 ${star.size * 8}px ${star.size * 2}px ${star.color}50`
-                  : star.size > 1.5
-                  ? `0 0 ${star.size * 3}px ${star.size}px ${star.color}80`
-                  : `0 0 ${star.size * 2}px ${star.color}60`,
-            }}
-          />
-        ))}
-      </div>
+
 
       {/* ====== OCEAN — BOTTOM 48% (DARK MIDNIGHT OCEAN WITH STATIC WAVE GRADIENTS) ====== */}
       <div className="absolute bottom-0 left-0 right-0 h-[48%] z-10">
@@ -196,17 +121,6 @@ export const AnimatedBackground: React.FC = () => {
         {/* Midnight Ocean Base */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#051428] via-[#07203d] to-[#041224]" />
 
-        {/* Moonlight Shimmer Beam on Water */}
-        <div
-          className="absolute top-0 h-full pointer-events-none opacity-75"
-          style={{
-            right: '6%',
-            width: '18%',
-            background: 'linear-gradient(180deg, rgba(255,255,220,0.25) 0%, rgba(45,212,191,0.15) 35%, rgba(14,116,144,0.05) 100%)',
-            filter: 'blur(8px)',
-            clipPath: 'polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%)',
-          }}
-        />
 
         {/* Water Surface Glitter */}
         {waterSparkles.map((sp, i) => (
@@ -317,12 +231,8 @@ export const AnimatedBackground: React.FC = () => {
         </svg>
       </div>
 
-      {/* ====== KEYFRAME ANIMATIONS (AURORA & STARS ONLY - NO WAVE MOVEMENTS) ====== */}
+      {/* ====== KEYFRAME ANIMATIONS (AURORA & WATER GLINT - NO WAVE MOVEMENTS) ====== */}
       <style>{`
-        @keyframes twinkleStar {
-          0%, 100% { opacity: 0.2; transform: scale(0.8); }
-          50% { opacity: 1; transform: scale(1.25); }
-        }
         @keyframes waterGlint {
           0%, 100% { opacity: 0.08; transform: scale(0.4); }
           50% { opacity: 1; transform: scale(1.4); }

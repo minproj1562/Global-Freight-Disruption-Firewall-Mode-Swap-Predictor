@@ -22,11 +22,14 @@ class ActiveRouteItem(BaseModel):
     eta_predicted_ml: str
     delay_hours: float
     delay_probability_pct: float
+    ml_risk_score: Optional[float] = None
     recommended_action: str
     status: str
     risk_level: str
     risk_reason: str
     cargo_summary: str
+    carrier_name: Optional[str] = None
+    consignor_company: Optional[str] = None
     waypoints: List[List[float]]
     progress_percent: float
     avg_speed_knots: float

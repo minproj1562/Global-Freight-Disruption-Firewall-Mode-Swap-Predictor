@@ -303,3 +303,38 @@ export const fetchNetworkPortTelemetry = async (
   return response.data;
 };
 
+// ============= LANDING PAGE REAL-TIME TELEMETRY =============
+
+export interface CriticalPortSummary {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+  congestion_percent: number;
+  congestion_level: string;
+  waiting_vessels: number;
+  avg_wait_hours: number;
+  status_label: string;
+}
+
+export interface LandingTelemetryData {
+  total_ports: number;
+  total_tracked_vessels: number;
+  waiting_vessels_total: number;
+  avg_global_congestion_pct: number;
+  critical_ports_count: number;
+  moderate_ports_count: number;
+  low_ports_count: number;
+  total_berths: number;
+  active_berths: number;
+  active_disruptions_count: number;
+  top_critical_ports: CriticalPortSummary[];
+  system_status: string;
+}
+
+export const fetchLandingTelemetryApi = async (): Promise<LandingTelemetryData> => {
+  const response = await api.get<LandingTelemetryData>('/api/ports/landing-telemetry');
+  return response.data;
+};
+
+

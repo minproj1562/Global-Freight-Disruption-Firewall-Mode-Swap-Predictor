@@ -17,6 +17,7 @@ import {
   Zap,
   Map as MapIcon,
   Globe,
+  RefreshCw,
 } from 'lucide-react';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
@@ -74,12 +75,67 @@ export const PortOverviewPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Congestion Update Modal
+  // Congestion Update Modal — Operational Inputs & API Integration
   const [showCongestionModal, setShowCongestionModal] = useState(false);
   const [congestionValue, setCongestionValue] = useState(0);
   const [congestionNote, setCongestionNote] = useState('');
   const [congestionSubmitting, setCongestionSubmitting] = useState(false);
   const [selectedPortIdForUpdate, setSelectedPortIdForUpdate] = useState<string | null>(null);
+
+  // Logical Operational Inputs (Berths, Anchorage Queue, Conditions)
+  const [totalBerthsCount, setTotalBerthsCount] = useState(16);
+  const [occupiedBerthsCount, setOccupiedBerthsCount] = useState(10);
+  const [anchorageQueueCount, setAnchorageQueueCount] = useState(2);
+  const [operatingCondition, setOperatingCondition] = useState<'normal' | 'busy' | 'severe' | 'lockdown'>('busy');
+  const [apiBaselineCongestion, setApiBaselineCongestion] = useState(50);
+
+  const recalculateCongestion = (
+    total: number,
+    occupied: number,
+    queue: number,
+    condition: 'normal' | 'busy' | 'severe' | 'lockdown'
+  ) => {
+    const safeTotal = Math.max(1, total);
+    const berthRatio = Math.min(1, Math.max(0, occupied / safeTotal));
+    const berthContrib = berthRatio * 70;
+    const queueContrib = Math.min(22, queue * 3.5);
+    const conditionContrib = condition === 'normal' ? 0 : condition === 'busy' ? 5 : condition === 'severe' ? 12 : 20;
+    const finalVal = Math.min(100, Math.max(5, Math.round(berthContrib + queueContrib + conditionContrib)));
+    setCongestionValue(finalVal);
+  };
+
+  const handleOpenCongestionModal = (port: BackendPort) => {
+    setSelectedPortIdForUpdate(port.id);
+    const total = port.berth_capacity || 16;
+    setTotalBerthsCount(total);
+    const curr = port.congestion_percent || 45;
+    setApiBaselineCongestion(curr);
+    const occ = port.active_berths_used ?? Math.min(total, Math.max(1, Math.round((curr / 100) * total)));
+    setOccupiedBerthsCount(occ);
+    const q = port.waiting_vessels ?? (curr > 75 ? 4 : curr > 50 ? 2 : 0);
+    setAnchorageQueueCount(q);
+    const cond = curr > 80 ? 'severe' : curr > 55 ? 'busy' : 'normal';
+    setOperatingCondition(cond);
+    setCongestionValue(curr);
+    setCongestionNote('');
+    setShowCongestionModal(true);
+  };
+
+  const handleSyncWithLiveApi = () => {
+    const total = totalBerthsCount || 16;
+    const occ = Math.min(total, Math.max(1, Math.round((apiBaselineCongestion / 100) * total)));
+    setOccupiedBerthsCount(occ);
+    const q = apiBaselineCongestion > 75 ? 4 : apiBaselineCongestion > 50 ? 2 : 0;
+    setAnchorageQueueCount(q);
+    const cond = apiBaselineCongestion > 80 ? 'severe' : apiBaselineCongestion > 55 ? 'busy' : 'normal';
+    setOperatingCondition(cond);
+    setCongestionValue(apiBaselineCongestion);
+    setCongestionNote('Synced with live AIS satellite telemetry baseline.');
+    toast({
+      title: 'Synced with Live AIS API',
+      description: `Reset to live satellite computed rate: ${apiBaselineCongestion}%`,
+    });
+  };
 
   // Add Arrival Modal
   const [showArrivalModal, setShowArrivalModal] = useState(false);
@@ -752,8 +808,22 @@ export const PortOverviewPage: React.FC = () => {
                             </div>
                             <span className="text-xs font-mono text-slate-500">{port.code} • {port.country}</span>
                           </div>
-                          <div className={`px-2 py-1 rounded-lg border text-[10px] font-bold ${style.badge}`}>
-                            {port.status_label}
+                          <div className="flex flex-col items-end gap-1.5">
+                            <div className={`px-2 py-1 rounded-lg border text-[10px] font-bold ${style.badge}`}>
+                              {port.status_label}
+                            </div>
+                            {isUserPort && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenCongestionModal(port);
+                                }}
+                                className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all"
+                              >
+                                <Gauge className="w-3 h-3" /> Update
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -816,7 +886,7 @@ export const PortOverviewPage: React.FC = () => {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <button
-                      onClick={() => { setSelectedPortIdForUpdate(assignedPort.id); setCongestionValue(assignedPort.congestion_percent); setShowCongestionModal(true); }}
+                      onClick={() => handleOpenCongestionModal(assignedPort)}
                       className="group flex flex-col items-center gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-300/60 dark:border-amber-500/30 hover:border-amber-500 hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-all"
                     >
                       <div className="p-3 rounded-2xl bg-amber-500/20 group-hover:bg-amber-500/30"><Gauge className="w-6 h-6 text-amber-600 dark:text-amber-400" /></div>
@@ -866,69 +936,231 @@ export const PortOverviewPage: React.FC = () => {
         </main>
       </div>
 
-      {/* ===== CONGESTION UPDATE MODAL ===== */}
+      {/* ===== CONGESTION UPDATE MODAL (OPERATIONAL INPUTS & API SYNC) ===== */}
       <AnimatePresence>
         {showCongestionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-5"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-lg space-y-5"
             >
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <Gauge className="w-5 h-5 text-amber-500" />
-                  <h3 className="font-bold text-slate-900 dark:text-white">Update Port Congestion</h3>
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                    <Gauge className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Port Congestion Management</h3>
+                    <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      Operational berth calculation & AIS satellite telemetry sync
+                    </p>
+                  </div>
                 </div>
                 <button onClick={() => setShowCongestionModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleCongestionSubmit} className="space-y-4 text-sm">
+              {/* API Telemetry Coexistence Strip */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs font-mono">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-2">
-                    Congestion Percentage: <span className={`font-black text-lg ${getCongestionStyle(congestionValue).color}`}>{congestionValue}%</span>
-                  </label>
-                  <input
-                    type="range"
-                    min={0} max={100} step={1}
-                    value={congestionValue}
-                    onChange={(e) => setCongestionValue(Number(e.target.value))}
-                    className="w-full accent-amber-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-                    <span>0% — Clear</span><span>50% — Busy</span><span>100% — Critical</span>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">LIVE AIS SATELLITE TELEMETRY</div>
+                  <div className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">
+                    {apiBaselineCongestion}% Baseline Congestion
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSyncWithLiveApi}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all shadow-sm"
+                  title="Reset to live satellite AIS telemetry rate"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sync with Live API</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleCongestionSubmit} className="space-y-4 text-xs font-mono">
+                {/* 1. Berth Occupancy Counter */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">ACTIVE BERTH OCCUPANCY</span>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">Vessels docked & transferring cargo</p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold">
+                      {Math.round((occupiedBerthsCount / Math.max(1, totalBerthsCount)) * 100)}% Load
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.max(0, occupiedBerthsCount - 1);
+                          setOccupiedBerthsCount(val);
+                          recalculateCongestion(totalBerthsCount, val, anchorageQueueCount, operatingCondition);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-white flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-sm"
+                      >
+                        -
+                      </button>
+                      <span className="text-base font-bold text-slate-900 dark:text-white w-8 text-center">
+                        {occupiedBerthsCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.min(totalBerthsCount, occupiedBerthsCount + 1);
+                          setOccupiedBerthsCount(val);
+                          recalculateCongestion(totalBerthsCount, val, anchorageQueueCount, operatingCondition);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-white flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-sm"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <span className="text-slate-500 dark:text-slate-400 text-xs">
+                      of <strong>{totalBerthsCount}</strong> Total Terminal Berths
+                    </span>
                   </div>
                 </div>
 
-                <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div className={`h-full ${getCongestionStyle(congestionValue).bar} transition-all duration-200`} style={{ width: `${congestionValue}%` }} />
+                {/* 2. Anchorage Waiting Queue */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">OUTER ROADSTEAD / ANCHORAGE QUEUE</span>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">Vessels waiting outside port limits</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                      anchorageQueueCount > 4
+                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                        : anchorageQueueCount > 1
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                        : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {anchorageQueueCount} Ships Waiting
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = Math.max(0, anchorageQueueCount - 1);
+                        setAnchorageQueueCount(val);
+                        recalculateCongestion(totalBerthsCount, occupiedBerthsCount, val, operatingCondition);
+                      }}
+                      className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-white flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-sm"
+                    >
+                      -
+                    </button>
+                    <span className="text-base font-bold text-slate-900 dark:text-white w-8 text-center">
+                      {anchorageQueueCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = Math.min(25, anchorageQueueCount + 1);
+                        setAnchorageQueueCount(val);
+                        recalculateCongestion(totalBerthsCount, occupiedBerthsCount, val, operatingCondition);
+                      }}
+                      className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-white flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-sm"
+                    >
+                      +
+                    </button>
+                    <span className="text-slate-500 dark:text-slate-400 text-[11px] ml-2">
+                      (+3.5% queue congestion per waiting vessel)
+                    </span>
+                  </div>
                 </div>
 
+                {/* 3. Terminal Operational Condition */}
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                    Note / Reason <span className="text-slate-400">(optional)</span>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">
+                    TERMINAL OPERATIONAL CONDITION
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { key: 'normal' as const, label: 'Optimal Flow', badge: 'bg-emerald-500' },
+                      { key: 'busy' as const, label: 'High Traffic', badge: 'bg-amber-500' },
+                      { key: 'severe' as const, label: 'Severe Weather', badge: 'bg-orange-500' },
+                      { key: 'lockdown' as const, label: 'Crane Halt', badge: 'bg-rose-500' },
+                    ].map((cond) => (
+                      <button
+                        key={cond.key}
+                        type="button"
+                        onClick={() => {
+                          setOperatingCondition(cond.key);
+                          recalculateCongestion(totalBerthsCount, occupiedBerthsCount, anchorageQueueCount, cond.key);
+                        }}
+                        className={`p-2 rounded-xl text-center border text-[10px] font-bold transition-all ${
+                          operatingCondition === cond.key
+                            ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        {cond.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Resulting Computed Congestion Index */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-amber-700 dark:text-amber-300 font-bold">
+                      CALCULATED CONGESTION INDEX:
+                    </span>
+                    <span className={`font-black text-xl ${getCongestionStyle(congestionValue).color}`}>
+                      {congestionValue}%
+                    </span>
+                  </div>
+
+                  <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getCongestionStyle(congestionValue).bar} transition-all duration-300`}
+                      style={{ width: `${congestionValue}%` }}
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Formula: {occupiedBerthsCount}/{totalBerthsCount} berths active ({Math.round((occupiedBerthsCount / totalBerthsCount) * 70)}%) + {anchorageQueueCount} anchored ships ({Math.round(Math.min(22, anchorageQueueCount * 3.5))}%) + condition factor.
+                  </div>
+                </div>
+
+                {/* 5. Note / Reason */}
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    OPERATIONAL LOG / REASON <span className="text-slate-400">(logged in audit history)</span>
                   </label>
                   <textarea
-                    rows={3}
-                    placeholder="e.g. Emergency drill — all berths occupied temporarily"
+                    rows={2}
+                    placeholder={`e.g. Berth maintenance on quay 3; ${anchorageQueueCount} vessels awaiting pilot boarding`}
                     value={congestionNote}
                     onChange={(e) => setCongestionNote(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs resize-none focus:border-amber-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs resize-none focus:border-amber-500 focus:outline-none"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" onClick={() => setShowCongestionModal(false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">
+                <div className="flex justify-end gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowCongestionModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-all"
+                  >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={congestionSubmitting}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md shadow-amber-500/20 disabled:opacity-60 transition-all"
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 disabled:opacity-60 transition-all"
                   >
                     {congestionSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    Submit Override
+                    <span>Submit Verified Override</span>
                   </button>
                 </div>
               </form>

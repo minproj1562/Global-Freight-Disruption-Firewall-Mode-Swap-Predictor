@@ -6,7 +6,7 @@
 // GET /api/v1/reroute/dijkstra-compare
 // POST /api/v1/reports/pdf (Backend PDF Report Export Endpoint)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -35,6 +35,9 @@ import {
   X,
   PlayCircle,
   Search,
+  RefreshCw,
+  Zap,
+  Shield,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -72,7 +75,6 @@ export const RerouteRecommendationPage: React.FC = () => {
   const [availableVessels, setAvailableVessels] = useState<Array<{ id: string; name: string; mmsi: number; type: string; flag?: string }>>([]);
   const [availableDisruptions, setAvailableDisruptions] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [availableCargoTypes, setAvailableCargoTypes] = useState<string[]>([]);
-  const [optionsLoaded, setOptionsLoaded] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState<RouteRequest>({
@@ -100,6 +102,78 @@ export const RerouteRecommendationPage: React.FC = () => {
   // Dijkstra Comparison Modal
   const [showDijkstraModal, setShowDijkstraModal] = useState(false);
 
+  // Manager-friendly tab view: 'cards' | 'scatter'
+  const [activeAnalysisView, setActiveAnalysisView] = useState<'cards' | 'scatter'>('cards');
+
+  // Quick 1-Click Crisis Presets for Logistics Managers
+  const PRESET_SCENARIOS = [
+    {
+      id: 'red-sea',
+      label: '🔴 Red Sea Threat Bypass',
+      desc: 'Avoid Bab-el-Mandeb drone threats via southern Cape highway',
+      origin: 'port-shanghai',
+      dest: 'port-rotterdam',
+      vessel: 'vessel-ever-given',
+      cargo: 'High-Tech Consumer Electronics',
+      disruption: 'disruption-red-sea',
+      priority: 'Balanced' as const,
+    },
+    {
+      id: 'panama',
+      label: '🟠 Panama Drought Bypass',
+      desc: 'Shift critical freight load via Pacific sea-rail intermodal',
+      origin: 'port-houston',
+      dest: 'port-busan',
+      vessel: 'vessel-cma-cgm-marco-polo',
+      cargo: 'Automotive Parts & Assemblies',
+      disruption: 'disruption-panama',
+      priority: 'Time' as const,
+    },
+    {
+      id: 'malacca',
+      label: '🟡 Malacca Congestion Bypass',
+      desc: 'Evade Singapore bottleneck via Sunda Strait feeder corridor',
+      origin: 'port-singapore',
+      dest: 'port-hamburg',
+      vessel: 'vessel-madrid-maersk',
+      cargo: 'General Containerized Freight',
+      disruption: 'disruption-malacca',
+      priority: 'Cost' as const,
+    },
+  ];
+
+  const handleApplyPreset = async (preset: typeof PRESET_SCENARIOS[0]) => {
+    const updatedForm: RouteRequest = {
+      ...formData,
+      origin_port: preset.origin,
+      destination_port: preset.dest,
+      vessel_id: preset.vessel,
+      cargo_type: preset.cargo,
+      disruption_to_avoid: preset.disruption,
+      priority: preset.priority,
+    };
+    setFormData(updatedForm);
+    toast({
+      title: 'Scenario Preset Loaded',
+      description: `${preset.label} loaded into Monte Carlo engine.`,
+    });
+    try {
+      setIsSimulating(true);
+      setSimProgress(45);
+      setSimStepText('Simulating 2,000 stochastic futures for preset...');
+      const res = await simulateReroute(updatedForm);
+      if (res && res.recommended_routes?.length > 0) {
+        setSimulationResult(res);
+        setSelectedRouteId(res.recommended_routes[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSimulating(false);
+      setSimProgress(100);
+    }
+  };
+
   // Is Form Valid?
   const isFormValid = Boolean(
     formData.origin_port &&
@@ -107,6 +181,46 @@ export const RerouteRecommendationPage: React.FC = () => {
       formData.vessel_id &&
       formData.cargo_type
   );
+
+  // Track whether initial load is done (to skip auto-sim on mount)
+  const isInitialLoadDone = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isAutoCalcActive, setIsAutoCalcActive] = useState(false);
+
+  // Debounced Auto-Simulation: Re-run Monte Carlo when form inputs change
+  useEffect(() => {
+    if (!isInitialLoadDone.current) return; // Skip on first mount
+    if (!isFormValid || isSimulating) return;
+
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    setIsAutoCalcActive(true);
+
+    debounceTimerRef.current = setTimeout(async () => {
+      setIsSimulating(true);
+      setSimProgress(50);
+      setSimStepText('Auto-recalculating 2,000 Monte Carlo simulations for updated parameters...');
+
+      try {
+        const res = await simulateReroute(formData);
+        if (res && res.recommended_routes?.length > 0) {
+          setSimulationResult(res);
+          setSelectedRouteId(res.recommended_routes[0].id);
+        }
+      } catch (err) {
+        console.error('[Auto-Simulation Error]:', err);
+      } finally {
+        setIsSimulating(false);
+        setSimProgress(100);
+        setIsAutoCalcActive(false);
+      }
+    }, 800);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [formData.origin_port, formData.destination_port, formData.cargo_type, formData.priority, formData.disruption_to_avoid]);
 
   // Load Form Options and Initial Live Monte Carlo Simulation from Backend
   useEffect(() => {
@@ -118,7 +232,6 @@ export const RerouteRecommendationPage: React.FC = () => {
           setAvailableVessels(opts.vessels || []);
           setAvailableDisruptions(opts.disruptions || []);
           setAvailableCargoTypes(opts.cargo_types || []);
-          setOptionsLoaded(true);
         }
 
         // Run initial live 2,000 Monte Carlo simulation
@@ -135,6 +248,7 @@ export const RerouteRecommendationPage: React.FC = () => {
       } finally {
         setIsSimulating(false);
         setSimProgress(100);
+        isInitialLoadDone.current = true;
       }
     };
 
@@ -365,36 +479,36 @@ export const RerouteRecommendationPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col overflow-x-hidden transition-colors duration-300">
       <LogisticsManagerSidebar />
 
       {/* ========================================================================= */}
       {/* 1. TOP HEADER BAR */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-30 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 px-4 lg:px-8 py-3 flex items-center justify-between ml-16">
+      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-950/85 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 px-4 lg:px-8 py-3 flex items-center justify-between ml-16 transition-colors duration-300">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard/disruptions')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-amber-400 text-xs font-mono font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-amber-500 text-xs font-mono font-bold transition-all shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Alert Center</span>
           </button>
 
-          <div className="flex items-center gap-2 border-l border-slate-800 pl-3">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-md">
+          <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-800 pl-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-sm">
               <Compass className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold font-mono text-white tracking-tight">
+                <h1 className="text-sm font-bold font-mono text-slate-900 dark:text-white tracking-tight">
                   MONTE CARLO REROUTE PLANNER
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                   2,000 SIMULATIONS
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono hidden sm:block">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono hidden sm:block">
                 PAGE 1.3 • MULTIMODAL MODE-SWAP PREDICTOR & PARETO FRONTIER OPTIMIZER
               </p>
             </div>
@@ -418,28 +532,28 @@ export const RerouteRecommendationPage: React.FC = () => {
                 description: 'Transferred vessel & port parameters to Analytics & Simulation Lab.',
               });
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-bold transition-all shadow-sm"
           >
-            <PlayCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <PlayCircle className="w-3.5 h-3.5 text-emerald-500" />
             <span className="hidden sm:inline">Launch in Simulator</span>
           </button>
 
           {/* Compare with Dijkstra Trigger Button */}
           <button
             onClick={() => setShowDijkstraModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-700 dark:text-purple-300 text-xs font-mono font-bold transition-all shadow-sm"
           >
-            <Scale className="w-3.5 h-3.5 text-purple-400" />
+            <Scale className="w-3.5 h-3.5 text-purple-500" />
             <span className="hidden sm:inline">Compare with Dijkstra</span>
           </button>
 
           {/* Download PDF Button */}
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono font-bold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-mono font-bold transition-all shadow-sm"
             title="Export Reroute Simulation Summary PDF Report"
           >
-            <Download className="w-3.5 h-3.5 text-amber-400" />
+            <Download className="w-3.5 h-3.5 text-amber-500" />
             <span className="hidden sm:inline">Download PDF</span>
           </button>
 
@@ -450,31 +564,61 @@ export const RerouteRecommendationPage: React.FC = () => {
       {/* ========================================================================= */}
       {/* 2. TOP TWO-PANE SECTION (LEFT FORM / RIGHT TOP 3 RESULTS) */}
       {/* ========================================================================= */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-8 ml-16">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-6 ml-16">
+        {/* 1-Click Scenario Presets Banner for Logistics Manager */}
+        <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5 transition-colors duration-300">
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500" />
+              RAPID CRISIS PRESETS FOR LOGISTICS MANAGERS
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
+              Select any threat scenario to instantly autofill & execute 2,000 Monte Carlo runs
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            {PRESET_SCENARIOS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => handleApplyPreset(preset)}
+                className="p-3 text-left rounded-2xl bg-slate-50 dark:bg-slate-950/70 hover:bg-amber-50 dark:hover:bg-amber-950/20 border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500/40 transition-all group"
+              >
+                <div className="text-xs font-bold font-mono text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 flex items-center justify-between">
+                  <span>{preset.label}</span>
+                  <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-500" />
+                </div>
+                <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 line-clamp-1 mt-1">
+                  {preset.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* ========================================================================= */}
           {/* LEFT — ROUTE REQUEST FORM (lg:col-span-5) */}
           {/* ========================================================================= */}
-          <section className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-3xl p-5 lg:p-6 shadow-2xl flex flex-col justify-between space-y-5">
+          <section className="lg:col-span-5 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 lg:p-6 shadow-xl flex flex-col justify-between space-y-5 transition-colors duration-300">
             <div>
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                <div className="flex items-center gap-2 text-amber-400 font-mono font-bold text-xs uppercase tracking-wider">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-4">
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-mono font-bold text-xs uppercase tracking-wider">
                   <Layers className="w-4 h-4" />
-                  <span>1. ROUTE REQUEST & THREAT PARAMETERS</span>
+                  <span>1. ROUTE REQUEST & PARAMETERS</span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">FastAPI ML Engine</span>
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">FastAPI ML Engine</span>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 {/* 1. Origin Port Dropdown */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    ORIGIN PORT <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    ORIGIN PORT <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={formData.origin_port}
                     onChange={(e) => setFormData({ ...formData, origin_port: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {availablePorts.map((port) => (
                       <option key={port.id} value={port.id}>
@@ -486,13 +630,13 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                 {/* 2. Destination Port Dropdown */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    DESTINATION PORT <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    DESTINATION PORT <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={formData.destination_port}
                     onChange={(e) => setFormData({ ...formData, destination_port: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {availablePorts.map((port) => (
                       <option key={port.id} value={port.id}>
@@ -504,24 +648,24 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                 {/* 3. Target Vessel Selectable Dropdown with Search */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    TARGET VESSEL ({availableVessels.length} FLEET) <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    TARGET VESSEL ({availableVessels.length} FLEET) <span className="text-rose-500">*</span>
                   </label>
                   <div className="space-y-1">
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Search 200+ vessels by name..."
+                        placeholder="Search fleet vessels by name..."
                         value={vesselSearchFilter}
                         onChange={(e) => setVesselSearchFilter(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1 text-[11px] text-slate-200 font-mono focus:outline-none focus:border-amber-500/60"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-1 text-[11px] text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-amber-500"
                       />
                     </div>
                     <select
                       value={formData.vessel_id}
                       onChange={(e) => setFormData({ ...formData, vessel_id: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                     >
                       {availableVessels.filter((v) =>
                         v.name.toLowerCase().includes(vesselSearchFilter.toLowerCase()) ||
@@ -537,7 +681,7 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                 {/* 4. Cargo Value Input ($USD) */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     CARGO VALUE ($ USD)
                   </label>
                   <input
@@ -545,19 +689,19 @@ export const RerouteRecommendationPage: React.FC = () => {
                     placeholder="e.g. 42000000"
                     value={formData.cargo_value_usd || ''}
                     onChange={(e) => setFormData({ ...formData, cargo_value_usd: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
-                {/* 4. Cargo Type Dropdown */}
+                {/* 5. Cargo Type Dropdown */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     CARGO CATEGORY
                   </label>
                   <select
                     value={formData.cargo_type}
                     onChange={(e) => setFormData({ ...formData, cargo_type: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     {availableCargoTypes.map((cargo) => (
                       <option key={cargo} value={cargo}>
@@ -569,10 +713,10 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                 {/* 6. Priority Segmented Control (4 Options: Cost, Time, Balanced, Carbon) */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1.5">
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     OPTIMIZATION PRIORITY
                   </label>
-                  <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <div className="grid grid-cols-4 gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
                     {(['Cost', 'Time', 'Balanced', 'Carbon'] as const).map((p) => (
                       <button
                         key={p}
@@ -580,8 +724,8 @@ export const RerouteRecommendationPage: React.FC = () => {
                         onClick={() => setFormData({ ...formData, priority: p })}
                         className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
                           formData.priority === p
-                            ? 'bg-amber-500 text-slate-950 shadow-md'
-                            : 'text-slate-400 hover:text-slate-200'
+                            ? 'bg-amber-500 text-slate-950 shadow-sm'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                         }`}
                       >
                         {p}
@@ -590,15 +734,15 @@ export const RerouteRecommendationPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 6. Disruption to Avoid Dropdown */}
+                {/* 7. Disruption to Avoid Dropdown */}
                 <div>
-                  <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     DISRUPTION TO AVOID
                   </label>
                   <select
                     value={formData.disruption_to_avoid}
                     onChange={(e) => setFormData({ ...formData, disruption_to_avoid: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="None">None (Standard Baseline Transit)</option>
                     {availableDisruptions.map((d) => (
@@ -614,27 +758,26 @@ export const RerouteRecommendationPage: React.FC = () => {
             {/* Run Simulation Button & Distinct Progress State */}
             <div className="pt-2">
               {isSimulating ? (
-                // Distinct Monte Carlo Progress Loader
-                <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-amber-500/40 shadow-xl">
-                  <div className="flex items-center justify-between text-xs font-mono text-amber-300 font-bold">
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-amber-500/40 shadow-xl">
+                  <div className="flex items-center justify-between text-xs font-mono text-amber-600 dark:text-amber-300 font-bold">
                     <span className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 animate-spin text-amber-400" style={{ animationDuration: '3s' }} />
+                      <Sparkles className="w-4 h-4 animate-spin text-amber-500" style={{ animationDuration: '3s' }} />
                       <span>RUNNING MONTE CARLO SIMULATION</span>
                     </span>
                     <span>{simProgress}%</span>
                   </div>
 
                   {/* Animated Progress Bar */}
-                  <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                  <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-900 rounded-full overflow-hidden border border-slate-300 dark:border-slate-800">
                     <motion.div
-                      className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400"
+                      className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500"
                       initial={{ width: 0 }}
                       animate={{ width: `${simProgress}%` }}
                       transition={{ ease: 'easeOut' }}
                     />
                   </div>
 
-                  <p className="text-[11px] font-mono text-slate-400 animate-pulse">
+                  <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 animate-pulse">
                     {simStepText}
                   </p>
                 </div>
@@ -645,7 +788,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                   className={`w-full py-3.5 rounded-2xl font-mono text-xs font-bold transition-all shadow-xl flex items-center justify-center gap-2 ${
                     isFormValid
                       ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-amber-500/20 transform hover:scale-[1.01]'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-800'
                   }`}
                 >
                   <Compass className="w-4 h-4" />
@@ -654,7 +797,7 @@ export const RerouteRecommendationPage: React.FC = () => {
               )}
 
               {!isFormValid && (
-                <span className="text-[10px] text-rose-400 font-mono block mt-1.5 text-center">
+                <span className="text-[10px] text-rose-500 font-mono block mt-1.5 text-center">
                   * Please fill all required fields to launch simulation
                 </span>
               )}
@@ -665,15 +808,76 @@ export const RerouteRecommendationPage: React.FC = () => {
           {/* RIGHT — TOP 3 RANKED RESULTS CARDS (lg:col-span-7) */}
           {/* ========================================================================= */}
           <section className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                 <Sparkles className="w-4 h-4" />
                 <span>2. TOP 3 RANKED MULTIMODAL REROUTE OPTIONS</span>
               </div>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                PARETO SWEET-SPOT
-              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-mono font-bold">
+                  <button
+                    onClick={() => setActiveAnalysisView('cards')}
+                    className={`px-2 py-0.5 rounded-lg transition-all ${
+                      activeAnalysisView === 'cards'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Routes
+                  </button>
+                  <button
+                    onClick={() => setActiveAnalysisView('scatter')}
+                    className={`px-2 py-0.5 rounded-lg transition-all ${
+                      activeAnalysisView === 'scatter'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    Cloud
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                  PARETO SWEET-SPOT
+                </span>
+              </div>
             </div>
+
+            {/* Confidence Interval Explainability Strip */}
+            {simulationResult && simulationResult.recommended_routes.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/30 text-xs font-mono flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="text-emerald-800 dark:text-emerald-300 font-bold">
+                    Monte Carlo Arrival Confidence Interval:
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-slate-700 dark:text-slate-300">
+                  <span>P10 (Optimal): <strong>{(simulationResult.recommended_routes[0].total_time_days * 0.92).toFixed(1)}d</strong></span>
+                  <span>•</span>
+                  <span>P50 (Median): <strong>{simulationResult.recommended_routes[0].total_time_days}d</strong></span>
+                  <span>•</span>
+                  <span>P90 (Worst case): <strong>{(simulationResult.recommended_routes[0].total_time_days * 1.15).toFixed(1)}d</strong></span>
+                </div>
+              </div>
+            )}
+
+            {/* Corridor Trade Lane Badge + Auto-Calc Indicator */}
+            {simulationResult && simulationResult.recommended_routes.length > 0 && (
+              <div className="flex items-center justify-between gap-2">
+                {simulationResult.recommended_routes[0].corridor_name && (
+                  <span className="px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-700 dark:text-sky-300 text-[10px] font-mono font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-sky-500" />
+                    {simulationResult.recommended_routes[0].corridor_name}
+                  </span>
+                )}
+                {isAutoCalcActive && (
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-300 text-[10px] font-mono font-bold animate-pulse flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    LIVE ML AUTO-CALCULATION
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="space-y-4">
               {simulationResult ? (
@@ -689,10 +893,10 @@ export const RerouteRecommendationPage: React.FC = () => {
                       transition={{ duration: 0.3 }}
                       className={`relative p-5 rounded-3xl border transition-all ${
                         isBest
-                          ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-emerald-500/60 shadow-2xl shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                          ? 'bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 border-emerald-500 shadow-xl ring-1 ring-emerald-500/20'
                           : isSelected
-                          ? 'bg-slate-900 border-amber-500/80 shadow-xl'
-                          : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
+                          ? 'bg-white dark:bg-slate-900 border-amber-500 shadow-xl'
+                          : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
                     {/* Best Recommended Accent Ribbon */}
@@ -707,18 +911,18 @@ export const RerouteRecommendationPage: React.FC = () => {
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center font-mono font-bold text-amber-400 text-xs shadow-inner">
+                          <span className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center font-mono font-bold text-amber-600 dark:text-amber-400 text-xs shadow-inner">
                             #{route.rank}
                           </span>
-                          <h3 className="text-sm font-bold font-mono text-white">
+                          <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white">
                             {route.title}
                           </h3>
-                          <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono text-[10px] font-bold uppercase">
+                          <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-mono text-[10px] font-bold uppercase">
                             Strategy: {route.strategy_label || (route.rank === 1 ? 'Most Resilient' : route.rank === 2 ? 'Cheapest' : 'Fastest')}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          Carrier: <strong className="text-slate-200">{route.carrier_name}</strong>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          Carrier: <strong className="text-slate-800 dark:text-slate-200">{route.carrier_name}</strong>
                         </p>
                       </div>
 
@@ -737,15 +941,15 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                     {/* Mode Breakdown Stacked Bar */}
                     <div className="mb-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
                         <span>Multimodal Transit Breakdown:</span>
-                        <span className="text-slate-300 font-bold">
+                        <span className="text-slate-800 dark:text-slate-300 font-bold">
                           Sea {route.mode_breakdown.sea}% | Rail {route.mode_breakdown.rail}% | Air {route.mode_breakdown.air}%
                         </span>
                       </div>
 
                       {/* Horizontal Stacked Bar */}
-                      <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
+                      <div className="w-full h-3 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden flex border border-slate-200 dark:border-slate-800">
                         <div
                           style={{ width: `${route.mode_breakdown.sea}%` }}
                           className="h-full bg-sky-500 shadow-inner"
@@ -765,16 +969,16 @@ export const RerouteRecommendationPage: React.FC = () => {
                     </div>
 
                     {/* Waypoints Visual Chain */}
-                    <div className="bg-slate-950/70 p-3 rounded-2xl border border-slate-800/80 mb-4 text-xs font-mono">
+                    <div className="bg-slate-50 dark:bg-slate-950/70 p-3 rounded-2xl border border-slate-200 dark:border-slate-800/80 mb-4 text-xs font-mono">
                       <span className="text-[10px] text-slate-500 block mb-1">WAYPOINTS TRAJECTORY:</span>
-                      <div className="flex flex-wrap items-center gap-1.5 text-slate-300 text-[11px]">
+                      <div className="flex flex-wrap items-center gap-1.5 text-slate-700 dark:text-slate-300 text-[11px]">
                         {route.waypoint_names.map((wp, idx) => (
                           <React.Fragment key={idx}>
-                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-white font-medium">
+                            <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium shadow-sm">
                               {wp}
                             </span>
                             {idx < route.waypoint_names.length - 1 && (
-                              <ArrowRight className="w-3 h-3 text-amber-400 shrink-0" />
+                              <ArrowRight className="w-3 h-3 text-amber-500 shrink-0" />
                             )}
                           </React.Fragment>
                         ))}
@@ -783,53 +987,53 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                     {/* Metrics Grid (Cost, Time, Carbon, ML Risk Score, Savings) */}
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-4 text-xs font-mono">
-                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block mb-0.5">TOTAL COST</span>
-                        <span className="text-white font-bold text-sm">${route.total_cost_usd.toLocaleString()}</span>
+                      <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">TOTAL COST</span>
+                        <span className="text-slate-900 dark:text-white font-bold text-sm">${route.total_cost_usd.toLocaleString()}</span>
                       </div>
 
-                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block mb-0.5">TRANSIT TIME</span>
-                        <span className="text-white font-bold text-sm">{route.total_time_days} Days</span>
+                      <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">TRANSIT TIME</span>
+                        <span className="text-slate-900 dark:text-white font-bold text-sm">{route.total_time_days} Days</span>
                       </div>
 
-                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block mb-0.5 flex items-center gap-1">
-                          <Leaf className="w-3 h-3 text-emerald-400" /> CARBON
+                      <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5 flex items-center gap-1">
+                          <Leaf className="w-3 h-3 text-emerald-500" /> CARBON
                         </span>
-                        <span className="text-emerald-400 font-bold text-sm">{route.co2_carbon_footprint_tons} t CO₂</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">{route.co2_carbon_footprint_tons} t CO₂</span>
                       </div>
 
-                      <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-                        <span className="text-[10px] text-slate-400 block mb-0.5">ML RISK SCORE</span>
-                        <span className="text-amber-400 font-bold text-sm">
+                      <div className="bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">ML RISK SCORE</span>
+                        <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">
                           {route.ml_risk_score ?? (route.risk_level === 'low' ? 0.12 : 0.35)}
                         </span>
                       </div>
 
                       <div className="col-span-2 sm:col-span-1 bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/30">
-                        <span className="text-[10px] text-emerald-400 font-bold block mb-0.5">SAVINGS VS ORIG</span>
-                        <span className="text-emerald-300 font-extrabold text-xs">
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block mb-0.5">SAVINGS VS ORIG</span>
+                        <span className="text-emerald-700 dark:text-emerald-300 font-extrabold text-xs">
                           Saves ${route.savings_vs_original.cost_usd.toLocaleString()}
                         </span>
                       </div>
                     </div>
 
                     {/* Action Row */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-                      <p className="text-[11px] text-slate-400 line-clamp-1 italic max-w-md">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 italic max-w-md">
                         {route.transit_summary}
                       </p>
 
                       <button
                         onClick={() => handleSelectRoute(route)}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-md shrink-0 ${
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-sm shrink-0 ${
                           isSelected
                             ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20'
-                            : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-700'
+                            : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        {isSelected ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Check className="w-4 h-4 text-amber-400" />}
+                        {isSelected ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Check className="w-4 h-4 text-amber-500" />}
                         <span>{isSelected ? 'Route Selected' : 'Select Route'}</span>
                       </button>
                     </div>
@@ -837,9 +1041,9 @@ export const RerouteRecommendationPage: React.FC = () => {
                 );
               })
             ) : (
-              <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
-                <RefreshCw className="w-8 h-8 animate-spin text-amber-400 mx-auto" />
-                <div className="font-mono text-sm text-slate-300 font-bold">Executing 2,000 Monte Carlo Simulations...</div>
+              <div className="p-12 rounded-3xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center space-y-4">
+                <RefreshCw className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
+                <div className="font-mono text-sm text-slate-800 dark:text-slate-300 font-bold">Executing 2,000 Monte Carlo Simulations...</div>
                 <p className="text-xs font-mono text-slate-500 max-w-md mx-auto">Evaluating stochastic bunker fuel shocks, non-linear weather risk curves, and multimodal transfer bottlenecks.</p>
               </div>
             )}
@@ -850,26 +1054,26 @@ export const RerouteRecommendationPage: React.FC = () => {
         {/* ========================================================================= */}
         {/* 3. FULL-WIDTH COST VS TIME SCATTER PLOT SECTION */}
         {/* ========================================================================= */}
-        <section className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <section className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-4 transition-colors duration-300">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
             <div>
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-400 uppercase tracking-wider">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                 <BarChart3 className="w-4 h-4" />
                 <span>3. COST VS. TIME PARETO SCATTER PLOT (2,000 MONTE CARLO SIMULATION CLOUD)</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-                Visualizing the tradeoff cloud across all simulated route options. Top 3 sweet-spot recommended routes are highlighted as gold/emerald nodes. Hover any point to inspect detailed trade-offs.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+                Visualizing the trade-off cloud across all simulated route options. Top 3 sweet-spot recommended routes are highlighted as gold/emerald nodes. Hover any point to inspect detailed trade-offs.
               </p>
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-mono text-slate-300 bg-slate-950 p-2.5 rounded-2xl border border-slate-800 shrink-0">
+            <div className="flex items-center gap-4 text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-emerald-400 border-t border-emerald-300" />
-                <span className="text-emerald-400 font-bold">Pareto Frontier Line</span>
+                <span className="w-3 h-0.5 bg-emerald-500 border-t border-emerald-400" />
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Pareto Frontier Line</span>
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-emerald-400 border border-slate-950" />
+                <span className="w-3 h-3 rounded-full bg-emerald-500 border border-white dark:border-slate-950" />
                 <span>Top 3 Sweet Spot</span>
               </div>
 
@@ -879,7 +1083,7 @@ export const RerouteRecommendationPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-rose-500 border border-slate-950" />
+                <span className="w-3 h-3 rounded-full bg-rose-500 border border-white dark:border-slate-950" />
                 <span>Naive Dijkstra</span>
               </div>
             </div>
@@ -890,27 +1094,27 @@ export const RerouteRecommendationPage: React.FC = () => {
             {simulationResult ? (
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.25} />
                   <XAxis
                     type="number"
                     dataKey="time"
                     name="Transit Time"
                     unit=" days"
-                    stroke="#94a3b8"
+                    stroke="#64748b"
                     fontSize={11}
                     tickLine={false}
-                    label={{ value: 'Transit Time (Days)', position: 'bottom', offset: 0, fill: '#94a3b8', fontSize: 11 }}
+                    label={{ value: 'Transit Time (Days)', position: 'bottom', offset: 0, fill: '#64748b', fontSize: 11 }}
                   />
                   <YAxis
                     type="number"
                     dataKey="cost"
                     name="Total Cost"
                     unit=" USD"
-                    stroke="#94a3b8"
+                    stroke="#64748b"
                     fontSize={11}
                     tickLine={false}
                     tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
-                    label={{ value: 'Total Cost ($ USD)', angle: -90, position: 'left', fill: '#94a3b8', fontSize: 11 }}
+                    label={{ value: 'Total Cost ($ USD)', angle: -90, position: 'left', fill: '#64748b', fontSize: 11 }}
                   />
                   <ZAxis type="number" dataKey="confidence" range={[40, 220]} />
                   <Tooltip
@@ -919,19 +1123,19 @@ export const RerouteRecommendationPage: React.FC = () => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload as SimulatedPoint;
                         return (
-                          <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3.5 shadow-2xl text-xs font-mono space-y-1.5 max-w-xs backdrop-blur-md">
-                            <div className="font-bold text-amber-400 border-b border-slate-800 pb-1 flex items-center justify-between">
+                          <div className="bg-white dark:bg-slate-950/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xl text-xs font-mono space-y-1.5 max-w-xs backdrop-blur-md">
+                            <div className="font-bold text-amber-600 dark:text-amber-400 border-b border-slate-200 dark:border-slate-800 pb-1 flex items-center justify-between">
                               <span>{data.routeName || 'Simulated Scenario'}</span>
                               {data.isTop3 && (
-                                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px]">
+                                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[9px]">
                                   TOP #{data.rank}
                                 </span>
                               )}
                             </div>
-                            <div className="text-white font-semibold">Cost: ${data.cost.toLocaleString()}</div>
-                            <div className="text-slate-300">Transit Time: {data.time} days</div>
-                            <div className="text-slate-400">Confidence: {data.confidence}%</div>
-                            <div className="text-slate-400 capitalize">Risk Level: {data.risk}</div>
+                            <div className="text-slate-900 dark:text-white font-semibold">Cost: ${data.cost.toLocaleString()}</div>
+                            <div className="text-slate-700 dark:text-slate-300">Transit Time: {data.time} days</div>
+                            <div className="text-slate-500 dark:text-slate-400">Confidence: {data.confidence}%</div>
+                            <div className="text-slate-500 dark:text-slate-400 capitalize">Risk Level: {data.risk}</div>
                           </div>
                         );
                       }
@@ -947,7 +1151,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                         <Cell
                           key={`cell-${index}`}
                           fill={fill}
-                          stroke={entry.isTop3 ? '#f59e0b' : '#0f172a'}
+                          stroke={entry.isTop3 ? '#f59e0b' : '#334155'}
                           strokeWidth={entry.isTop3 ? 2 : 1}
                         />
                       );
@@ -978,23 +1182,23 @@ export const RerouteRecommendationPage: React.FC = () => {
       {/* ========================================================================= */}
       <AnimatePresence>
         {showDijkstraModal && simulationResult && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-5"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-5 transition-colors duration-300"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                     <Scale className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold font-mono text-white">
+                    <h3 className="text-base font-bold font-mono text-slate-900 dark:text-white">
                       Monte Carlo vs. Naive Dijkstra Comparison
                     </h3>
-                    <p className="text-xs text-slate-400 font-mono">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                       Why traditional shortest-path algorithms fail in active threat zones
                     </p>
                   </div>
@@ -1002,7 +1206,7 @@ export const RerouteRecommendationPage: React.FC = () => {
 
                 <button
                   onClick={() => setShowDijkstraModal(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg bg-slate-100 dark:bg-slate-800"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1011,48 +1215,48 @@ export const RerouteRecommendationPage: React.FC = () => {
               {/* Side by Side Comparison Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                 {/* Monte Carlo Recommended */}
-                <div className="bg-slate-950/80 p-4 rounded-2xl border border-emerald-500/40 space-y-2">
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold block w-max">
+                <div className="bg-slate-50 dark:bg-slate-950/80 p-4 rounded-2xl border border-emerald-500/40 space-y-2">
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold block w-max">
                     MONTE CARLO RECOMMENDED (#1)
                   </span>
-                  <h4 className="font-bold text-white text-sm">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
                     {simulationResult.recommended_routes[0]?.title}
                   </h4>
-                  <div className="space-y-1 text-slate-300 pt-2 border-t border-slate-800">
-                    <div>Total Cost: <strong className="text-emerald-400">${simulationResult.recommended_routes[0]?.total_cost_usd.toLocaleString()}</strong></div>
-                    <div>Total Time: <strong className="text-emerald-400">{simulationResult.recommended_routes[0]?.total_time_days} days</strong></div>
-                    <div>Risk Level: <span className="text-emerald-400 uppercase font-bold">Low Risk</span></div>
+                  <div className="space-y-1 text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div>Total Cost: <strong className="text-emerald-600 dark:text-emerald-400">${simulationResult.recommended_routes[0]?.total_cost_usd.toLocaleString()}</strong></div>
+                    <div>Total Time: <strong className="text-emerald-600 dark:text-emerald-400">{simulationResult.recommended_routes[0]?.total_time_days} days</strong></div>
+                    <div>Risk Level: <span className="text-emerald-600 dark:text-emerald-400 uppercase font-bold">Low Risk</span></div>
                     <div>Threat Mitigation: Bypasses Red Sea Missile Zone completely</div>
                   </div>
                 </div>
 
                 {/* Naive Dijkstra */}
-                <div className="bg-slate-950/80 p-4 rounded-2xl border border-rose-500/40 space-y-2">
-                  <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-[10px] font-bold block w-max">
+                <div className="bg-slate-50 dark:bg-slate-950/80 p-4 rounded-2xl border border-rose-500/40 space-y-2">
+                  <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-bold block w-max">
                     NAIVE DIJKSTRA SHORTEST PATH
                   </span>
-                  <h4 className="font-bold text-white text-sm">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
                     {simulationResult.dijkstra_comparison.route_name}
                   </h4>
-                  <div className="space-y-1 text-slate-300 pt-2 border-t border-slate-800">
-                    <div>Total Cost: <strong className="text-rose-400">${simulationResult.dijkstra_comparison.cost_usd.toLocaleString()}</strong></div>
-                    <div>Total Time: <strong className="text-rose-400">{simulationResult.dijkstra_comparison.time_days} days</strong></div>
-                    <div>Risk Level: <span className="text-rose-400 uppercase font-bold">Critical Hazard</span></div>
+                  <div className="space-y-1 text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div>Total Cost: <strong className="text-rose-600 dark:text-rose-400">${simulationResult.dijkstra_comparison.cost_usd.toLocaleString()}</strong></div>
+                    <div>Total Time: <strong className="text-rose-600 dark:text-rose-400">{simulationResult.dijkstra_comparison.time_days} days</strong></div>
+                    <div>Risk Level: <span className="text-rose-600 dark:text-rose-400 uppercase font-bold">Critical Hazard</span></div>
                     <div>Threat Mitigation: None (Traverses active combat zone)</div>
                   </div>
                 </div>
               </div>
 
               {/* Strategic Explanation */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
-                <strong className="text-amber-400 block mb-1">Strategic Takeaway:</strong>
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                <strong className="text-amber-600 dark:text-amber-400 block mb-1">Strategic Takeaway:</strong>
                 {simulationResult.dijkstra_comparison.details}
               </div>
 
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setShowDijkstraModal(false)}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-bold"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-bold shadow-md shadow-amber-500/20"
                 >
                   Close Comparison
                 </button>

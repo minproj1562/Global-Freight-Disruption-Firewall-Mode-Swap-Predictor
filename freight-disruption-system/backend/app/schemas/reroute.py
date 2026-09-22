@@ -33,10 +33,13 @@ class RouteResultSchema(BaseModel):
     total_time_days: float
     confidence_score: float
     risk_level: str  # low, medium, high, critical
+    ml_risk_score: Optional[float] = None
     co2_carbon_footprint_tons: float
     savings_vs_original: SavingsVsOriginal
     transit_summary: str
     carrier_name: str
+    strategy_label: Optional[str] = None
+    corridor_name: Optional[str] = None
 
 class SimulatedPointSchema(BaseModel):
     id: str

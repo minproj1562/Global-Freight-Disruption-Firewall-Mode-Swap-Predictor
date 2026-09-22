@@ -912,11 +912,12 @@ export const getRerouteOptions = async () => {
 
 // ============= PAGE 1.4: ACTIVE FLEET & ROUTES MONITOR =============
 
-export const getActiveRoutes = async (filters?: { type?: string; status?: string; risk?: string; limit?: number }) => {
+export const getActiveRoutes = async (filters?: { type?: string; status?: string; risk?: string; company?: string; limit?: number }) => {
   const params = new URLSearchParams();
   if (filters?.type && filters.type !== 'All' && filters.type !== 'all') params.append('vessel_type', filters.type);
   if (filters?.status && filters.status !== 'All' && filters.status !== 'all') params.append('status', filters.status);
   if (filters?.risk && filters.risk !== 'All' && filters.risk !== 'all') params.append('risk_level', filters.risk);
+  if (filters?.company && filters.company !== 'All' && filters.company !== 'all') params.append('company', filters.company);
   if (filters?.limit) params.append('limit', filters.limit.toString());
   
   const response = await fetch(`${API_BASE_URL}/api/routes/active?${params.toString()}`);
