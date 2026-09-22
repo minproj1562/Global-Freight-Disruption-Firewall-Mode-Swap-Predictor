@@ -4,11 +4,7 @@ from app.routers.ports import router as ports_router
 from app.routers.vessels import router as vessels_router
 from app.routers.vessel_logs import router as vessel_logs_router
 from app.routers.admin import router as admin_router
-<<<<<<< HEAD
 from app.routers.simulation import router as simulation_router
-
-__all__ = ["auth_router", "ports_router", "vessels_router", "vessel_logs_router", "admin_router", "simulation_router"]
-=======
 from app.routers.map import router as map_router
 from app.routers.disruptions import router as disruptions_router
 from app.routers.reroute import router as reroute_router
@@ -22,6 +18,7 @@ __all__ = [
     "vessels_router",
     "vessel_logs_router",
     "admin_router",
+    "simulation_router",
     "map_router",
     "disruptions_router",
     "reroute_router",
@@ -29,4 +26,3 @@ __all__ = [
     "congestion_router",
     "risk_register_router",
 ]
->>>>>>> asmita

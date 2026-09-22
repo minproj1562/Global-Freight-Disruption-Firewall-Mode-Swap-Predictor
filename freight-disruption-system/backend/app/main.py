@@ -11,15 +11,13 @@ from app.database import init_db
 from app.services.ais_stream_client import AISStreamClient
 from app.services.vessel_handler import handle_vessel_update
 from app.services.port_services import seed_sample_ports
-<<<<<<< HEAD
-from app.routers import auth_router, ports_router, vessels_router, vessel_logs_router, admin_router, simulation_router
-=======
 from app.routers import (
     auth_router,
     ports_router,
     vessels_router,
     vessel_logs_router,
     admin_router,
+    simulation_router,
     map_router,
     disruptions_router,
     reroute_router,
@@ -27,7 +25,6 @@ from app.routers import (
     congestion_router,
     risk_register_router,
 )
->>>>>>> asmita
 from app.database import SessionLocal
 
 load_dotenv()
@@ -87,22 +84,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all 11 routers
+# Include all 12 routers
 app.include_router(auth_router)
 app.include_router(ports_router)
 app.include_router(vessels_router)
 app.include_router(vessel_logs_router)
 app.include_router(admin_router)
-<<<<<<< HEAD
 app.include_router(simulation_router)
-=======
 app.include_router(map_router)
 app.include_router(disruptions_router)
 app.include_router(reroute_router)
 app.include_router(active_routes_router)
 app.include_router(congestion_router)
 app.include_router(risk_register_router)
->>>>>>> asmita
 
 # ============= ROOT ENDPOINTS =============
 
@@ -122,15 +116,12 @@ async def root():
             "risk_register": "/api/risk-register",
             "ports": "/api/ports",
             "vessels": "/api/vessels/admin",
-<<<<<<< HEAD
             "vessel_logs": "/api/vessel-logs",
             "admin_disruptions": "/api/admin/disruptions",
             "admin_health": "/api/admin/health-cards",
             "admin_users": "/api/admin/users",
             "admin_data": "/api/admin/data/stats",
             "simulation": "/api/simulation",
-=======
->>>>>>> asmita
             "docs": "/docs"
         }
     }
