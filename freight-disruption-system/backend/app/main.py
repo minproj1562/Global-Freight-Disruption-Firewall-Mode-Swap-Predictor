@@ -11,7 +11,19 @@ from app.database import init_db
 from app.services.ais_stream_client import AISStreamClient
 from app.services.vessel_handler import handle_vessel_update
 from app.services.port_services import seed_sample_ports
-from app.routers import auth_router, ports_router, vessels_router, vessel_logs_router, admin_router
+from app.routers import (
+    auth_router,
+    ports_router,
+    vessels_router,
+    vessel_logs_router,
+    admin_router,
+    map_router,
+    disruptions_router,
+    reroute_router,
+    active_routes_router,
+    congestion_router,
+    risk_register_router,
+)
 from app.database import SessionLocal
 
 load_dotenv()
@@ -71,30 +83,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include all 11 routers
 app.include_router(auth_router)
 app.include_router(ports_router)
 app.include_router(vessels_router)
 app.include_router(vessel_logs_router)
 app.include_router(admin_router)
+app.include_router(map_router)
+app.include_router(disruptions_router)
+app.include_router(reroute_router)
+app.include_router(active_routes_router)
+app.include_router(congestion_router)
+app.include_router(risk_register_router)
 
 # ============= ROOT ENDPOINTS =============
 
 @app.get("/")
 async def root():
     return {
-        "message": "Freight Disruption API - Port Operations Center",
+        "message": "Freight Disruption API - Global Operations Command Center",
         "version": "1.0.0",
         "status": "running",
         "endpoints": {
             "auth": "/api/auth",
+            "map": "/api/map",
+            "disruptions": "/api/disruptions",
+            "reroute": "/api/reroute",
+            "routes": "/api/routes",
+            "congestion": "/api/congestion",
+            "risk_register": "/api/risk-register",
             "ports": "/api/ports",
             "vessels": "/api/vessels/admin",
-            "vessel_logs": "/api/vessel-logs",
-            "admin_disruptions": "/api/admin/disruptions",
-            "admin_health": "/api/admin/health-cards",
-            "admin_users": "/api/admin/users",
-            "admin_data": "/api/admin/data/stats",
             "docs": "/docs"
         }
     }
