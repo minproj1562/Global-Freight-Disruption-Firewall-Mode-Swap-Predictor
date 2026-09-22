@@ -758,4 +758,192 @@ export const runNSGA2Optimization = async (config: NSGA2Config): Promise<any> =>
   return response.json();
 };
 
+// ============= LOGISTICS MANAGER AUTHENTICATION =============
+
+export interface LogisticsManagerRegisterData {
+  email: string;
+  password: string;
+  full_name: string;
+  username: string;
+  company_name: string;
+  employee_id: string;
+  department?: string;
+  region?: string;
+}
+
+export const registerLogisticsManager = async (data: LogisticsManagerRegisterData): Promise<AuthResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/logistics/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    let msg = 'Registration failed';
+    if (typeof error.detail === 'string') {
+      msg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      msg = error.detail.map((d: { msg?: string; message?: string }) => d.msg || d.message).join(', ');
+    }
+    throw new Error(msg);
+  }
+
+  return response.json();
+};
+
+export const loginLogisticsManager = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/logistics/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    let msg = 'Login failed';
+    if (typeof error.detail === 'string') {
+      msg = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      msg = error.detail.map((d: { msg?: string; message?: string }) => d.msg || d.message).join(', ');
+    }
+    throw new Error(msg);
+  }
+
+  return response.json();
+};
+
+// ============= PAGE 1.1: LIVE GLOBAL MAP =============
+
+export const getMapVessels = async (vesselType?: string) => {
+  const params = new URLSearchParams();
+  if (vesselType && vesselType !== 'All' && vesselType !== 'all') params.append('type', vesselType);
+  const response = await fetch(`${API_BASE_URL}/api/map/vessels?${params.toString()}`);
+  if (!response.ok) throw new Error('Failed to fetch map vessels');
+  return response.json();
+};
+
+export const getMapPorts = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/map/ports`);
+  if (!response.ok) throw new Error('Failed to fetch map ports');
+  return response.json();
+};
+
+export const getMapDisruptions = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/map/disruptions`);
+  if (!response.ok) throw new Error('Failed to fetch map disruptions');
+  return response.json();
+};
+
+export const getMapRoutes = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/map/routes`);
+  if (!response.ok) throw new Error('Failed to fetch map routes');
+  return response.json();
+};
+
+export const getMapKPIs = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/map/kpis`);
+  if (!response.ok) throw new Error('Failed to fetch KPIs');
+  return response.json();
+};
+
+export const getVesselHistory = async (vesselId: string, hours: number = 24) => {
+  const response = await fetch(`${API_BASE_URL}/api/map/vessels/${vesselId}/history?hours=${hours}`);
+  if (!response.ok) throw new Error('Failed to fetch vessel history');
+  return response.json();
+};
+
+export const searchMapEntities = async (query: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/map/search?q=${encodeURIComponent(query)}`);
+  if (!response.ok) throw new Error('Failed to search map entities');
+  return response.json();
+};
+
+export const getSecondaryInfrastructure = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/map/infrastructure`);
+  if (!response.ok) throw new Error('Failed to fetch infrastructure');
+  return response.json();
+};
+
+// ============= PAGE 1.2: DISRUPTION ALERT CENTER =============
+
+export const getDisruptionAlerts = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/disruptions/alert-center`);
+  if (!response.ok) throw new Error('Failed to fetch disruption alerts');
+  return response.json();
+};
+
+export const acknowledgeDisruptionAlert = async (disruptionId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/disruptions/${disruptionId}/acknowledge`, {
+    method: 'PATCH',
+  });
+  if (!response.ok) throw new Error('Failed to acknowledge disruption');
+  return response.json();
+};
+
+export const resolveDisruptionAlert = async (disruptionId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/disruptions/${disruptionId}/resolve`, {
+    method: 'PATCH',
+  });
+  if (!response.ok) throw new Error('Failed to resolve disruption');
+  return response.json();
+};
+
+// ============= PAGE 1.3: REROUTE RECOMMENDATION & 2,000 MC SIMULATION =============
+
+export const simulateReroute = async (request: any) => {
+  const response = await fetch(`${API_BASE_URL}/api/reroute/simulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Simulation failed: ${errText || response.statusText}`);
+  }
+  return response.json();
+};
+
+export const getRerouteOptions = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/reroute/options`);
+  if (!response.ok) throw new Error('Failed to fetch reroute options');
+  return response.json();
+};
+
+// ============= PAGE 1.4: ACTIVE FLEET & ROUTES MONITOR =============
+
+export const getActiveRoutes = async (filters?: { type?: string; status?: string; risk?: string; limit?: number }) => {
+  const params = new URLSearchParams();
+  if (filters?.type && filters.type !== 'All' && filters.type !== 'all') params.append('vessel_type', filters.type);
+  if (filters?.status && filters.status !== 'All' && filters.status !== 'all') params.append('status', filters.status);
+  if (filters?.risk && filters.risk !== 'All' && filters.risk !== 'all') params.append('risk_level', filters.risk);
+  if (filters?.limit) params.append('limit', filters.limit.toString());
+  
+  const response = await fetch(`${API_BASE_URL}/api/routes/active?${params.toString()}`);
+  if (!response.ok) throw new Error('Failed to fetch active fleet routes');
+  return response.json();
+};
+
+export const getActiveRoutesStats = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/routes/stats`);
+  if (!response.ok) throw new Error('Failed to fetch routes stats');
+  return response.json();
+};
+
+// ============= PAGE 1.5: PORT CONGESTION FORECAST =============
+
+export const getPortCongestionOverview = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/congestion/forecast`);
+  if (!response.ok) throw new Error('Failed to fetch congestion overview');
+  return response.json();
+};
+
+// ============= PAGE 1.6: RISK REGISTER & EXECUTIVE SUMMARY =============
+
+export const getRiskRegisterSummary = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/risk-register/summary`);
+  if (!response.ok) throw new Error('Failed to fetch risk register summary');
+  return response.json();
+};
+
 export default api;

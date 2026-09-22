@@ -25,6 +25,7 @@ class User(Base):
     
     # Relationship to PortManager
     port_manager = relationship("PortManager", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    logistics_manager = relationship("LogisticsManager", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 class PortManager(Base):
     __tablename__ = "port_managers"
@@ -41,3 +42,17 @@ class PortManager(Base):
     # Relationships
     user = relationship("User", back_populates="port_manager")
     port = relationship("Port", back_populates="managers")
+
+class LogisticsManager(Base):
+    __tablename__ = "logistics_managers"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    company_name = Column(String, nullable=False)
+    employee_id = Column(String, unique=True, index=True, nullable=False)
+    department = Column(String)
+    region = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="logistics_manager")

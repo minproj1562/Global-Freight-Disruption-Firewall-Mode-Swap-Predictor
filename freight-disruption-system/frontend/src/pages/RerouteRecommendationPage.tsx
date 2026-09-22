@@ -49,11 +49,7 @@ import {
   SimulatedPoint,
   DisruptionSeverity,
 } from '../types';
-import { MOCK_PORTS, MOCK_VESSELS, MOCK_DISRUPTIONS } from '../shared/mock/mockData';
-import {
-  MOCK_CARGO_TYPES,
-  MOCK_INITIAL_SIMULATION_RESULT,
-} from '../shared/mock/rerouteMockData';
+import { getRerouteOptions, simulateReroute } from '@/services/api';
 
 export const RerouteRecommendationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -71,27 +67,30 @@ export const RerouteRecommendationPage: React.FC = () => {
     cargoType?: string;
   } | null;
 
+  // Form Dropdown Options (Loaded Live from Backend API)
+  const [availablePorts, setAvailablePorts] = useState<Array<{ id: string; name: string; code: string; country: string }>>([]);
+  const [availableVessels, setAvailableVessels] = useState<Array<{ id: string; name: string; mmsi: number; type: string; flag?: string }>>([]);
+  const [availableDisruptions, setAvailableDisruptions] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  const [availableCargoTypes, setAvailableCargoTypes] = useState<string[]>([]);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState<RouteRequest>({
-    origin_port: navState?.originPort || 'port-suez',
+    origin_port: navState?.originPort || 'port-shanghai',
     destination_port: navState?.destinationPort || 'port-rotterdam',
     vessel_id: navState?.vesselId || 'vessel-ever-given',
     cargo_type: navState?.cargoType || 'High-Tech Consumer Electronics',
     priority: 'Balanced',
-    disruption_to_avoid: navState?.disruptionToAvoid || 'disruption-red-sea-critical',
+    disruption_to_avoid: navState?.disruptionToAvoid || 'disruption-red-sea',
     cargo_value_usd: 42000000,
   });
 
   // Vessel Dropdown Search Filter State for 200+ vessels
   const [vesselSearchFilter, setVesselSearchFilter] = useState('');
 
-  // Simulation & Results State
-  const [simulationResult] = useState<SimulationResult>(
-    MOCK_INITIAL_SIMULATION_RESULT
-  );
-  const [selectedRouteId, setSelectedRouteId] = useState<string>(
-    MOCK_INITIAL_SIMULATION_RESULT.recommended_routes[0].id
-  );
+  // Simulation & Results State (Live 2,000 Monte Carlo Iterations)
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+  const [selectedRouteId, setSelectedRouteId] = useState<string>('');
 
   // Simulation Loading Progress
   const [isSimulating, setIsSimulating] = useState(false);
@@ -106,12 +105,41 @@ export const RerouteRecommendationPage: React.FC = () => {
     formData.origin_port &&
       formData.destination_port &&
       formData.vessel_id &&
-      formData.cargo_type &&
-      formData.disruption_to_avoid
+      formData.cargo_type
   );
 
-  // Show Toast if arrived from Page 1.2 with pre-filled context
+  // Load Form Options and Initial Live Monte Carlo Simulation from Backend
   useEffect(() => {
+    const initPageData = async () => {
+      try {
+        const opts = await getRerouteOptions();
+        if (opts) {
+          setAvailablePorts(opts.ports || []);
+          setAvailableVessels(opts.vessels || []);
+          setAvailableDisruptions(opts.disruptions || []);
+          setAvailableCargoTypes(opts.cargo_types || []);
+          setOptionsLoaded(true);
+        }
+
+        // Run initial live 2,000 Monte Carlo simulation
+        setIsSimulating(true);
+        setSimProgress(40);
+        setSimStepText('Executing 2,000 live Monte Carlo trials...');
+        const initResult = await simulateReroute(formData);
+        if (initResult && initResult.recommended_routes?.length > 0) {
+          setSimulationResult(initResult);
+          setSelectedRouteId(initResult.recommended_routes[0].id);
+        }
+      } catch (err) {
+        console.error('[Monte Carlo Simulation Init Error]:', err);
+      } finally {
+        setIsSimulating(false);
+        setSimProgress(100);
+      }
+    };
+
+    initPageData();
+
     if (navState?.disruptionName) {
       toast({
         title: 'Disruption Context Loaded',
@@ -120,42 +148,58 @@ export const RerouteRecommendationPage: React.FC = () => {
     }
   }, []);
 
-  // Run Monte Carlo Simulation Handler with Progress State
-  const handleRunSimulation = () => {
+  // Run Real Monte Carlo Simulation Handler with Live Calculation
+  const handleRunSimulation = async () => {
     if (!isFormValid || isSimulating) return;
 
     setIsSimulating(true);
-    setSimProgress(5);
-    setSimStepText('Initializing 2,000 Monte Carlo route paths...');
+    setSimProgress(10);
+    setSimStepText('Initializing 2,000 Monte Carlo route paths in backend...');
 
     const steps = [
-      { pct: 25, text: 'Calculating real-time weather & geopolitical risk surfaces...' },
-      { pct: 55, text: 'Evaluating multimodal transfer hubs (Sea-Rail-Air)...' },
-      { pct: 85, text: 'Synthesizing Pareto-optimal frontier and carbon tradeoffs...' },
-      { pct: 100, text: 'Simulation Complete! Pareto sweet-spot generated.' },
+      { pct: 30, text: 'Sampling bunker fuel volatility & non-linear sea-state distributions...' },
+      { pct: 60, text: 'Evaluating multimodal transfer nodes (Sea-Air & Sea-Rail landbridge)...' },
+      { pct: 85, text: 'Executing multi-objective Pareto frontier ranking & IMO GHG carbon modeling...' },
+      { pct: 100, text: '2,000 Monte Carlo simulations complete! Top Pareto solutions generated.' },
     ];
 
     let currentStep = 0;
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       if (currentStep < steps.length) {
         setSimProgress(steps[currentStep].pct);
         setSimStepText(steps[currentStep].text);
         currentStep++;
       } else {
         clearInterval(interval);
-        setIsSimulating(false);
 
-        // Update mock simulation result title with selected vessel/ports
-        const selectedVessel = MOCK_VESSELS.find((v) => v.id === formData.vessel_id);
-        const originPortObj = MOCK_PORTS.find((p) => p.id === formData.origin_port);
-        const destPortObj = MOCK_PORTS.find((p) => p.id === formData.destination_port);
+        try {
+          // Call live backend Monte Carlo simulation API
+          const apiResult = await simulateReroute(formData);
+          if (apiResult && apiResult.recommended_routes?.length > 0) {
+            setSimulationResult(apiResult);
+            setSelectedRouteId(apiResult.recommended_routes[0].id);
 
-        toast({
-          title: '2,000 Simulations Complete',
-          description: `Generated Pareto frontier for ${selectedVessel?.name || 'Vessel'} from ${originPortObj?.name || 'Origin'} to ${destPortObj?.name || 'Destination'}.`,
-        });
+            const selectedVessel = availableVessels.find((v) => v.id === formData.vessel_id);
+            const originPortObj = availablePorts.find((p) => p.id === formData.origin_port);
+            const destPortObj = availablePorts.find((p) => p.id === formData.destination_port);
+
+            toast({
+              title: '2,000 Simulations Complete ✓',
+              description: `Generated Pareto frontier for ${selectedVessel?.name || 'Vessel'} from ${originPortObj?.name || 'Origin'} to ${destPortObj?.name || 'Destination'}.`,
+            });
+          }
+        } catch (err: any) {
+          console.error('[Simulation Error]:', err);
+          toast({
+            title: 'Simulation Error',
+            description: err?.message || 'Failed to complete 2,000 Monte Carlo iterations.',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsSimulating(false);
+        }
       }
-    }, 600);
+    }, 450);
   };
 
   // Route Selection Action
@@ -169,6 +213,14 @@ export const RerouteRecommendationPage: React.FC = () => {
 
   // Generate & Download Client-Side PDF Report using jsPDF & jspdf-autotable
   const handleDownloadPDF = () => {
+    if (!simulationResult) {
+      toast({
+        title: 'Simulation In Progress',
+        description: 'Please wait for the 2,000 Monte Carlo simulations to complete before generating the PDF.',
+      });
+      return;
+    }
+
     try {
       const doc = new jsPDF();
 
@@ -189,10 +241,10 @@ export const RerouteRecommendationPage: React.FC = () => {
       doc.setFontSize(12);
       doc.text('1. Simulation Parameters & Constraints', 14, 40);
 
-      const vesselObj = MOCK_VESSELS.find((v) => v.id === formData.vessel_id);
-      const originPortObj = MOCK_PORTS.find((p) => p.id === formData.origin_port);
-      const destPortObj = MOCK_PORTS.find((p) => p.id === formData.destination_port);
-      const disruptionObj = MOCK_DISRUPTIONS.find((d) => d.id === formData.disruption_to_avoid);
+      const vesselObj = availableVessels.find((v) => v.id === formData.vessel_id);
+      const originPortObj = availablePorts.find((p) => p.id === formData.origin_port);
+      const destPortObj = availablePorts.find((p) => p.id === formData.destination_port);
+      const disruptionObj = availableDisruptions.find((d) => d.id === formData.disruption_to_avoid);
 
       autoTable(doc, {
         startY: 45,
@@ -203,7 +255,7 @@ export const RerouteRecommendationPage: React.FC = () => {
           ['Destination Port', destPortObj?.name || formData.destination_port],
           ['Cargo Type', formData.cargo_type],
           ['Optimization Priority', formData.priority],
-          ['Disruption Avoided', disruptionObj?.name || formData.disruption_to_avoid],
+          ['Disruption Avoided', disruptionObj?.name || formData.disruption_to_avoid || 'None'],
           ['Simulations Run', '2,000 Monte Carlo Iterations'],
         ],
         theme: 'striped',
@@ -213,16 +265,16 @@ export const RerouteRecommendationPage: React.FC = () => {
       // Section 2: Top Recommended Routes Table
       const finalY = (doc as any).lastAutoTable.finalY || 100;
       doc.setFontSize(12);
-      doc.text('2. Top 3 Ranked Multimodal Reroute Options', 14, finalY + 12);
+      doc.text('2. Top Pareto-Optimal Multimodal Routes', 14, finalY + 15);
 
       const tableRows = simulationResult.recommended_routes.map((r) => [
-        `#${r.rank} ${r.is_recommended ? '(Recommended)' : ''}`,
-        r.title,
+        `#${r.rank} ${r.title}`,
         `$${r.total_cost_usd.toLocaleString()}`,
         `${r.total_time_days} days`,
         `${r.confidence_score}%`,
         r.risk_level.toUpperCase(),
         `${r.co2_carbon_footprint_tons} t`,
+        r.carrier_name,
       ]);
 
       autoTable(doc, {
@@ -424,7 +476,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, origin_port: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
                   >
-                    {MOCK_PORTS.map((port) => (
+                    {availablePorts.map((port) => (
                       <option key={port.id} value={port.id}>
                         {port.name} ({port.code}) — {port.country}
                       </option>
@@ -442,7 +494,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, destination_port: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
                   >
-                    {MOCK_PORTS.map((port) => (
+                    {availablePorts.map((port) => (
                       <option key={port.id} value={port.id}>
                         {port.name} ({port.code}) — {port.country}
                       </option>
@@ -453,7 +505,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                 {/* 3. Target Vessel Selectable Dropdown with Search */}
                 <div>
                   <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    TARGET VESSEL ({MOCK_VESSELS.length} FLEET) <span className="text-rose-400">*</span>
+                    TARGET VESSEL ({availableVessels.length} FLEET) <span className="text-rose-400">*</span>
                   </label>
                   <div className="space-y-1">
                     <div className="relative">
@@ -471,12 +523,12 @@ export const RerouteRecommendationPage: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, vessel_id: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
                     >
-                      {MOCK_VESSELS.filter((v) =>
+                      {availableVessels.filter((v) =>
                         v.name.toLowerCase().includes(vesselSearchFilter.toLowerCase()) ||
-                        v.vessel_type.toLowerCase().includes(vesselSearchFilter.toLowerCase())
+                        v.type.toLowerCase().includes(vesselSearchFilter.toLowerCase())
                       ).map((vessel) => (
                         <option key={vessel.id} value={vessel.id}>
-                          {vessel.name} ({vessel.vessel_type} — {vessel.flag})
+                          {vessel.name} ({vessel.type} — MMSI: {vessel.mmsi})
                         </option>
                       ))}
                     </select>
@@ -507,7 +559,7 @@ export const RerouteRecommendationPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, cargo_type: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
                   >
-                    {MOCK_CARGO_TYPES.map((cargo) => (
+                    {availableCargoTypes.map((cargo) => (
                       <option key={cargo} value={cargo}>
                         {cargo}
                       </option>
@@ -541,16 +593,17 @@ export const RerouteRecommendationPage: React.FC = () => {
                 {/* 6. Disruption to Avoid Dropdown */}
                 <div>
                   <label className="block text-xs font-mono font-semibold text-slate-300 mb-1">
-                    DISRUPTION TO AVOID <span className="text-rose-400">*</span>
+                    DISRUPTION TO AVOID
                   </label>
                   <select
                     value={formData.disruption_to_avoid}
                     onChange={(e) => setFormData({ ...formData, disruption_to_avoid: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-500/80 cursor-pointer"
                   >
-                    {MOCK_DISRUPTIONS.map((d) => (
+                    <option value="None">None (Standard Baseline Transit)</option>
+                    {availableDisruptions.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.name} ({d.severity.toUpperCase()})
+                        {d.name} ({d.type})
                       </option>
                     ))}
                   </select>
@@ -623,24 +676,25 @@ export const RerouteRecommendationPage: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              {simulationResult.recommended_routes.map((route) => {
-                const isSelected = route.id === selectedRouteId;
-                const isBest = route.is_recommended;
+              {simulationResult ? (
+                simulationResult.recommended_routes.map((route) => {
+                  const isSelected = route.id === selectedRouteId;
+                  const isBest = route.is_recommended;
 
-                return (
-                  <motion.div
-                    key={route.id}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className={`relative p-5 rounded-3xl border transition-all ${
-                      isBest
-                        ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-emerald-500/60 shadow-2xl shadow-emerald-500/10 ring-1 ring-emerald-500/30'
-                        : isSelected
-                        ? 'bg-slate-900 border-amber-500/80 shadow-xl'
-                        : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
-                    }`}
-                  >
+                  return (
+                    <motion.div
+                      key={route.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className={`relative p-5 rounded-3xl border transition-all ${
+                        isBest
+                          ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border-emerald-500/60 shadow-2xl shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                          : isSelected
+                          ? 'bg-slate-900 border-amber-500/80 shadow-xl'
+                          : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                    >
                     {/* Best Recommended Accent Ribbon */}
                     {isBest && (
                       <div className="absolute top-0 right-6 -translate-y-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-mono text-[10px] font-extrabold uppercase shadow-lg flex items-center gap-1">
@@ -781,7 +835,14 @@ export const RerouteRecommendationPage: React.FC = () => {
                     </div>
                   </motion.div>
                 );
-              })}
+              })
+            ) : (
+              <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4">
+                <RefreshCw className="w-8 h-8 animate-spin text-amber-400 mx-auto" />
+                <div className="font-mono text-sm text-slate-300 font-bold">Executing 2,000 Monte Carlo Simulations...</div>
+                <p className="text-xs font-mono text-slate-500 max-w-md mx-auto">Evaluating stochastic bunker fuel shocks, non-linear weather risk curves, and multimodal transfer bottlenecks.</p>
+              </div>
+            )}
             </div>
           </section>
         </div>
@@ -826,81 +887,88 @@ export const RerouteRecommendationPage: React.FC = () => {
 
           {/* Recharts Scatter Plot Canvas */}
           <div className="w-full h-[380px] pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6} />
-                <XAxis
-                  type="number"
-                  dataKey="time"
-                  name="Transit Time"
-                  unit=" days"
-                  stroke="#94a3b8"
-                  fontSize={11}
-                  tickLine={false}
-                  label={{ value: 'Transit Time (Days)', position: 'bottom', offset: 0, fill: '#94a3b8', fontSize: 11 }}
-                />
-                <YAxis
-                  type="number"
-                  dataKey="cost"
-                  name="Total Cost"
-                  unit=" USD"
-                  stroke="#94a3b8"
-                  fontSize={11}
-                  tickLine={false}
-                  tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
-                  label={{ value: 'Total Cost ($ USD)', angle: -90, position: 'left', fill: '#94a3b8', fontSize: 11 }}
-                />
-                <ZAxis type="number" dataKey="confidence" range={[40, 220]} />
-                <Tooltip
-                  cursor={{ strokeDasharray: '3 3', stroke: '#f59e0b' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload as SimulatedPoint;
-                      return (
-                        <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3.5 shadow-2xl text-xs font-mono space-y-1.5 max-w-xs backdrop-blur-md">
-                          <div className="font-bold text-amber-400 border-b border-slate-800 pb-1 flex items-center justify-between">
-                            <span>{data.routeName || 'Simulated Scenario'}</span>
-                            {data.isTop3 && (
-                              <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px]">
-                                TOP #{data.rank}
-                              </span>
-                            )}
+            {simulationResult ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6} />
+                  <XAxis
+                    type="number"
+                    dataKey="time"
+                    name="Transit Time"
+                    unit=" days"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    label={{ value: 'Transit Time (Days)', position: 'bottom', offset: 0, fill: '#94a3b8', fontSize: 11 }}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="cost"
+                    name="Total Cost"
+                    unit=" USD"
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                    label={{ value: 'Total Cost ($ USD)', angle: -90, position: 'left', fill: '#94a3b8', fontSize: 11 }}
+                  />
+                  <ZAxis type="number" dataKey="confidence" range={[40, 220]} />
+                  <Tooltip
+                    cursor={{ strokeDasharray: '3 3', stroke: '#f59e0b' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload as SimulatedPoint;
+                        return (
+                          <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3.5 shadow-2xl text-xs font-mono space-y-1.5 max-w-xs backdrop-blur-md">
+                            <div className="font-bold text-amber-400 border-b border-slate-800 pb-1 flex items-center justify-between">
+                              <span>{data.routeName || 'Simulated Scenario'}</span>
+                              {data.isTop3 && (
+                                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[9px]">
+                                  TOP #{data.rank}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-white font-semibold">Cost: ${data.cost.toLocaleString()}</div>
+                            <div className="text-slate-300">Transit Time: {data.time} days</div>
+                            <div className="text-slate-400">Confidence: {data.confidence}%</div>
+                            <div className="text-slate-400 capitalize">Risk Level: {data.risk}</div>
                           </div>
-                          <div className="text-white font-semibold">Cost: ${data.cost.toLocaleString()}</div>
-                          <div className="text-slate-300">Transit Time: {data.time} days</div>
-                          <div className="text-slate-400">Confidence: {data.confidence}%</div>
-                          <div className="text-slate-400 capitalize">Risk Level: {data.risk}</div>
-                        </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Scatter data={simulationResult.scatter_cloud}>
+                    {simulationResult.scatter_cloud.map((entry, index) => {
+                      let fill = '#0284c7'; // default blue
+                      if (entry.isTop3) fill = '#10b981'; // emerald for top 3
+                      if (entry.id === 'pt-dijkstra') fill = '#f43f5e'; // rose for dijkstra
+                      return (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={fill}
+                          stroke={entry.isTop3 ? '#f59e0b' : '#0f172a'}
+                          strokeWidth={entry.isTop3 ? 2 : 1}
+                        />
                       );
-                    }
-                    return null;
-                  }}
-                />
-                <Scatter data={simulationResult.scatter_cloud}>
-                  {simulationResult.scatter_cloud.map((entry, index) => {
-                    let fill = '#0284c7'; // default blue
-                    if (entry.isTop3) fill = '#10b981'; // emerald for top 3
-                    if (entry.id === 'pt-dijkstra') fill = '#f43f5e'; // rose for dijkstra
-                    return (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={fill}
-                        stroke={entry.isTop3 ? '#f59e0b' : entry.isParetoOptimal ? '#10b981' : '#0f172a'}
-                        strokeWidth={entry.isTop3 ? 2 : entry.isParetoOptimal ? 2 : 1}
-                      />
-                    );
-                  })}
-                </Scatter>
-                {/* Pareto Frontier Line connecting optimal non-dominated boundary points */}
-                <Scatter
-                  data={[...simulationResult.scatter_cloud]
-                    .filter((p) => p.isTop3 || p.isParetoOptimal)
-                    .sort((a, b) => a.time - b.time)}
-                  line={{ stroke: '#10b981', strokeWidth: 2, strokeDasharray: '4 4' }}
-                  shape={() => null}
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
+                    })}
+                  </Scatter>
+                  {/* Pareto Frontier Line connecting optimal non-dominated boundary points */}
+                  <Scatter
+                    data={[...simulationResult.scatter_cloud]
+                      .filter((p) => p.isTop3)
+                      .sort((a, b) => a.time - b.time)}
+                    line={{ stroke: '#10b981', strokeWidth: 2, strokeDasharray: '4 4' }}
+                    shape={() => null}
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[320px] flex flex-col items-center justify-center text-slate-500 font-mono text-xs space-y-2">
+                <RefreshCw className="w-6 h-6 animate-spin text-amber-500/60" />
+                <span>Generating 2,000-point Monte Carlo Pareto scatter cloud...</span>
+              </div>
+            )}
           </div>
         </section>
       </main>
@@ -909,7 +977,7 @@ export const RerouteRecommendationPage: React.FC = () => {
       {/* DIJKSTRA COMPARISON MODAL */}
       {/* ========================================================================= */}
       <AnimatePresence>
-        {showDijkstraModal && (
+        {showDijkstraModal && simulationResult && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -948,11 +1016,11 @@ export const RerouteRecommendationPage: React.FC = () => {
                     MONTE CARLO RECOMMENDED (#1)
                   </span>
                   <h4 className="font-bold text-white text-sm">
-                    {simulationResult.recommended_routes[0].title}
+                    {simulationResult.recommended_routes[0]?.title}
                   </h4>
                   <div className="space-y-1 text-slate-300 pt-2 border-t border-slate-800">
-                    <div>Total Cost: <strong className="text-emerald-400">${simulationResult.recommended_routes[0].total_cost_usd.toLocaleString()}</strong></div>
-                    <div>Total Time: <strong className="text-emerald-400">{simulationResult.recommended_routes[0].total_time_days} days</strong></div>
+                    <div>Total Cost: <strong className="text-emerald-400">${simulationResult.recommended_routes[0]?.total_cost_usd.toLocaleString()}</strong></div>
+                    <div>Total Time: <strong className="text-emerald-400">{simulationResult.recommended_routes[0]?.total_time_days} days</strong></div>
                     <div>Risk Level: <span className="text-emerald-400 uppercase font-bold">Low Risk</span></div>
                     <div>Threat Mitigation: Bypasses Red Sea Missile Zone completely</div>
                   </div>
