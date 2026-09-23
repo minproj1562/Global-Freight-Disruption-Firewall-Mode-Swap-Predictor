@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,16 +18,30 @@ import {
   Map as MapIcon,
   Globe,
   RefreshCw,
+  Search,
+  Navigation,
+  Calendar,
+  Edit3,
+  Trash2,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
 import { useAuthStore } from '@/store/authStore';
 import {
   fetchAllPorts,
+  fetchPortDetail,
   updateCongestionApi,
   addVesselArrivalApi,
+  updateVesselETAApi,
+  markVesselArrivedApi,
+  cancelVesselArrivalApi,
+  markVesselDepartedApi,
   fetchNetworkPortTelemetry,
   BackendPort,
+  BackendPortDetail,
+  BackendVesselArrival,
   NetworkPortTelemetry,
 } from '@/services/portManagerApi';
 import { useToast } from '@/components/ui/use-toast';
@@ -164,12 +178,35 @@ export const PortOverviewPage: React.FC = () => {
   const [liveTelemetry, setLiveTelemetry] = useState<NetworkPortTelemetry | null>(null);
   const [telemetryLoading, setTelemetryLoading] = useState<boolean>(false);
 
+  // Vessel Traffic Section State
+  const [managedPortDetail, setManagedPortDetail] = useState<BackendPortDetail | null>(null);
+  const [vesselTab, setVesselTab] = useState<'arrivals' | 'departures'>('arrivals');
+  const [vesselSearch, setVesselSearch] = useState('');
+  const [editEtaArrival, setEditEtaArrival] = useState<BackendVesselArrival | null>(null);
+  const [editEtaValue, setEditEtaValue] = useState('');
+  const [editEtaSubmitting, setEditEtaSubmitting] = useState(false);
+  const [markArrivedTarget, setMarkArrivedTarget] = useState<BackendVesselArrival | null>(null);
+  const [markArrivedSubmitting, setMarkArrivedSubmitting] = useState(false);
+  const [cancelArrivalTarget, setCancelArrivalTarget] = useState<BackendVesselArrival | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [departTarget, setDepartTarget] = useState<BackendVesselArrival | null>(null);
+  const [departSubmitting, setDepartSubmitting] = useState(false);
+
   // Live UTC Clock
   const [utcTime, setUtcTime] = useState<string>(new Date().toUTCString().slice(17, 25) + ' UTC');
   useEffect(() => {
     const t = setInterval(() => setUtcTime(new Date().toUTCString().slice(17, 25) + ' UTC'), 1000);
     return () => clearInterval(t);
   }, []);
+
+  const loadPortDetail = async (portId: string) => {
+    try {
+      const detail = await fetchPortDetail(portId);
+      setManagedPortDetail(detail);
+    } catch (err) {
+      console.error('Failed to fetch port detail for vessels:', err);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -188,6 +225,8 @@ export const PortOverviewPage: React.FC = () => {
 
         setAssignedPort(managerPort);
         setCongestionValue(managerPort.congestion_percent);
+        // Also load vessel arrivals/departures for this port
+        await loadPortDetail(managerPort.id);
       }
 
       const allPortsWithRelation = await fetchAllPorts(undefined, undefined, managerPort?.id);
@@ -267,6 +306,93 @@ export const PortOverviewPage: React.FC = () => {
       setArrivalSubmitting(false);
     }
   };
+
+  // Vessel traffic handlers
+  const handleMarkArrived = async () => {
+    if (!managedPortDetail || !markArrivedTarget) return;
+    setMarkArrivedSubmitting(true);
+    try {
+      await markVesselArrivedApi(managedPortDetail.id, markArrivedTarget.id);
+      toast({ title: 'Vessel Arrived ✓', description: `${markArrivedTarget.vessel_name} marked as docked.` });
+      setMarkArrivedTarget(null);
+      await loadPortDetail(managedPortDetail.id);
+    } catch {
+      toast({ title: 'Error', description: 'Could not mark vessel as arrived.', variant: 'destructive' });
+    } finally {
+      setMarkArrivedSubmitting(false);
+    }
+  };
+
+  const handleEditEta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!managedPortDetail || !editEtaArrival || !editEtaValue) return;
+    setEditEtaSubmitting(true);
+    try {
+      await updateVesselETAApi(managedPortDetail.id, editEtaArrival.id, new Date(editEtaValue).toISOString());
+      toast({ title: 'ETA Updated ✓', description: `${editEtaArrival.vessel_name} ETA updated.` });
+      setEditEtaArrival(null);
+      setEditEtaValue('');
+      await loadPortDetail(managedPortDetail.id);
+    } catch {
+      toast({ title: 'Error', description: 'Could not update ETA.', variant: 'destructive' });
+    } finally {
+      setEditEtaSubmitting(false);
+    }
+  };
+
+  const handleCancelArrival = async () => {
+    if (!managedPortDetail || !cancelArrivalTarget) return;
+    setCancelSubmitting(true);
+    try {
+      await cancelVesselArrivalApi(managedPortDetail.id, cancelArrivalTarget.id);
+      toast({ title: 'Arrival Cancelled', description: `${cancelArrivalTarget.vessel_name} removed from schedule.` });
+      setCancelArrivalTarget(null);
+      await loadPortDetail(managedPortDetail.id);
+    } catch {
+      toast({ title: 'Error', description: 'Could not cancel arrival.', variant: 'destructive' });
+    } finally {
+      setCancelSubmitting(false);
+    }
+  };
+
+  const handleMarkDeparted = async () => {
+    if (!managedPortDetail || !departTarget) return;
+    setDepartSubmitting(true);
+    try {
+      await markVesselDepartedApi(managedPortDetail.id, departTarget.id);
+      toast({ title: 'Vessel Departed ✓', description: `${departTarget.vessel_name} marked as departed. Berth freed.` });
+      setDepartTarget(null);
+      await loadPortDetail(managedPortDetail.id);
+      await loadData(); // refresh port cards too since berth freed
+    } catch {
+      toast({ title: 'Error', description: 'Could not mark vessel as departed.', variant: 'destructive' });
+    } finally {
+      setDepartSubmitting(false);
+    }
+  };
+
+  // Filtered arrivals/departures
+  const filteredArrivals = useMemo(() => {
+    if (!managedPortDetail?.vessel_arrivals) return [];
+    return managedPortDetail.vessel_arrivals.filter(a => {
+      if (vesselSearch) {
+        const q = vesselSearch.toLowerCase();
+        if (!a.vessel_name.toLowerCase().includes(q) && !String(a.vessel_mmsi).includes(q)) return false;
+      }
+      return true;
+    });
+  }, [managedPortDetail?.vessel_arrivals, vesselSearch]);
+
+  const filteredDepartures = useMemo(() => {
+    if (!managedPortDetail?.docked_vessels) return [];
+    return managedPortDetail.docked_vessels.filter(d => {
+      if (vesselSearch) {
+        const q = vesselSearch.toLowerCase();
+        if (!d.vessel_name.toLowerCase().includes(q) && !String(d.vessel_mmsi).includes(q)) return false;
+      }
+      return true;
+    });
+  }, [managedPortDetail?.docked_vessels, vesselSearch]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col transition-colors duration-300">
@@ -919,7 +1045,7 @@ export const PortOverviewPage: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => navigate(`/dashboard/ports/${assignedPort.id}`)}
+                      onClick={() => document.getElementById('port-vessels-section')?.scrollIntoView({ behavior: 'smooth' })}
                       className="group flex flex-col items-center gap-3 p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border-2 border-purple-300/60 dark:border-purple-500/30 hover:border-purple-500 hover:bg-purple-100 dark:hover:bg-purple-950/40 transition-all"
                     >
                       <div className="p-3 rounded-2xl bg-purple-500/20 group-hover:bg-purple-500/30"><List className="w-6 h-6 text-purple-600 dark:text-purple-400" /></div>

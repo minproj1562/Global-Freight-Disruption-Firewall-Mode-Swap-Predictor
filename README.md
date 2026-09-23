@@ -268,102 +268,25 @@ npm install zustand framer-motion lucide-react react-router-dom
 npm install --save-dev @types/node
 
 # Install TailwindCSS
-npm install -D tailwindcss postcss autoprefixer
+cd frontend
+
+# Uninstall Tailwind v4
+npm uninstall tailwindcss
+
+# Install Tailwind v3
+npm install -D tailwindcss@3.4.1 postcss@8.4.35 autoprefixer@10.4.17
+
+npm install tailwindcss-animate
 ```
 
-#### 3.3 Create Tailwind Config Manually (Skip npx)
 
-Since you had issues with `npx`, create these files manually:
-
-**Create `frontend/tailwind.config.js`**:
-
-```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-```
-
-**Create `frontend/postcss.config.js`**:
-
-```javascript
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-```
-
-**Update `frontend/src/index.css`** (Tailwind v4 syntax):
-
-```css
-@import "tailwindcss";
-```
-
-#### 3.4 Update TypeScript Configs
-
-**Update `frontend/tsconfig.app.json`**:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
-    "ignoreDeprecations": "6.0"
-  },
-  "include": ["src"]
-}
-```
-
-**Update `frontend/vite.config.ts`**:
-
-```typescript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
-```
-
-#### 3.5 Install Node Types
+#### 3.3 Install Node Types
 
 ```powershell
 npm install --save-dev @types/node
 ```
 
-#### 3.6 Install Shadcn UI
+#### 3.4 Install Shadcn UI
 
 ```powershell
 npx shadcn@latest init
