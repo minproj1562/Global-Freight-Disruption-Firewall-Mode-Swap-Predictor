@@ -9,7 +9,7 @@ from sqlalchemy import func, and_, extract
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import random
-
+import json
 from app.database import get_db
 from app.models.reroute import RerouteDecision
 from app.models.disruptions import GlobalDisruption
@@ -36,12 +36,26 @@ def get_executive_kpis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get top-level KPIs for executive dashboard"""
+    """Get top-level KPIs for executive dashboard (cached for 5 minutes)"""
     
+    # Try to get from Redis cache
+    try:
+        from app.services.redis_client import redis_client
+        
+        if redis_client:
+            cache_key = f"exec_kpis:{current_user.organization_id or 'global'}"
+            cached_data = redis_client.get(cache_key)
+            
+            if cached_data:
+                print("[Risk Register] Using cached KPIs from Redis")
+                return KPISummarySchema(**json.loads(cached_data))
+    except Exception as e:
+        print(f"[Risk Register] Redis cache read failed: {e}")
+    
+    # Calculate KPIs (original logic)
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    # Cost saved this month
     cost_saved = db.query(func.sum(RerouteDecision.cost_saved_usd)).filter(
         and_(
             RerouteDecision.decision_confirmed == True,
@@ -49,7 +63,6 @@ def get_executive_kpis(
         )
     ).scalar() or 0.0
     
-    # Routes rerouted this month
     routes_rerouted = db.query(func.count(RerouteDecision.id)).filter(
         and_(
             RerouteDecision.decision_confirmed == True,
@@ -57,7 +70,6 @@ def get_executive_kpis(
         )
     ).scalar() or 0
     
-    # Average decision time (minutes)
     decisions_with_time = db.query(RerouteDecision).filter(
         and_(
             RerouteDecision.decision_confirmed == True,
@@ -76,12 +88,10 @@ def get_executive_kpis(
     else:
         avg_decision_time = 0.0
     
-    # Active disruptions
     active_disruptions = db.query(func.count(GlobalDisruption.id)).filter(
         GlobalDisruption.resolved == False
     ).scalar() or 0
     
-    # Vessels at risk (within 200nm of active disruptions)
     vessels_at_risk = db.query(func.count(Vessel.id)).filter(
         and_(
             Vessel.is_active == True,
@@ -89,13 +99,26 @@ def get_executive_kpis(
         )
     ).scalar() or 0
     
-    return KPISummarySchema(
+    kpi_data = KPISummarySchema(
         cost_saved_this_month_usd=round(cost_saved, 2),
         routes_rerouted_count=routes_rerouted,
         avg_decision_time_minutes=avg_decision_time,
         active_disruptions_count=active_disruptions,
         vessels_at_risk_count=vessels_at_risk
     )
+    
+    # Cache in Redis for 5 minutes
+    try:
+        from app.services.redis_client import redis_client
+        
+        if redis_client:
+            cache_key = f"exec_kpis:{current_user.organization_id or 'global'}"
+            redis_client.setex(cache_key, 300, json.dumps(kpi_data.dict()))  # 300 seconds = 5 minutes
+            print("[Risk Register] KPIs cached in Redis (TTL: 5min)")
+    except Exception as e:
+        print(f"[Risk Register] Redis cache write failed: {e}")
+    
+    return kpi_data
 
 
 @router.get("/savings-trend", response_model=List[MonthlySavingsTrendSchema])
@@ -521,25 +544,52 @@ async def export_executive_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Export executive summary report as PDF"""
-    from app.services.pdf_generator import ReroutePDFGenerator
-    import matplotlib.pyplot as plt
-    import io
-    import base64
+    """Export executive summary report as PDF with charts"""
     
-    # Generate charts and compile report
-    # This would create a multi-page PDF with:
-    # - KPI summary
-    # - Monthly savings trend chart
-    # - Disruption breakdown pie chart
-    # - Risk matrix scatter plot
-    # - Decision audit trail table
-    # - ROI metrics
+    from app.services.executive_report_generator import ExecutiveReportGenerator
     
-    # For now, return mock response
-    return {
-        "status": "success",
-        "message": f"{request.report_type.capitalize()} report generated successfully",
-        "download_url": f"/api/exec/download-report/{request.report_type}-{datetime.now().strftime('%Y%m%d')}",
-        "generated_at": datetime.utcnow().isoformat()
-    }
+    try:
+        # Gather all data for report
+        kpis_data = get_executive_kpis(db, current_user).dict()
+        savings_trend_data = get_monthly_savings_trend(db, 6, current_user)
+        disruption_breakdown_data = get_disruption_type_breakdown(db, current_user)
+        roi_data = get_roi_dashboard(db, current_user).dict()
+        
+        # Generate PDF
+        report_generator = ExecutiveReportGenerator()
+        pdf_path = report_generator.generate_report(
+            report_type=request.report_type,
+            kpis=kpis_data,
+            savings_trend=[item.dict() for item in savings_trend_data],
+            disruption_breakdown=[item.dict() for item in disruption_breakdown_data],
+            roi_data=roi_data
+        )
+        
+        return {
+            "status": "success",
+            "message": f"{request.report_type.capitalize()} report generated successfully",
+            "download_url": f"/api/exec/download-report/{os.path.basename(pdf_path)}",
+            "file_path": pdf_path,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
+
+@router.get("/download-report/{filename}")
+async def download_report(filename: str):
+    """Download generated executive report PDF"""
+    
+    from fastapi.responses import FileResponse
+    
+    file_path = f"/tmp/executive_reports/{filename}"
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Report file not found")
+    
+    return FileResponse(
+        file_path,
+        media_type='application/pdf',
+        filename=filename
+    )

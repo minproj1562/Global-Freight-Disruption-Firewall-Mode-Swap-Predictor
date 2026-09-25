@@ -8,7 +8,8 @@ from app.schemas.congestion import *
 from app.schemas.active_routes import *
 from app.schemas.simulation import *
 from app.schemas.map import *
-from app.schemas.reroute import *  
+from app.schemas.reroute import * 
+from app.schemas.historical_validator import * 
 from app.schemas.risk_register import *  
 __all__ = [
     "UserCreate",

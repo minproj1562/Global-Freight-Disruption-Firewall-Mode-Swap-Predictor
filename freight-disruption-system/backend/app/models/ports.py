@@ -1,5 +1,5 @@
 # backend/app/models/port.py
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Boolean, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Boolean, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -162,3 +162,63 @@ class PortNetwork(Base):
     distance_nautical_miles = Column(Float)
     avg_transit_days = Column(Float)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class PortCongestionForecast(Base):
+    """Port congestion forecast results from Prophet model"""
+    __tablename__ = "port_congestion_forecasts"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    port_id = Column(String, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Forecast metadata
+    forecast_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    forecast_horizon_days = Column(Integer, nullable=False)  # 7, 14, or 30
+    model_version = Column(String, default="prophet_v1")
+    
+    # Forecast values (time series)
+    forecast_data = Column(JSON, nullable=False)  # [{ds: "2024-12-25", yhat: 65, yhat_lower: 50, yhat_upper: 80}, ...]
+    
+    # Model performance metrics
+    mae = Column(Float)  # Mean Absolute Error
+    mape = Column(Float)  # Mean Absolute Percentage Error
+    confidence_score = Column(Float)  # 0-100%
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationship
+    port = relationship("Port", backref="forecasts")
+    
+    # Index for fast queries
+    __table_args__ = (
+        Index('ix_port_forecast_date', 'port_id', 'forecast_date'),
+    )
+
+
+class PortCongestionAlternative(Base):
+    """Alternative ports with lower congestion"""
+    __tablename__ = "port_congestion_alternatives"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_port_id = Column(String, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    alternative_port_id = Column(String, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Distance and time metrics
+    distance_km = Column(Float)
+    additional_transit_days = Column(Float)
+    
+    # Cost differential
+    cost_delta_usd = Column(Float)  # Positive = more expensive, Negative = cheaper
+    
+    # Congestion comparison
+    congestion_reduction_percent = Column(Float)  # How much less congested
+    
+    # Suitability score (0-100)
+    suitability_score = Column(Float)
+    
+    # Timestamps
+    last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    source_port = relationship("Port", foreign_keys=[source_port_id])
+    alternative_port = relationship("Port", foreign_keys=[alternative_port_id])

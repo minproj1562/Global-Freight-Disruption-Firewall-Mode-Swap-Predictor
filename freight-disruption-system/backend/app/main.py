@@ -11,6 +11,8 @@ from app.database import init_db
 from app.services.ais_stream_client import AISStreamClient
 from app.services.vessel_handler import handle_vessel_update
 from app.services.port_services import seed_sample_ports
+from app.routers import port_forecast
+from app.routers import historical_validator
 from app.routers import (
     auth_router,
     ports_router,
@@ -103,7 +105,8 @@ app.include_router(risk_register_router)
 app.include_router(reroute.router)
 app.include_router(risk_register.router)
 app.include_router(currency.router)
-
+app.include_router(port_forecast.router)
+app.include_router(historical_validator.router)
 # ============= ROOT ENDPOINTS =============
 
 @app.get("/")
