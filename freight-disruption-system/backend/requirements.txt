@@ -56,3 +56,6 @@ websockets>=11.0.3
 # API Utilities
 pydantic==2.10.5
 email-validator==2.2.0
+reportlab>=4.2.2
+redis>=5.0.1
+psycopg>=3.3.6

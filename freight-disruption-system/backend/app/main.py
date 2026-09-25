@@ -24,6 +24,8 @@ from app.routers import (
     active_routes_router,
     congestion_router,
     risk_register_router,
+    reroute,  
+    risk_register,
 )
 from app.database import SessionLocal
 
@@ -97,6 +99,8 @@ app.include_router(reroute_router)
 app.include_router(active_routes_router)
 app.include_router(congestion_router)
 app.include_router(risk_register_router)
+app.include_router(reroute.router)
+app.include_router(risk_register.router)
 
 # ============= ROOT ENDPOINTS =============
 

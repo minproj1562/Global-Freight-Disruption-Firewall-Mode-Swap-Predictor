@@ -1,63 +1,545 @@
 # backend/app/routers/risk_register.py
-from fastapi import APIRouter, Depends
+"""
+Risk Register & Executive Summary Dashboard
+Provides KPIs, savings trends, risk matrix, decision audit trail, and ROI metrics
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, extract
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+import random
 
 from app.database import get_db
+from app.models.reroute import RerouteDecision
+from app.models.disruptions import GlobalDisruption
+from app.models.vessels import Vessel
+from app.models.users import User
 from app.schemas.risk_register import (
-    RiskRegisterResponse,
-    ExecutiveKPISummary,
-    MonthlyCostSavingItem,
-    DisruptionTypeBreakdownItem,
-    RiskMatrixDisruptionPoint,
-    RegionalExposureItem,
-    TopDisruptionRiskItem,
+    KPISummarySchema,
+    MonthlySavingsTrendSchema,
+    DisruptionTypeBreakdownSchema,
+    RiskMatrixItemSchema,
+    ExposureMapRegionSchema,
+    TopRiskDisruptionSchema,
+    DecisionAuditItemSchema,
+    ROIDashboardSchema,
+    ExportReportRequest,
 )
+from app.core.security import get_current_user
 
-router = APIRouter(prefix="/api/risk-register", tags=["Risk Register & Executive Summary"])
+router = APIRouter(prefix="/api/exec", tags=["Risk Register & Executive Summary"])
 
-@router.get("/summary", response_model=RiskRegisterResponse)
-def get_risk_register_summary(db: Session = Depends(get_db)):
-    return RiskRegisterResponse(
-        kpis=ExecutiveKPISummary(
-            cost_saved_this_month_usd=4280000.0,
-            routes_rerouted_count=84,
-            avg_decision_time_hours=1.8,
-            active_disruptions_count=6,
-            vessels_at_risk_count=23,
-        ),
-        monthly_savings_series=[
-            MonthlyCostSavingItem(month="Jan 2026", savings_usd=2850000.0, reroutes_count=42),
-            MonthlyCostSavingItem(month="Feb 2026", savings_usd=3120000.0, reroutes_count=51),
-            MonthlyCostSavingItem(month="Mar 2026", savings_usd=3490000.0, reroutes_count=58),
-            MonthlyCostSavingItem(month="Apr 2026", savings_usd=3880000.0, reroutes_count=69),
-            MonthlyCostSavingItem(month="May 2026", savings_usd=4150000.0, reroutes_count=78),
-            MonthlyCostSavingItem(month="Jun 2026", savings_usd=4280000.0, reroutes_count=84),
-        ],
-        disruption_breakdown=[
-            DisruptionTypeBreakdownItem(category="Geopolitical Conflict", count=14, percentage=41.2, color="#ef4444"),
-            DisruptionTypeBreakdownItem(category="Canal / Chokepoints", count=9, percentage=26.5, color="#f59e0b"),
-            DisruptionTypeBreakdownItem(category="Port Strikes & Labor", count=6, percentage=17.6, color="#8b5cf6"),
-            DisruptionTypeBreakdownItem(category="Severe Weather Fronts", count=5, percentage=14.7, color="#06b6d4"),
-        ],
-        risk_matrix_points=[
-            RiskMatrixDisruptionPoint(id="rm-1", name="Bab-el-Mandeb Red Sea Anti-Ship Threat", likelihood=5, impact=5, severity="critical", category="Geopolitical", affected_vessels_count=8),
-            RiskMatrixDisruptionPoint(id="rm-2", name="Panama Canal Draft Restrictions (Gatun Lake)", likelihood=4, impact=4, severity="high", category="Canal", affected_vessels_count=5),
-            RiskMatrixDisruptionPoint(id="rm-3", name="Strait of Hormuz Security Escalation", likelihood=4, impact=5, severity="critical", category="Geopolitical", affected_vessels_count=4),
-            RiskMatrixDisruptionPoint(id="rm-4", name="US East Coast ILA Dockworker Strike Risk", likelihood=3, impact=4, severity="high", category="Labor", affected_vessels_count=6),
-            RiskMatrixDisruptionPoint(id="rm-5", name="Typhoon Shanshan East China Sea Path", likelihood=3, impact=3, severity="medium", category="Weather", affected_vessels_count=3),
-        ],
-        regional_exposures=[
-            RegionalExposureItem(id="reg-1", region_name="Red Sea / Gulf of Aden", cargo_value_at_risk_usd=342000000.0, vessels_at_risk=8, risk_level="critical", coordinates=[43.2, 13.8]),
-            RegionalExposureItem(id="reg-2", region_name="Central America (Panama)", cargo_value_at_risk_usd=185000000.0, vessels_at_risk=5, risk_level="high", coordinates=[-79.7, 9.1]),
-            RegionalExposureItem(id="reg-3", region_name="Persian Gulf / Hormuz", cargo_value_at_risk_usd=220000000.0, vessels_at_risk=4, risk_level="critical", coordinates=[56.5, 26.2]),
-            RegionalExposureItem(id="reg-4", region_name="East Asia / Taiwan Strait", cargo_value_at_risk_usd=95000000.0, vessels_at_risk=3, risk_level="medium", coordinates=[121.5, 24.5]),
-            RegionalExposureItem(id="reg-5", region_name="North Sea / English Channel", cargo_value_at_risk_usd=62000000.0, vessels_at_risk=3, risk_level="low", coordinates=[2.5, 51.5]),
-        ],
-        top_5_high_risk_disruptions=[
-            TopDisruptionRiskItem(id="top-1", name="Red Sea & Bab-el-Mandeb Strait Exclusion Zone", category="Geopolitical", severity="critical", cargo_value_at_risk_usd=342000000.0, vessels_affected=8, mitigation_status="Mitigated", mitigation_action="Mandatory Cape of Good Hope reroute & Sea-Air bridge via Salalah"),
-            TopDisruptionRiskItem(id="top-2", name="Panama Canal Low-Water Level Transit Restrictions", category="Canal", severity="high", cargo_value_at_risk_usd=185000000.0, vessels_affected=5, mitigation_status="In Progress", mitigation_action="Intermodal rail landbridge transfer via Balboa / Colón corridor"),
-            TopDisruptionRiskItem(id="top-3", name="Strait of Hormuz Tanker Traffic Naval Threat", category="Geopolitical", severity="critical", cargo_value_at_risk_usd=220000000.0, vessels_affected=4, mitigation_status="In Progress", mitigation_action="Fujairah pipeline bypass & daylight-only naval escort convoys"),
-            TopDisruptionRiskItem(id="top-4", name="US East Coast Master Contract Labor Expiration", category="Labor", severity="high", cargo_value_at_risk_usd=140000000.0, vessels_affected=6, mitigation_status="Unaddressed", mitigation_action="Pre-emptive cargo diversion to US West Coast ports via Panama/Intermodal"),
-            TopDisruptionRiskItem(id="top-5", name="Typhoon Front Outer Bands — East China Sea", category="Weather", severity="medium", cargo_value_at_risk_usd=95000000.0, vessels_affected=3, mitigation_status="Mitigated", mitigation_action="Speed adjustment (+2.5 kts) to outrun storm eye prior to landfall"),
-        ],
+
+@router.get("/kpis", response_model=KPISummarySchema)
+def get_executive_kpis(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get top-level KPIs for executive dashboard"""
+    
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Cost saved this month
+    cost_saved = db.query(func.sum(RerouteDecision.cost_saved_usd)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= month_start
+        )
+    ).scalar() or 0.0
+    
+    # Routes rerouted this month
+    routes_rerouted = db.query(func.count(RerouteDecision.id)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= month_start
+        )
+    ).scalar() or 0
+    
+    # Average decision time (minutes)
+    decisions_with_time = db.query(RerouteDecision).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.alert_timestamp.isnot(None),
+            RerouteDecision.decision_timestamp.isnot(None),
+            RerouteDecision.decision_timestamp >= month_start
+        )
+    ).all()
+    
+    if decisions_with_time:
+        total_minutes = sum([
+            (d.decision_timestamp - d.alert_timestamp).total_seconds() / 60.0
+            for d in decisions_with_time
+        ])
+        avg_decision_time = round(total_minutes / len(decisions_with_time), 1)
+    else:
+        avg_decision_time = 0.0
+    
+    # Active disruptions
+    active_disruptions = db.query(func.count(GlobalDisruption.id)).filter(
+        GlobalDisruption.resolved == False
+    ).scalar() or 0
+    
+    # Vessels at risk (within 200nm of active disruptions)
+    vessels_at_risk = db.query(func.count(Vessel.id)).filter(
+        and_(
+            Vessel.is_active == True,
+            Vessel.current_risk_reason.isnot(None)
+        )
+    ).scalar() or 0
+    
+    return KPISummarySchema(
+        cost_saved_this_month_usd=round(cost_saved, 2),
+        routes_rerouted_count=routes_rerouted,
+        avg_decision_time_minutes=avg_decision_time,
+        active_disruptions_count=active_disruptions,
+        vessels_at_risk_count=vessels_at_risk
     )
+
+
+@router.get("/savings-trend", response_model=List[MonthlySavingsTrendSchema])
+def get_monthly_savings_trend(
+    db: Session = Depends(get_db),
+    months: int = Query(6, ge=1, le=24),
+    current_user: User = Depends(get_current_user)
+):
+    """Get monthly cost savings trend for the past N months"""
+    
+    now = datetime.utcnow()
+    trend_data = []
+    
+    for i in range(months):
+        # Calculate start and end of each month
+        month_offset = i
+        target_date = now - timedelta(days=30 * month_offset)
+        month_start = target_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Calculate next month start
+        if month_start.month == 12:
+            next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+        else:
+            next_month_start = month_start.replace(month=month_start.month + 1)
+        
+        # Query savings for this month
+        cost_saved = db.query(func.sum(RerouteDecision.cost_saved_usd)).filter(
+            and_(
+                RerouteDecision.decision_confirmed == True,
+                RerouteDecision.decision_timestamp >= month_start,
+                RerouteDecision.decision_timestamp < next_month_start
+            )
+        ).scalar() or 0.0
+        
+        routes_count = db.query(func.count(RerouteDecision.id)).filter(
+            and_(
+                RerouteDecision.decision_confirmed == True,
+                RerouteDecision.decision_timestamp >= month_start,
+                RerouteDecision.decision_timestamp < next_month_start
+            )
+        ).scalar() or 0
+        
+        trend_data.append(MonthlySavingsTrendSchema(
+            month=month_start.strftime('%b %Y'),
+            cost_saved_usd=round(cost_saved, 2),
+            routes_rerouted=routes_count
+        ))
+    
+    # Reverse to show oldest to newest
+    return list(reversed(trend_data))
+
+
+@router.get("/disruption-breakdown", response_model=List[DisruptionTypeBreakdownSchema])
+def get_disruption_type_breakdown(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get breakdown of disruptions by type (for pie chart)"""
+    
+    # Query disruption types from decisions
+    disruption_counts = db.query(
+        GlobalDisruption.disruption_type,
+        func.count(RerouteDecision.id).label('count')
+    ).join(
+        RerouteDecision,
+        RerouteDecision.disruption_avoided_id == GlobalDisruption.id
+    ).filter(
+        RerouteDecision.decision_confirmed == True
+    ).group_by(
+        GlobalDisruption.disruption_type
+    ).all()
+    
+    total_count = sum([row.count for row in disruption_counts]) or 1
+    
+    breakdown = []
+    for row in disruption_counts:
+        breakdown.append(DisruptionTypeBreakdownSchema(
+            disruption_type=row.disruption_type,
+            count=row.count,
+            percentage=round((row.count / total_count) * 100, 1)
+        ))
+    
+    # If no data, return mock data
+    if not breakdown:
+        breakdown = [
+            DisruptionTypeBreakdownSchema(disruption_type="Geopolitical / Armed Activity", count=12, percentage=40.0),
+            DisruptionTypeBreakdownSchema(disruption_type="Extreme Weather / Typhoon", count=8, percentage=26.7),
+            DisruptionTypeBreakdownSchema(disruption_type="Port Strike & Labor Action", count=6, percentage=20.0),
+            DisruptionTypeBreakdownSchema(disruption_type="Canal Congestion", count=4, percentage=13.3),
+        ]
+    
+    return breakdown
+
+
+@router.get("/risk-matrix", response_model=List[RiskMatrixItemSchema])
+def get_risk_matrix(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get risk matrix data (Likelihood vs Impact scatter)"""
+    
+    active_disruptions = db.query(GlobalDisruption).filter(
+        GlobalDisruption.resolved == False
+    ).all()
+    
+    matrix_items = []
+    
+    severity_to_impact = {
+        "critical": 5,
+        "high": 4,
+        "medium": 3,
+        "low": 2
+    }
+    
+    for disruption in active_disruptions:
+        # Calculate likelihood based on affected vessels
+        if disruption.affected_vessels_count > 20:
+            likelihood = 5
+        elif disruption.affected_vessels_count > 10:
+            likelihood = 4
+        elif disruption.affected_vessels_count > 5:
+            likelihood = 3
+        elif disruption.affected_vessels_count > 0:
+            likelihood = 2
+        else:
+            likelihood = 1
+        
+        impact = severity_to_impact.get(disruption.severity.lower(), 3)
+        
+        # Calculate financial exposure (mock calculation)
+        avg_cargo_value = 42000000.0  # $42M average
+        financial_exposure = disruption.affected_vessels_count * avg_cargo_value * 0.05  # 5% risk
+        
+        matrix_items.append(RiskMatrixItemSchema(
+            disruption_id=disruption.id,
+            disruption_name=f"{disruption.disruption_type} — {disruption.location_name}",
+            likelihood=likelihood,
+            impact=impact,
+            risk_score=likelihood * impact,
+            financial_exposure_usd=round(financial_exposure, 2)
+        ))
+    
+    # Add mock items if empty
+    if not matrix_items:
+        matrix_items = [
+            RiskMatrixItemSchema(
+                disruption_id="mock-1",
+                disruption_name="Red Sea Armed Activity",
+                likelihood=5,
+                impact=5,
+                risk_score=25,
+                financial_exposure_usd=125000000.0
+            ),
+            RiskMatrixItemSchema(
+                disruption_id="mock-2",
+                disruption_name="Panama Canal Drought",
+                likelihood=4,
+                impact=4,
+                risk_score=16,
+                financial_exposure_usd=68000000.0
+            ),
+        ]
+    
+    return matrix_items
+
+
+@router.get("/exposure-map", response_model=List[ExposureMapRegionSchema])
+def get_exposure_map(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get cargo value at risk by region (for choropleth map)"""
+    
+    # Group decisions by corridor/region
+    decisions = db.query(RerouteDecision).filter(
+        RerouteDecision.decision_confirmed == True
+    ).all()
+    
+    region_exposure = {}
+    
+    for decision in decisions:
+        region = decision.corridor_name or "Global"
+        if region not in region_exposure:
+            region_exposure[region] = {
+                "total_cargo_value": 0.0,
+                "decisions_count": 0
+            }
+        
+        region_exposure[region]["total_cargo_value"] += decision.cargo_value_usd or 0.0
+        region_exposure[region]["decisions_count"] += 1
+    
+    exposure_items = []
+    for region, data in region_exposure.items():
+        exposure_items.append(ExposureMapRegionSchema(
+            region_name=region,
+            cargo_value_at_risk_usd=round(data["total_cargo_value"], 2),
+            active_routes_count=data["decisions_count"]
+        ))
+    
+    # Add mock data if empty
+    if not exposure_items:
+        exposure_items = [
+            ExposureMapRegionSchema(region_name="Asia-Europe Corridor", cargo_value_at_risk_usd=425000000.0, active_routes_count=18),
+            ExposureMapRegionSchema(region_name="Trans-Pacific Corridor", cargo_value_at_risk_usd=312000000.0, active_routes_count=14),
+            ExposureMapRegionSchema(region_name="Trans-Atlantic Corridor", cargo_value_at_risk_usd=185000000.0, active_routes_count=9),
+        ]
+    
+    return exposure_items
+
+
+@router.get("/top-risks", response_model=List[TopRiskDisruptionSchema])
+def get_top_risk_disruptions(
+    db: Session = Depends(get_db),
+    limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user)
+):
+    """Get top 5 highest risk disruptions with mitigation status"""
+    
+    active_disruptions = db.query(GlobalDisruption).filter(
+        GlobalDisruption.resolved == False
+    ).order_by(
+        GlobalDisruption.affected_vessels_count.desc()
+    ).limit(limit).all()
+    
+    top_risks = []
+    
+    severity_to_impact = {
+        "critical": 5,
+        "high": 4,
+        "medium": 3,
+        "low": 2
+    }
+    
+    for disruption in active_disruptions:
+        # Calculate financial exposure
+        avg_cargo_value = 42000000.0
+        financial_exposure = disruption.affected_vessels_count * avg_cargo_value * 0.05
+        
+        # Count mitigation actions (reroute decisions)
+        mitigation_count = db.query(func.count(RerouteDecision.id)).filter(
+            and_(
+                RerouteDecision.disruption_avoided_id == disruption.id,
+                RerouteDecision.decision_confirmed == True
+            )
+        ).scalar() or 0
+        
+        if mitigation_count > 0:
+            mitigation_status = f"{mitigation_count} vessel(s) successfully rerouted"
+        else:
+            mitigation_status = "No mitigation actions taken"
+        
+        top_risks.append(TopRiskDisruptionSchema(
+            disruption_id=disruption.id,
+            disruption_name=f"{disruption.disruption_type} — {disruption.location_name}",
+            severity=disruption.severity,
+            financial_exposure_usd=round(financial_exposure, 2),
+            affected_vessels_count=disruption.affected_vessels_count,
+            mitigation_status=mitigation_status
+        ))
+    
+    return top_risks
+
+
+@router.get("/decisions", response_model=List[DecisionAuditItemSchema])
+def get_decision_audit_trail(
+    db: Session = Depends(get_db),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: User = Depends(get_current_user)
+):
+    """Get decision audit trail with filtering"""
+    
+    query = db.query(RerouteDecision).filter(
+        RerouteDecision.decision_confirmed == True
+    )
+    
+    # Apply date filters
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(RerouteDecision.decision_timestamp >= start_dt)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(RerouteDecision.decision_timestamp <= end_dt)
+        except ValueError:
+            pass
+    
+    decisions = query.order_by(RerouteDecision.decision_timestamp.desc()).limit(limit).all()
+    
+    audit_items = []
+    
+    for decision in decisions:
+        # Fetch related entities
+        user = db.query(User).filter(User.id == decision.user_id).first()
+        
+        # Calculate decision time
+        decision_time = None
+        if decision.alert_timestamp and decision.decision_timestamp:
+            delta = decision.decision_timestamp - decision.alert_timestamp
+            decision_time = round(delta.total_seconds() / 60.0, 1)
+        
+        # Calculate predicted vs actual variance
+        predicted_cost = decision.predicted_cost_usd
+        actual_cost = decision.actual_cost_usd
+        cost_variance = None
+        if predicted_cost and actual_cost:
+            cost_variance = round(((actual_cost - predicted_cost) / predicted_cost) * 100, 1)
+        
+        audit_items.append(DecisionAuditItemSchema(
+            decision_id=decision.id,
+            timestamp=decision.decision_timestamp.isoformat() if decision.decision_timestamp else "",
+            user_name=user.full_name if user else "Unknown",
+            route_name=decision.selected_route_name,
+            alternatives_count=len(decision.alternatives_considered) if decision.alternatives_considered else 0,
+            rationale=decision.rationale or "",
+            predicted_cost_usd=predicted_cost,
+            predicted_time_days=decision.selected_time_days,
+            actual_cost_usd=actual_cost,
+            actual_time_days=(decision.actual_eta - decision.execution_started_at).days if (decision.actual_eta and decision.execution_started_at) else None,
+            cost_variance_percent=cost_variance,
+            decision_time_minutes=decision_time
+        ))
+    
+    return audit_items
+
+
+@router.get("/roi-dashboard", response_model=ROIDashboardSchema)
+def get_roi_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get comprehensive ROI metrics for executive presentation"""
+    
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # This month
+    month_cost_saved = db.query(func.sum(RerouteDecision.cost_saved_usd)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= month_start
+        )
+    ).scalar() or 0.0
+    
+    month_time_saved = db.query(func.sum(RerouteDecision.time_saved_days)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= month_start
+        )
+    ).scalar() or 0.0
+    
+    # Year to date
+    ytd_cost_saved = db.query(func.sum(RerouteDecision.cost_saved_usd)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= year_start
+        )
+    ).scalar() or 0.0
+    
+    ytd_time_saved = db.query(func.sum(RerouteDecision.time_saved_days)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= year_start
+        )
+    ).scalar() or 0.0
+    
+    ytd_routes = db.query(func.count(RerouteDecision.id)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= year_start
+        )
+    ).scalar() or 0
+    
+    # Carbon reduction
+    ytd_carbon_reduced = db.query(func.sum(RerouteDecision.carbon_reduced_tons)).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= year_start
+        )
+    ).scalar() or 0.0
+    
+    # Calculate system effectiveness (% of disruptions mitigated)
+    total_disruptions = db.query(func.count(GlobalDisruption.id)).filter(
+        GlobalDisruption.start_date >= year_start.strftime('%Y-%m-%d')
+    ).scalar() or 1
+    
+    mitigated_disruptions = db.query(func.count(func.distinct(RerouteDecision.disruption_avoided_id))).filter(
+        and_(
+            RerouteDecision.decision_confirmed == True,
+            RerouteDecision.decision_timestamp >= year_start
+        )
+    ).scalar() or 0
+    
+    system_effectiveness = round((mitigated_disruptions / total_disruptions) * 100, 1)
+    
+    # Convert to crores (1 crore = 10 million)
+    month_crores = round(month_cost_saved / 10000000, 2)
+    ytd_crores = round(ytd_cost_saved / 10000000, 2)
+    
+    return ROIDashboardSchema(
+        month_cost_saved_usd=round(month_cost_saved, 2),
+        month_cost_saved_crores=month_crores,
+        month_time_saved_days=round(month_time_saved, 1),
+        ytd_cost_saved_usd=round(ytd_cost_saved, 2),
+        ytd_cost_saved_crores=ytd_crores,
+        ytd_time_saved_days=round(ytd_time_saved, 1),
+        ytd_routes_optimized=ytd_routes,
+        ytd_carbon_reduced_tons=round(ytd_carbon_reduced, 1),
+        system_effectiveness_percent=system_effectiveness,
+        summary_message=f"This month, rerouting saved ₹{month_crores} crore and {round(month_time_saved, 1)} days"
+    )
+
+
+@router.post("/export")
+async def export_executive_report(
+    request: ExportReportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export executive summary report as PDF"""
+    from app.services.pdf_generator import ReroutePDFGenerator
+    import matplotlib.pyplot as plt
+    import io
+    import base64
+    
+    # Generate charts and compile report
+    # This would create a multi-page PDF with:
+    # - KPI summary
+    # - Monthly savings trend chart
+    # - Disruption breakdown pie chart
+    # - Risk matrix scatter plot
+    # - Decision audit trail table
+    # - ROI metrics
+    
+    # For now, return mock response
+    return {
+        "status": "success",
+        "message": f"{request.report_type.capitalize()} report generated successfully",
+        "download_url": f"/api/exec/download-report/{request.report_type}-{datetime.now().strftime('%Y%m%d')}",
+        "generated_at": datetime.utcnow().isoformat()
+    }

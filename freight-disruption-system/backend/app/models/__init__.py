@@ -5,7 +5,7 @@ from app.models.ports import Port, BerthSlot, PortCongestionHistory, VesselArriv
 from app.models.disruptions import GlobalDisruption
 from app.models.system import SystemErrorLog, SystemHealthCard
 from app.models.data_management import DataUploadLog, DataCleanupLog
-
+from app.models.reroute import RerouteDecision, RouteAlternative, RouteLeg, CostBreakdown
 __all__ = [
     "User",
     "PortManager", 
@@ -21,5 +21,12 @@ __all__ = [
     "SystemErrorLog",
     "SystemHealthCard",
     "DataUploadLog",
-    "DataCleanupLog"
+    "DataCleanupLog",
+    "SystemHealthMetric",
+    "ErrorLog",
+    "DataImportJob",
+    "RerouteDecision",
+    "RouteAlternative",
+    "RouteLeg",
+    "CostBreakdown",
 ]

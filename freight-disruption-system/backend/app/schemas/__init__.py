@@ -1,44 +1,15 @@
 # backend/app/schemas/__init__.py
-from app.schemas.user import (
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    Token,
-    PortManagerCreate,
-    PortManagerResponse
-)
-from app.schemas.port import (
-    PortResponse,
-    PortDetailResponse,
-    BerthSlotResponse,
-    VesselArrivalResponse,
-    PortCongestionHistoryResponse,
-    PortDisruptionCreate,
-    PortDisruptionResponse
-)
-from app.schemas.vessels import (
-    AdminVesselCreate,
-    AdminVesselUpdate,
-    AdminVesselResponse,
-    VesselLogCreate,
-    VesselLogResponse
-)
-from app.schemas.admin import (
-    GlobalDisruptionCreate,
-    GlobalDisruptionUpdate,
-    GlobalDisruptionResponse,
-    SystemHealthCardResponse,
-    SystemErrorLogResponse,
-    ApiUsageDataPointResponse,
-    AdminUserCreate,
-    AdminUserUpdate,
-    AdminUserResponse,
-    DatabaseStatsResponse,
-    UploadHistoryResponse,
-    CleanupLogResponse,
-    CleanupRequest
-)
-
+from app.schemas.user import *
+from app.schemas.port import *
+from app.schemas.vessels import *
+from app.schemas.disruptions import *
+from app.schemas.admin import *
+from app.schemas.congestion import *
+from app.schemas.active_routes import *
+from app.schemas.simulation import *
+from app.schemas.map import *
+from app.schemas.reroute import *  
+from app.schemas.risk_register import *  
 __all__ = [
     "UserCreate",
     "UserLogin",
@@ -70,5 +41,7 @@ __all__ = [
     "DatabaseStatsResponse",
     "UploadHistoryResponse",
     "CleanupLogResponse",
-    "CleanupRequest"
+    "CleanupRequest",
+    "RouteRequestSchema"
+
 ]

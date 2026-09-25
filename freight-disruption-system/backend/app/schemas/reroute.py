@@ -1,6 +1,7 @@
 # backend/app/schemas/reroute.py
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 
 class RouteRequestSchema(BaseModel):
     origin_port: str
@@ -73,3 +74,82 @@ class SimulationResultSchema(BaseModel):
     recommended_routes: List[RouteResultSchema]
     scatter_cloud: List[SimulatedPointSchema]
     dijkstra_comparison: DijkstraComparisonSchema
+
+class CostBreakdownDetailSchema(BaseModel):
+    ocean_freight: float = 0.0
+    bunker_fuel: float = 0.0
+    charter_daily_rate: float = 0.0
+    port_call_charges: float = 0.0
+    canal_transit_fees: float = 0.0
+    rail_freight: float = 0.0
+    air_freight: float = 0.0
+    road_freight: float = 0.0
+    insurance_base: float = 0.0
+    insurance_war_risk: float = 0.0
+    insurance_hull: float = 0.0
+    inventory_holding_cost: float = 0.0
+    demurrage_detention: float = 0.0
+    customs_duties: float = 0.0
+    handling_charges: float = 0.0
+    documentation_fees: float = 0.0
+    contingency_buffer: float = 0.0
+    subtotal: float = 0.0
+    taxes_surcharges: float = 0.0
+    total_cost_usd: float = 0.0
+    exchange_rate_usd_inr: float = 83.25
+    total_cost_inr: float = 0.0
+
+class RouteLegSchema(BaseModel):
+    leg_number: int
+    mode: str  # Sea, Rail, Air, Road
+    from_location: str
+    to_location: str
+    distance_km: float
+    duration_days: float
+    cost_usd: float
+    co2_tons: float
+    carrier: str
+    handover_point: Optional[str] = None
+    handover_duration_hours: float = 0.0
+
+class GanttChartSchema(BaseModel):
+    route_id: str
+    route_name: str
+    legs: List[RouteLegSchema]
+    total_duration_days: float
+    handover_count: int
+
+class ConfirmRerouteRequest(BaseModel):
+    simulation_request: RouteRequestSchema
+    selected_route: RouteResultSchema
+    alternatives_considered: List[RouteResultSchema]
+    dijkstra_comparison: DijkstraComparisonSchema
+    rationale: Optional[str] = "AI-recommended optimal reroute to avoid disruption"
+    alert_timestamp: Optional[datetime] = None
+
+class ConfirmRerouteResponse(BaseModel):
+    decision_id: str
+    status: str = "confirmed"
+    message: str
+    pdf_url: Optional[str] = None
+    dispatch_status: str = "queued"
+    estimated_savings_usd: float
+    estimated_time_saved_days: float
+
+class DecisionAuditTrailItem(BaseModel):
+    decision_id: str
+    timestamp: str
+    user_name: str
+    organization: str
+    route_name: str
+    origin: str
+    destination: str
+    vessel_name: str
+    disruption_avoided: str
+    cost_saved_usd: float
+    time_saved_days: float
+    status: str
+    rationale: str
+    predicted_eta: Optional[str] = None
+    actual_eta: Optional[str] = None
+    decision_time_minutes: Optional[float] = None
