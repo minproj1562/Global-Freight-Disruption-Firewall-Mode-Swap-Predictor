@@ -27,6 +27,7 @@ from app.routers import (
     reroute,  
     risk_register,
 )
+from app.routers import currency
 from app.database import SessionLocal
 
 load_dotenv()
@@ -101,6 +102,7 @@ app.include_router(congestion_router)
 app.include_router(risk_register_router)
 app.include_router(reroute.router)
 app.include_router(risk_register.router)
+app.include_router(currency.router)
 
 # ============= ROOT ENDPOINTS =============
 
