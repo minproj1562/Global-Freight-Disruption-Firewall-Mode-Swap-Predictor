@@ -173,6 +173,17 @@ const MultiSelectChips: React.FC<{
   );
 };
 
+// ─── Shared UI Helpers ────────────────────────────────────────────────────────
+
+const inputCls =
+  'w-full bg-slate-800/60 border border-slate-700/60 text-slate-100 placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-cyan-500/70 focus:ring-1 focus:ring-cyan-500/30 transition-all';
+
+const labelCls = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5';
+
+const FieldRow: React.FC<{ children: React.ReactNode; cols?: 1 | 2 }> = ({ children, cols = 1 }) => (
+  <div className={cols === 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''}>{children}</div>
+);
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const LogisticsManagerAuthPage: React.FC = () => {
@@ -336,15 +347,6 @@ export const LogisticsManagerAuthPage: React.FC = () => {
   // ────────────────────────────────────────────────────────────────────────────
   // Render helpers
   // ────────────────────────────────────────────────────────────────────────────
-
-  const inputCls =
-    'w-full bg-slate-800/60 border border-slate-700/60 text-slate-100 placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-cyan-500/70 focus:ring-1 focus:ring-cyan-500/30 transition-all';
-
-  const labelCls = 'block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5';
-
-  const FieldRow: React.FC<{ children: React.ReactNode; cols?: 1 | 2 }> = ({ children, cols = 1 }) => (
-    <div className={cols === 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''}>{children}</div>
-  );
 
   // ── Step 1: Personal ──
   const renderStep1 = () => (
