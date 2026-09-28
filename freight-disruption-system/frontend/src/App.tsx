@@ -17,11 +17,13 @@ import { CongestionForecastPage } from './pages/CongestionForecastPage';
 import { AnalyticsSimulationPage } from './pages/AnalyticsSimulationPage';
 import { Toaster } from '@/components/ui/toaster';
 import { ForceDarkMode } from '@/components/ForceDarkMode';
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+    <GlobalErrorBoundary>
+      <Router>
+        <div className="min-h-screen text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         <Routes>
           {/* Landing, Login, Register — always forced dark mode */}
           <Route path="/" element={<ForceDarkMode><LandingPage /></ForceDarkMode>} />
@@ -101,6 +103,7 @@ function App() {
         <Toaster />
       </div>
     </Router>
+    </GlobalErrorBoundary>
   );
 }
 

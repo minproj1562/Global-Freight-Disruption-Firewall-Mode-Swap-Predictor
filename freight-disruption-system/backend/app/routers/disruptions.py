@@ -16,6 +16,9 @@ from app.schemas.disruptions import (
 
 router = APIRouter(prefix="/api/disruptions", tags=["Disruption Alert Center"])
 
+# In-memory status overrides store for live threat acknowledgement & resolution
+_DISRUPTION_STATUS_OVERRIDES: dict = {}
+
 @router.get("/alert-center", response_model=List[AlertCenterDisruptionItem])
 def get_alert_center_disruptions(db: Session = Depends(get_db)):
     disruptions = db.query(GlobalDisruption).filter(GlobalDisruption.resolved == False).all()
@@ -120,10 +123,16 @@ def get_alert_center_disruptions(db: Session = Depends(get_db)):
             ),
         ),
     ]
-    return curated
+    result = []
+    for item in curated:
+        if item.id in _DISRUPTION_STATUS_OVERRIDES:
+            item = item.model_copy(update={"status": _DISRUPTION_STATUS_OVERRIDES[item.id]})
+        result.append(item)
+    return result
 
 @router.patch("/{disruption_id}/acknowledge", response_model=DisruptionActionResponse)
 def acknowledge_disruption(disruption_id: str, db: Session = Depends(get_db)):
+    _DISRUPTION_STATUS_OVERRIDES[disruption_id] = "acknowledged"
     return DisruptionActionResponse(
         id=disruption_id,
         status="acknowledged",
@@ -133,6 +142,7 @@ def acknowledge_disruption(disruption_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/{disruption_id}/resolve", response_model=DisruptionActionResponse)
 def resolve_disruption(disruption_id: str, db: Session = Depends(get_db)):
+    _DISRUPTION_STATUS_OVERRIDES[disruption_id] = "resolved"
     return DisruptionActionResponse(
         id=disruption_id,
         status="resolved",

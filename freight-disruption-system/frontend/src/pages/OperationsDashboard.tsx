@@ -24,19 +24,61 @@ import { KPIBar } from '../features/kpis/KPIBar';
 import { ConnectionIndicator } from '../shared/components/ConnectionIndicator';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { RerouteModal } from '../shared/components/RerouteModal';
-import { Vessel, Port, SearchResult, VesselType } from '../types';
+import { Vessel, Port, Route, Disruption, SearchResult, VesselType, SecondaryInfrastructure } from '../types';
 import {
-  MOCK_VESSELS,
-  MOCK_PORTS,
-  MOCK_DISRUPTIONS,
-  MOCK_ROUTES,
-  MOCK_KPIS,
-  MOCK_SECONDARY_INFRASTRUCTURE,
-} from '../shared/mock/mockData';
+  getMapVessels,
+  getMapPorts,
+  getMapDisruptions,
+  getMapRoutes,
+  getMapKPIs,
+  getSecondaryInfrastructure,
+} from '@/services/api';
 
 export const OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user, role, logout } = useAuthStore();
+
+  // Live Map Datasets
+  const [vessels, setVessels] = useState<Vessel[]>([]);
+  const [ports, setPorts] = useState<Port[]>([]);
+  const [disruptions, setDisruptions] = useState<Disruption[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [kpis, setKpis] = useState<any>({
+    active_vessels_count: 620,
+    active_disruptions_count: 3,
+    vessels_affected_count: 14,
+    routes_needing_reroute: 4,
+    last_updated: 'Just now',
+  });
+  const [secondaryInfra, setSecondaryInfra] = useState<SecondaryInfrastructure[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Load live map data from Backend REST API
+  useEffect(() => {
+    const loadMapData = async () => {
+      try {
+        const [vList, pList, dList, rList, kData, infraList] = await Promise.all([
+          getMapVessels().catch(() => []),
+          getMapPorts().catch(() => []),
+          getMapDisruptions().catch(() => []),
+          getMapRoutes().catch(() => []),
+          getMapKPIs().catch(() => null),
+          getSecondaryInfrastructure().catch(() => []),
+        ]);
+        if (vList && vList.length > 0) setVessels(vList);
+        if (pList && pList.length > 0) setPorts(pList);
+        if (dList && dList.length > 0) setDisruptions(dList);
+        if (rList && rList.length > 0) setRoutes(rList);
+        if (kData) setKpis(kData);
+        if (infraList && infraList.length > 0) setSecondaryInfra(infraList);
+      } catch (err) {
+        console.error('Failed to load live map data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMapData();
+  }, []);
 
   // Layer Visibility State
   const [layers, setLayers] = useState<LayerVisibilityState>({
@@ -118,13 +160,13 @@ export const OperationsDashboard: React.FC = () => {
   // Handle Search Result Selection
   const handleSelectSearchResult = (result: SearchResult) => {
     if (result.type === 'vessel') {
-      const vessel = MOCK_VESSELS.find((v) => v.id === result.id) || (result.item as Vessel);
+      const vessel = vessels.find((v) => v.id === result.id) || (result.item as Vessel);
       setSelectedVessel(vessel);
       setSelectedPort(null);
       setQuickPopupVessel(vessel);
       setQuickPopupPoint({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     } else if (result.type === 'port') {
-      const port = MOCK_PORTS.find((p) => p.id === result.id) || (result.item as Port);
+      const port = ports.find((p) => p.id === result.id) || (result.item as Port);
       setSelectedPort(port);
       setSelectedVessel(null);
     }
@@ -132,7 +174,7 @@ export const OperationsDashboard: React.FC = () => {
 
   // Get matching route for selected vessel
   const selectedRoute = selectedVessel
-    ? MOCK_ROUTES.find((r) => r.vessel_id === selectedVessel.id)
+    ? routes.find((r) => r.vessel_id === selectedVessel.id)
     : null;
 
   return (
@@ -193,9 +235,9 @@ export const OperationsDashboard: React.FC = () => {
         {/* Center: Search Bar & Connection Status */}
         <div className="flex items-center gap-3">
           <MapSearch
-            vessels={MOCK_VESSELS}
-            ports={MOCK_PORTS}
-            disruptions={MOCK_DISRUPTIONS}
+            vessels={vessels}
+            ports={ports}
+            disruptions={disruptions}
             onSelectResult={handleSelectSearchResult}
             className="hidden md:block"
           />
@@ -232,9 +274,9 @@ export const OperationsDashboard: React.FC = () => {
       {/* Mobile Search & Status Bar (visible < sm) */}
       <div className="sm:hidden absolute top-14 left-0 right-0 z-25 p-2 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between gap-2">
         <MapSearch
-          vessels={MOCK_VESSELS}
-          ports={MOCK_PORTS}
-          disruptions={MOCK_DISRUPTIONS}
+          vessels={vessels}
+          ports={ports}
+          disruptions={disruptions}
           onSelectResult={handleSelectSearchResult}
           className="w-full"
         />
@@ -244,7 +286,7 @@ export const OperationsDashboard: React.FC = () => {
       {/* 2. FLOATING KPI BAR (TOP SUB-HEADER) */}
       {/* ========================================================================= */}
       <div className="absolute top-16 sm:top-20 left-4 right-4 z-20 pointer-events-none flex justify-center">
-        <KPIBar kpis={MOCK_KPIS} className="pointer-events-auto" />
+        <KPIBar kpis={kpis} className="pointer-events-auto" />
       </div>
 
       {/* ========================================================================= */}
@@ -252,15 +294,15 @@ export const OperationsDashboard: React.FC = () => {
       {/* ========================================================================= */}
       <main className="w-full h-full">
         <MapView
-          vessels={MOCK_VESSELS.filter((v) => {
+          vessels={vessels.filter((v) => {
             const flagMatch = selectedFlags.length === 0 || selectedFlags.includes(v.flag);
             const riskMatch = selectedRiskLevels.length === 0 || selectedRiskLevels.includes(v.status);
             return flagMatch && riskMatch;
           })}
-          ports={MOCK_PORTS}
-          disruptions={MOCK_DISRUPTIONS}
-          routes={MOCK_ROUTES}
-          secondaryInfra={MOCK_SECONDARY_INFRASTRUCTURE}
+          ports={ports}
+          disruptions={disruptions}
+          routes={routes}
+          secondaryInfra={secondaryInfra}
           layers={layers}
           selectedVesselTypeFilters={selectedVesselTypes}
           selectedVessel={selectedVessel}
@@ -397,7 +439,7 @@ export const OperationsDashboard: React.FC = () => {
         {rerouteModalVessel && (
           <RerouteModal
             vessel={rerouteModalVessel}
-            route={MOCK_ROUTES.find((r) => r.vessel_id === rerouteModalVessel.id) || null}
+            route={routes.find((r) => r.vessel_id === rerouteModalVessel.id) || null}
             onClose={() => setRerouteModalVessel(null)}
           />
         )}

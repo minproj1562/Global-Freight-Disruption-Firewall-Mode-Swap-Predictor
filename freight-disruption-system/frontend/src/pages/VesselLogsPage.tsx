@@ -15,7 +15,6 @@ import {
   Activity,
   Settings,
 } from 'lucide-react';
-import { MOCK_VESSEL_LOGS } from '@/shared/mock/vesselLogMockData';
 import { getVesselLogs, getVesselLogsExportUrl, VesselLogEntry } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
@@ -26,8 +25,8 @@ export const VesselLogsPage: React.FC = () => {
   const { user } = useAuthStore();
 
   // Logs state
-  const [logs, setLogs] = useState<VesselLogEntry[]>(MOCK_VESSEL_LOGS);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [logs, setLogs] = useState<VesselLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Tab State: 'Arrivals' | 'Departures' | 'Expected'
   const [activeTab, setActiveTab] = useState<'Arrivals' | 'Departures' | 'Expected'>('Arrivals');
@@ -431,7 +430,7 @@ export const VesselLogsPage: React.FC = () => {
           </div>
 
           <div className="bg-slate-50 dark:bg-slate-950/90 px-6 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
-            <span>Showing {filteredLogs.length} of {MOCK_VESSEL_LOGS.length} Vessel Log Entries</span>
+            <span>Showing {filteredLogs.length} of {logs.length} Vessel Log Entries</span>
             <span>Last Terminal Log Sync: Just Now (Live AIS Ingest)</span>
           </div>
         </div>

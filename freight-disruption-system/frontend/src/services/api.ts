@@ -215,7 +215,29 @@ export const getVesselLogs = async (params?: { category?: string; search?: strin
     headers: { 'Authorization': `Bearer ${token}` }
   });
   if (!response.ok) throw new Error('Failed to fetch vessel logs');
-  return response.json();
+  const raw = await response.json();
+  return raw.map((item: any) => ({
+    id: item.id || `log-${item.mmsi}`,
+    mmsi: item.mmsi,
+    imo: item.imo || 0,
+    name: item.name || item.vessel_name || item.vesselName || 'Vessel',
+    type: item.type || item.vessel_type || item.vesselType || 'Container',
+    flag: item.flag || item.vessel_flag || 'Panama',
+    port: item.port || 'Port of Rotterdam',
+    terminal: item.terminal || 'APM Terminals Maasvlakte II',
+    berth: item.berth || 'Berth 1',
+    arrivalDate: item.arrivalDate || item.arrival_date || item.ata || new Date().toISOString().slice(0, 16),
+    departureDate: item.departureDate || item.departure_date || item.atd || new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
+    eta: item.eta,
+    etd: item.etd,
+    ata: item.ata,
+    atd: item.atd,
+    status: item.status || 'Moored',
+    category: item.category || 'Arrivals',
+    cargo: item.cargo || 'General Cargo',
+    agent: item.agent || 'Cosco Shipping Agencies',
+    draft: item.draft || item.max_draught_meters || 14.5,
+  }));
 };
 
 export const createVesselLog = async (logData: Partial<VesselLogEntry>): Promise<VesselLogEntry> => {
@@ -358,7 +380,21 @@ export const getAdminDisruptions = async (params?: { search?: string; severity?:
     headers: { 'Authorization': `Bearer ${token}` }
   });
   if (!response.ok) throw new Error('Failed to fetch disruptions');
-  return response.json();
+  const raw = await response.json();
+  return raw.map((d: any) => ({
+    id: d.id,
+    type: d.type || d.disruption_type || 'Geopolitical',
+    locationName: d.locationName || d.location_name || '',
+    latitude: d.latitude || 0,
+    longitude: d.longitude || 0,
+    startDate: d.startDate || d.start_date || '',
+    endDate: d.endDate || d.end_date || '',
+    severity: d.severity || 'high',
+    radiusNm: d.radiusNm || d.radius_nm || 100,
+    description: d.description || '',
+    affectedVesselsCount: d.affectedVesselsCount ?? d.affected_vessels_count ?? 0,
+    resolved: Boolean(d.resolved),
+  }));
 };
 
 export const createAdminDisruption = async (disruption: Partial<ManagedDisruption>): Promise<ManagedDisruption> => {

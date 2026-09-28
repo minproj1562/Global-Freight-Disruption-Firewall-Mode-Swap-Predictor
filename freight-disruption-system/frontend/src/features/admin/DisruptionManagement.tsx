@@ -15,7 +15,6 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { INITIAL_DISRUPTIONS } from '@/shared/mock/adminMockData';
 import {
   getAdminDisruptions,
   createAdminDisruption,
@@ -26,7 +25,8 @@ import {
 } from '@/services/api';
 
 export const DisruptionManagement: React.FC = () => {
-  const [disruptions, setDisruptions] = useState<ManagedDisruption[]>(INITIAL_DISRUPTIONS);
+  const [disruptions, setDisruptions] = useState<ManagedDisruption[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Form State for Adding Disruption
   const [formData, setFormData] = useState<Omit<ManagedDisruption, 'id' | 'affectedVesselsCount' | 'resolved'>>({

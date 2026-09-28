@@ -7,7 +7,7 @@
 // POST /api/v1/disruptions/{id}/resolve
 // POST /api/v1/recommendations/disruption/{id}
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,27 +42,62 @@ import { MapView } from '../features/map/MapView';
 import { LogisticsManagerSidebar } from '@/components/logistics/LogisticsManagerSidebar';
 import { ThemeToggle } from '../shared/components/ThemeToggle';
 import { useToast } from '@/components/ui/use-toast';
-import { Disruption, Vessel, DisruptionSeverity, DisruptionCategory, AcknowledgementStatus } from '../types';
-import { MOCK_DISRUPTION_ALERTS } from '../shared/mock/disruptionAlertMockData';
-import { MOCK_VESSELS, MOCK_PORTS, MOCK_ROUTES, MOCK_SECONDARY_INFRASTRUCTURE } from '../shared/mock/mockData';
+import { Disruption, Vessel, DisruptionSeverity, DisruptionCategory, AcknowledgementStatus, Port, Route } from '../types';
+import {
+  getDisruptionAlerts,
+  acknowledgeDisruptionAlert,
+  resolveDisruptionAlert,
+  getMapVessels,
+  getMapPorts,
+  getMapRoutes,
+  getSecondaryInfrastructure,
+} from '@/services/api';
 
 export const DisruptionAlertCenterPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // State
-  const [disruptions, setDisruptions] = useState<Disruption[]>(MOCK_DISRUPTION_ALERTS);
-  const [selectedDisruptionId, setSelectedDisruptionId] = useState<string>(MOCK_DISRUPTION_ALERTS[0].id);
+  const [disruptions, setDisruptions] = useState<Disruption[]>([]);
+  const [selectedDisruptionId, setSelectedDisruptionId] = useState<string>('');
+  const [mapVessels, setMapVessels] = useState<Vessel[]>([]);
+  const [mapPorts, setMapPorts] = useState<Port[]>([]);
+  const [mapRoutes, setMapRoutes] = useState<Route[]>([]);
+  const [mapInfra, setMapInfra] = useState<any[]>([]);
   const [activeTabMobile, setActiveTabMobile] = useState<'list' | 'detail'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | DisruptionCategory>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | AcknowledgementStatus>('all');
   const [sortBy, setSortBy] = useState<'severity' | 'time' | 'vessels'>('severity');
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
+
+  // Load live data from Operations Backend
+  const loadAlerts = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getDisruptionAlerts();
+      if (data && data.length > 0) {
+        setDisruptions(data);
+        setSelectedDisruptionId((prev) => (prev && data.some((d: any) => d.id === prev) ? prev : data[0].id));
+      }
+    } catch (err) {
+      console.error('Failed to load disruption alerts from API:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAlerts();
+    getMapVessels().then(setMapVessels).catch(console.error);
+    getMapPorts().then(setMapPorts).catch(console.error);
+    getMapRoutes().then(setMapRoutes).catch(console.error);
+    getSecondaryInfrastructure().then(setMapInfra).catch(console.error);
+  }, []);
 
   // Export Impact Report PDF handler
   const handleExportImpactReport = () => {
@@ -175,39 +210,48 @@ export const DisruptionAlertCenterPage: React.FC = () => {
     }
   };
 
-  // Acknowledge Action
-  const handleAcknowledge = () => {
+  // Acknowledge Action (Live Backend Integration)
+  const handleAcknowledge = async () => {
     if (!selectedDisruption) return;
     setIsAcknowledging(true);
 
-    setTimeout(() => {
+    try {
+      await acknowledgeDisruptionAlert(selectedDisruption.id);
       setDisruptions((prev) =>
         prev.map((d) => (d.id === selectedDisruption.id ? { ...d, status: 'acknowledged' } : d))
       );
-      setIsAcknowledging(false);
 
       toast({
         title: 'Disruption Acknowledged',
-        description: `${selectedDisruption.name} has been marked as Acknowledged and logged in audit history.`,
+        description: `${selectedDisruption.name} has been marked as Acknowledged in Operations Command DB.`,
       });
-    }, 600);
+    } catch (err) {
+      console.error('Failed to acknowledge disruption:', err);
+      toast({
+        title: 'Action Failed',
+        description: 'Could not connect to backend to record acknowledgement.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAcknowledging(false);
+    }
   };
 
-  // Resolve Action
-  const handleConfirmResolve = () => {
+  // Resolve Action (Live Backend Integration)
+  const handleConfirmResolve = async () => {
     if (!selectedDisruption) return;
     setIsResolving(true);
 
-    setTimeout(() => {
+    try {
+      await resolveDisruptionAlert(selectedDisruption.id);
       setDisruptions((prev) =>
         prev.map((d) => (d.id === selectedDisruption.id ? { ...d, status: 'resolved' } : d))
       );
-      setIsResolving(false);
       setShowResolveDialog(false);
 
       toast({
         title: 'Disruption Resolved',
-        description: `${selectedDisruption.name} has been marked as Resolved and moved to resolved archives.`,
+        description: `${selectedDisruption.name} has been marked as Resolved and archived in Operations Command DB.`,
       });
 
       // Select next remaining disruption if available
@@ -215,7 +259,16 @@ export const DisruptionAlertCenterPage: React.FC = () => {
       if (remaining.length > 0) {
         setSelectedDisruptionId(remaining[0].id);
       }
-    }, 700);
+    } catch (err) {
+      console.error('Failed to resolve disruption:', err);
+      toast({
+        title: 'Resolution Failed',
+        description: 'Could not connect to backend to resolve threat.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   // Navigate to Page 1.3 (Reroute Recommendation Page) passing state context
@@ -703,11 +756,11 @@ export const DisruptionAlertCenterPage: React.FC = () => {
               <div className="relative w-full h-[280px] lg:h-[320px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl bg-slate-100 dark:bg-slate-900 group">
                 {/* Mini Map Canvas reusing MapView */}
                 <MapView
-                  vessels={selectedDisruption.affected_vessels_list || MOCK_VESSELS}
-                  ports={MOCK_PORTS}
+                  vessels={selectedDisruption.affected_vessels_list && selectedDisruption.affected_vessels_list.length > 0 ? selectedDisruption.affected_vessels_list : mapVessels}
+                  ports={mapPorts}
                   disruptions={disruptions}
-                  routes={MOCK_ROUTES}
-                  secondaryInfra={MOCK_SECONDARY_INFRASTRUCTURE}
+                  routes={mapRoutes}
+                  secondaryInfra={mapInfra}
                   layers={{
                     vessels: true,
                     ports: true,
@@ -863,7 +916,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
 
                 <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                   <div className="max-h-48 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800/60">
-                    {(selectedDisruption.affected_vessels_list || MOCK_VESSELS.slice(0, 4)).map((vessel) => {
+                    {(selectedDisruption.affected_vessels_list && selectedDisruption.affected_vessels_list.length > 0 ? selectedDisruption.affected_vessels_list : mapVessels.slice(0, 4)).map((vessel) => {
                       const isVesselSelected = selectedVessel?.id === vessel.id;
                       return (
                         <div

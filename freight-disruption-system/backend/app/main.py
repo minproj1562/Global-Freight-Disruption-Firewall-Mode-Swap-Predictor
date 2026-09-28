@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events.
     """
     # ========== STARTUP ==========
-    print("🚀 Starting Freight Disruption API...")
+    print("[STARTUP] Starting Freight Disruption API...")
     
     # Initialize database tables
     init_db()
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     from app.models.ports import Port
     port_count = db.query(Port).count()
     if port_count < 50:
-        print(f"📦 Seeding sample ports (current count: {port_count})...")
+        print(f"[SEED] Seeding sample ports (current count: {port_count})...")
         seed_sample_ports(db)
     db.close()
     

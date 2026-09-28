@@ -479,6 +479,9 @@ export const MapView: React.FC<MapViewProps> = ({
       const courseTrailFeatures: any[] = [];
 
       filteredVessels.forEach((vessel) => {
+        // Guard: skip vessels with invalid coordinates for GeoJSON sources
+        if (vessel.longitude == null || vessel.latitude == null || isNaN(vessel.longitude) || isNaN(vessel.latitude)) return;
+
         let lon = vessel.longitude;
         let lat = vessel.latitude;
         if (replayProgress < 100) {
@@ -536,6 +539,9 @@ export const MapView: React.FC<MapViewProps> = ({
 
       // 2. Render Unclustered Vessel SVG Markers
       filteredVessels.forEach((vessel) => {
+        // Guard: skip vessels with invalid coordinates to prevent NaN crash
+        if (vessel.longitude == null || vessel.latitude == null || isNaN(vessel.longitude) || isNaN(vessel.latitude)) return;
+
         activeMarkerIds.add(vessel.id);
 
         let lon = vessel.longitude;
@@ -631,6 +637,9 @@ export const MapView: React.FC<MapViewProps> = ({
 
     if (layers.ports) {
       ports.forEach((port) => {
+        // Guard: skip ports with invalid coordinates
+        if (port.longitude == null || port.latitude == null || isNaN(port.longitude) || isNaN(port.latitude)) return;
+
         activePortIds.add(port.id);
 
         if (!portMarkersRef.current[port.id]) {
@@ -682,6 +691,9 @@ export const MapView: React.FC<MapViewProps> = ({
 
     if (layers.secondaryInfra) {
       secondaryInfra.forEach((infra) => {
+        // Guard: skip infra with invalid coordinates
+        if (infra.longitude == null || infra.latitude == null || isNaN(infra.longitude) || isNaN(infra.latitude)) return;
+
         activeInfraIds.add(infra.id);
 
         if (!infraMarkersRef.current[infra.id]) {
@@ -721,20 +733,22 @@ export const MapView: React.FC<MapViewProps> = ({
       const avgLon = lons.reduce((a, b) => a + b, 0) / lons.length;
       const avgLat = lats.reduce((a, b) => a + b, 0) / lats.length;
 
-      map.flyTo({
-        center: [avgLon, avgLat],
-        zoom: 5.5,
-        pitch: 25,
-        duration: 1200,
-      });
-    } else if (selectedVessel) {
+      if (!isNaN(avgLon) && !isNaN(avgLat)) {
+        map.flyTo({
+          center: [avgLon, avgLat],
+          zoom: 5.5,
+          pitch: 25,
+          duration: 1200,
+        });
+      }
+    } else if (selectedVessel && !isNaN(selectedVessel.longitude) && !isNaN(selectedVessel.latitude)) {
       map.flyTo({
         center: [selectedVessel.longitude, selectedVessel.latitude],
         zoom: 7,
         pitch: 45,
         duration: 1500,
       });
-    } else if (selectedPort) {
+    } else if (selectedPort && !isNaN(selectedPort.longitude) && !isNaN(selectedPort.latitude)) {
       map.flyTo({
         center: [selectedPort.longitude, selectedPort.latitude],
         zoom: 9,
@@ -910,8 +924,13 @@ export const MapView: React.FC<MapViewProps> = ({
 
       if (highlightedActiveRoute.waypoints.length > 1) {
         const bounds = new mapboxgl.LngLatBounds();
-        highlightedActiveRoute.waypoints.forEach((pt) => bounds.extend(pt as [number, number]));
-        map.fitBounds(bounds, { padding: 50, duration: 1200 });
+        const validWaypoints = highlightedActiveRoute.waypoints.filter(
+          (pt) => Array.isArray(pt) && pt.length >= 2 && !isNaN(pt[0]) && !isNaN(pt[1])
+        );
+        if (validWaypoints.length > 1) {
+          validWaypoints.forEach((pt) => bounds.extend(pt as [number, number]));
+          map.fitBounds(bounds, { padding: 50, duration: 1200 });
+        }
       }
     };
 
