@@ -42,8 +42,8 @@ class RFRiskPredictor:
         """Load trained model artifacts"""
         
         if not self.model_path.exists():
-            print(f"[RF Predictor] ⚠ Model not found at {self.model_path}")
-            print("[RF Predictor] → Using fallback rule-based heuristic")
+            print(f"[RF Predictor] [WARN] Model not found at {self.model_path}")
+            print("[RF Predictor] -> Using fallback rule-based heuristic")
             self.is_model_loaded = False
             return
         
@@ -54,14 +54,14 @@ class RFRiskPredictor:
             model_type = self.model_artifacts.get('model_type', 'Random Forest')
             trained_at = self.model_artifacts.get('trained_at', 'Unknown')
             
-            print(f"[RF Predictor] ✓ Model loaded successfully")
+            print(f"[RF Predictor] [OK] Model loaded successfully")
             print(f"[RF Predictor]   Type: {model_type}")
             print(f"[RF Predictor]   Trained: {trained_at}")
             print(f"[RF Predictor]   Features: {len(self.model_artifacts.get('feature_names', []))}")
             
         except Exception as e:
-            print(f"[RF Predictor] ✗ Failed to load model: {e}")
-            print(f"[RF Predictor] → Using fallback rule-based heuristic")
+            print(f"[RF Predictor] [ERR] Failed to load model: {e}")
+            print(f"[RF Predictor] -> Using fallback rule-based heuristic")
             self.is_model_loaded = False
     
     def predict_risk_score(

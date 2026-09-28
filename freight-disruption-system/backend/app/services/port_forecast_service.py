@@ -6,7 +6,12 @@ Uses Facebook Prophet for time series forecasting
 
 import pandas as pd
 import numpy as np
-from prophet import Prophet
+try:
+    from prophet import Prophet
+    PROPHET_AVAILABLE = True
+except (ImportError, Exception):
+    Prophet = None
+    PROPHET_AVAILABLE = False
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from sqlalchemy.orm import Session
@@ -72,8 +77,8 @@ class PortForecastService:
         print(f"[Forecast] Loading historical data for {port_id}...")
         historical_data = self._load_historical_data(port_id)
         
-        if len(historical_data) < 30:
-            print(f"[Forecast] Insufficient data for {port_id} ({len(historical_data)} records)")
+        if len(historical_data) < 30 or not PROPHET_AVAILABLE:
+            print(f"[Forecast] Insufficient data or Prophet unavailable for {port_id} ({len(historical_data)} records, Prophet: {PROPHET_AVAILABLE})")
             return self._generate_mock_forecast(port_id, forecast_horizon_days)
         
         # Train Prophet model
