@@ -215,7 +215,8 @@ export const MapView: React.FC<MapViewProps> = ({
           },
         };
 
-        if (!map.getSource(sourceId)) {
+        const existingSource = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
+        if (!existingSource) {
           map.addSource(sourceId, {
             type: 'geojson',
             data: geojson,
@@ -241,6 +242,8 @@ export const MapView: React.FC<MapViewProps> = ({
               'line-dasharray': [2, 2],
             },
           });
+        } else {
+          existingSource.setData(geojson);
         }
 
         // Toggle layer visibility
@@ -250,9 +253,10 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     };
 
-    if (map.isStyleLoaded()) {
+    if (map.loaded() || map.isStyleLoaded()) {
       updateDisruptions();
     } else {
+      map.once('load', updateDisruptions);
       map.once('style.load', updateDisruptions);
     }
   }, [disruptions, layers.disruptions]);
@@ -397,7 +401,11 @@ export const MapView: React.FC<MapViewProps> = ({
     let dashOffset = 0;
 
     const updateRoutes = () => {
+      if (!routes || routes.length === 0) return;
+
       routes.forEach((route) => {
+        if (!route.waypoints || !Array.isArray(route.waypoints) || route.waypoints.length < 2) return;
+
         const sourceId = `source-route-${route.id}`;
         const layerId = `layer-route-${route.id}`;
 
@@ -413,7 +421,8 @@ export const MapView: React.FC<MapViewProps> = ({
           },
         };
 
-        if (!map.getSource(sourceId)) {
+        const existingSource = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
+        if (!existingSource) {
           map.addSource(sourceId, {
             type: 'geojson',
             data: geojson,
@@ -430,20 +439,29 @@ export const MapView: React.FC<MapViewProps> = ({
             paint: {
               'line-color': route.requires_reroute ? '#ef4444' : '#38b0f8',
               'line-width': route.requires_reroute ? 4 : 2,
-              'line-opacity': 0.85,
+              'line-opacity': 0.9,
               'line-dasharray': route.requires_reroute ? [3, 2] : [4, 4],
             },
           });
+        } else {
+          existingSource.setData(geojson);
+          if (map.getLayer(layerId)) {
+            map.setPaintProperty(layerId, 'line-color', route.requires_reroute ? '#ef4444' : '#38b0f8');
+            map.setPaintProperty(layerId, 'line-width', route.requires_reroute ? 4 : 2);
+          }
         }
 
         const visibility = layers.routes ? 'visible' : 'none';
-        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visibility);
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
       });
     };
 
-    if (map.isStyleLoaded()) {
+    if (map.loaded() || map.isStyleLoaded()) {
       updateRoutes();
     } else {
+      map.once('load', updateRoutes);
       map.once('style.load', updateRoutes);
     }
 
