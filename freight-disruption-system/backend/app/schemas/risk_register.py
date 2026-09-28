@@ -1,56 +1,73 @@
 # backend/app/schemas/risk_register.py
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 
-class ExecutiveKPISummary(BaseModel):
+class KPISummarySchema(BaseModel):
     cost_saved_this_month_usd: float
     routes_rerouted_count: int
-    avg_decision_time_hours: float
+    avg_decision_time_minutes: float
     active_disruptions_count: int
     vessels_at_risk_count: int
 
-class MonthlyCostSavingItem(BaseModel):
-    month: str
-    savings_usd: float
-    reroutes_count: int
+class MonthlySavingsTrendSchema(BaseModel):
+    month: str  # "Jan 2024"
+    cost_saved_usd: float
+    routes_rerouted: int
 
-class DisruptionTypeBreakdownItem(BaseModel):
-    category: str
+class DisruptionTypeBreakdownSchema(BaseModel):
+    disruption_type: str
     count: int
     percentage: float
-    color: str
 
-class RiskMatrixDisruptionPoint(BaseModel):
-    id: str
-    name: str
-    likelihood: int  # 1 to 5
-    impact: int      # 1 to 5
-    severity: str    # low, medium, high, critical
-    category: str
-    affected_vessels_count: int
+class RiskMatrixItemSchema(BaseModel):
+    disruption_id: str
+    disruption_name: str
+    likelihood: int  # 1-5
+    impact: int  # 1-5
+    risk_score: int  # likelihood × impact
+    financial_exposure_usd: float
 
-class RegionalExposureItem(BaseModel):
-    id: str
+class ExposureMapRegionSchema(BaseModel):
     region_name: str
     cargo_value_at_risk_usd: float
-    vessels_at_risk: int
-    risk_level: str
-    coordinates: List[float]
+    active_routes_count: int
 
-class TopDisruptionRiskItem(BaseModel):
-    id: str
-    name: str
-    category: str
+class TopRiskDisruptionSchema(BaseModel):
+    disruption_id: str
+    disruption_name: str
     severity: str
-    cargo_value_at_risk_usd: float
-    vessels_affected: int
-    mitigation_status: str  # Mitigated, In Progress, Unaddressed
-    mitigation_action: str
+    financial_exposure_usd: float
+    affected_vessels_count: int
+    mitigation_status: str
 
-class RiskRegisterResponse(BaseModel):
-    kpis: ExecutiveKPISummary
-    monthly_savings_series: List[MonthlyCostSavingItem]
-    disruption_breakdown: List[DisruptionTypeBreakdownItem]
-    risk_matrix_points: List[RiskMatrixDisruptionPoint]
-    regional_exposures: List[RegionalExposureItem]
-    top_5_high_risk_disruptions: List[TopDisruptionRiskItem]
+class DecisionAuditItemSchema(BaseModel):
+    decision_id: str
+    timestamp: str
+    user_name: str
+    route_name: str
+    alternatives_count: int
+    rationale: str
+    predicted_cost_usd: Optional[float] = None
+    predicted_time_days: Optional[float] = None
+    actual_cost_usd: Optional[float] = None
+    actual_time_days: Optional[float] = None
+    cost_variance_percent: Optional[float] = None
+    decision_time_minutes: Optional[float] = None
+
+class ROIDashboardSchema(BaseModel):
+    month_cost_saved_usd: float
+    month_cost_saved_crores: float  # 1 crore = 10 million
+    month_time_saved_days: float
+    ytd_cost_saved_usd: float
+    ytd_cost_saved_crores: float
+    ytd_time_saved_days: float
+    ytd_routes_optimized: int
+    ytd_carbon_reduced_tons: float
+    system_effectiveness_percent: float
+    summary_message: str
+
+class ExportReportRequest(BaseModel):
+    report_type: str  # "daily", "weekly", "monthly"
+    include_charts: bool = True
+    include_audit_trail: bool = True
