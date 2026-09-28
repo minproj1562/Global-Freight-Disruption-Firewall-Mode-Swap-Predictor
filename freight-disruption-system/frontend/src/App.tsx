@@ -18,6 +18,7 @@ import { AnalyticsSimulationPage } from './pages/AnalyticsSimulationPage';
 import { Toaster } from '@/components/ui/toaster';
 import { ForceDarkMode } from '@/components/ForceDarkMode';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
+import { LogisticsManagerAuthPage } from './pages/LogisticsManagerAuthPage';
 
 function App() {
   return (
@@ -39,6 +40,11 @@ function App() {
           <Route path="/port-manager" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
           <Route path="/port-login" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
           <Route path="/port-register" element={<ForceDarkMode><PortManagerAuthPage /></ForceDarkMode>} />
+
+          {/* Page 1.0 — Logistics Manager Auth (Register + Login) */}
+          <Route path="/auth/logistics-manager" element={<ForceDarkMode><LogisticsManagerAuthPage /></ForceDarkMode>} />
+          <Route path="/logistics-register" element={<ForceDarkMode><LogisticsManagerAuthPage /></ForceDarkMode>} />
+          <Route path="/logistics-login" element={<ForceDarkMode><LogisticsManagerAuthPage /></ForceDarkMode>} />
 
           {/* Page 1.2 — Disruption Alert Center */}
           <Route path="/dashboard/disruptions" element={<DisruptionAlertCenterPage />} />

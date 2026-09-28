@@ -44,11 +44,11 @@ export const LandingPage: React.FC = () => {
 
   const handleRoleClick = (role: string) => {
     if (role === 'port') {
-      navigate('/dashboard/ports');
+      navigate('/auth/port-manager');
     } else if (role === 'operations') {
-      navigate('/dashboard/operations');
+      navigate('/auth/logistics-manager');
     } else if (role === 'admin') {
-      navigate('/dashboard/admin');
+      navigate('/auth/admin');
     } else {
       navigate('/login', { state: { role } });
     }
