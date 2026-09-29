@@ -20,12 +20,27 @@ class User(Base):
     department = Column(String, default="Operations")
     phone = Column(String, default="")
     last_login = Column(String, default="Just now")
+    
+    # Security: Email Verification
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+    verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Security: TOTP Two-Factor Authentication
+    totp_secret = Column(String, nullable=True)
+    is_totp_enabled = Column(Boolean, default=False)
+
+    # Security: Account Lockout / Failed Attempts
+    failed_login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationship to PortManager
     port_manager = relationship("PortManager", back_populates="user", uselist=False, cascade="all, delete-orphan")
     logistics_manager = relationship("LogisticsManager", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
 
 class PortManager(Base):
     __tablename__ = "port_managers"

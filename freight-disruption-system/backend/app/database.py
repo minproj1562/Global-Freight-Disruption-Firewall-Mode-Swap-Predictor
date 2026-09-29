@@ -32,6 +32,43 @@ def init_db():
     import app.models  # Ensure all models are registered with Base.metadata
     Base.metadata.create_all(bind=engine)
 
+    # 1. Spatial (PostGIS) extension & GiST spatial indexing
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+            # Ensure native geometry columns and GiST spatial indexes exist
+            conn.execute(text("ALTER TABLE vessels ADD COLUMN IF NOT EXISTS geom geometry(Point, 4326);"))
+            conn.execute(text("UPDATE vessels SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326) WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND geom IS NULL;"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_vessels_geom ON vessels USING GIST (geom);"))
+            
+            conn.execute(text("ALTER TABLE vessel_positions ADD COLUMN IF NOT EXISTS geom geometry(Point, 4326);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_vessel_positions_geom ON vessel_positions USING GIST (geom);"))
+        print("[DB] PostGIS extension & GiST spatial indexes verified/initialized")
+    except Exception as e:
+        print(f"[DB] PostGIS spatial initialization warning: {e}")
+
+    # 2. Cryptographic (pgcrypto) extension
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
+        print("[DB] pgcrypto extension verified/initialized")
+    except Exception as e:
+        print(f"[DB] pgcrypto extension not available: {e}")
+
+    # 3. TimescaleDB detection & honest status reporting
+    try:
+        with engine.connect() as conn:
+            timescale_avail = conn.execute(text("SELECT count(*) FROM pg_available_extensions WHERE name = 'timescaledb';")).scalar()
+            if timescale_avail and timescale_avail > 0:
+                with engine.begin() as wconn:
+                    wconn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
+                    wconn.execute(text("SELECT create_hypertable('vessel_positions', 'timestamp', if_not_exists => TRUE);"))
+                print("[DB] TimescaleDB extension verified and hypertable initialized")
+            else:
+                print("[DB] TimescaleDB extension not available for this PostgreSQL build (using optimized B-Tree time-series indexing on vessel_positions)")
+    except Exception as e:
+        print(f"[DB] TimescaleDB configuration note: {e}")
+
     # Safely ensure new columns exist in pre-existing PostgreSQL tables
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE ports ADD COLUMN IF NOT EXISTS congestion_updated_by VARCHAR;"))
@@ -51,6 +88,21 @@ def init_db():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_port VARCHAR DEFAULT 'Global Control HQ';"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login VARCHAR DEFAULT 'Just now';"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS status_label VARCHAR DEFAULT 'Active';"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP WITH TIME ZONE;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP WITH TIME ZONE;"))
+
+        # Migrations for reroute_decisions financial encryption columns (AES-256-GCM / pgcrypto)
+        conn.execute(text("ALTER TABLE reroute_decisions ADD COLUMN IF NOT EXISTS encrypted_cargo_value VARCHAR;"))
+        conn.execute(text("ALTER TABLE reroute_decisions ADD COLUMN IF NOT EXISTS encrypted_selected_cost VARCHAR;"))
+        conn.execute(text("ALTER TABLE reroute_decisions ADD COLUMN IF NOT EXISTS encrypted_cost_saved VARCHAR;"))
+
+
+
 
     # Seed Default Admin User if not present
     db = SessionLocal()

@@ -19,6 +19,7 @@ class RerouteDecision(Base):
     vessel_id = Column(String, ForeignKey("vessels.id", ondelete="SET NULL"))
     cargo_type = Column(String, nullable=False)
     cargo_value_usd = Column(Float, default=0.0)
+    encrypted_cargo_value = Column(String, nullable=True)  # AES-256-GCM encrypted cargo valuation at rest
     priority = Column(String, default="Balanced")  # Cost, Time, Balanced, Carbon
     disruption_avoided_id = Column(String, ForeignKey("global_disruptions.id", ondelete="SET NULL"))
     
@@ -33,6 +34,7 @@ class RerouteDecision(Base):
     selected_route_id = Column(String, nullable=False)  # opt-ocean-bypass, opt-sea-air-express, etc.
     selected_route_name = Column(String, nullable=False)
     selected_cost_usd = Column(Float, nullable=False)
+    encrypted_selected_cost = Column(String, nullable=True)  # AES-256-GCM encrypted selected cost
     selected_time_days = Column(Float, nullable=False)
     selected_co2_tons = Column(Float, nullable=False)
     selected_risk_level = Column(String, default="low")
@@ -51,6 +53,7 @@ class RerouteDecision(Base):
     
     # Savings Calculation
     cost_saved_usd = Column(Float, default=0.0)
+    encrypted_cost_saved = Column(String, nullable=True)  # AES-256-GCM encrypted cost savings
     time_saved_days = Column(Float, default=0.0)
     carbon_reduced_tons = Column(Float, default=0.0)
     

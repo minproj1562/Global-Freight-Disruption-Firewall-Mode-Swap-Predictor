@@ -10,6 +10,9 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import random
 import json
+import os
+from app.core.config import settings
+
 from app.database import get_db
 from app.models.reroute import RerouteDecision
 from app.models.disruptions import GlobalDisruption
@@ -520,9 +523,12 @@ def get_roi_dashboard(
     
     system_effectiveness = round((mitigated_disruptions / total_disruptions) * 100, 1)
     
-    # Convert to crores (1 crore = 10 million)
-    month_crores = round(month_cost_saved / 10000000, 2)
-    ytd_crores = round(ytd_cost_saved / 10000000, 2)
+    # Convert USD savings to INR Crores (1 crore INR = 10,000,000 INR)
+    usd_to_inr = getattr(settings, 'FALLBACK_USD_INR_RATE', 83.25) or 83.25
+    month_inr = month_cost_saved * usd_to_inr
+    ytd_inr = ytd_cost_saved * usd_to_inr
+    month_crores = round(month_inr / 10000000, 2)
+    ytd_crores = round(ytd_inr / 10000000, 2)
     
     return ROIDashboardSchema(
         month_cost_saved_usd=round(month_cost_saved, 2),
@@ -536,6 +542,7 @@ def get_roi_dashboard(
         system_effectiveness_percent=system_effectiveness,
         summary_message=f"This month, rerouting saved ₹{month_crores} crore and {round(month_time_saved, 1)} days"
     )
+
 
 
 @router.post("/export")

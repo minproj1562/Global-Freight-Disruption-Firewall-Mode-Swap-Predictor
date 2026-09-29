@@ -35,6 +35,7 @@ from app.services.cost_calculator import CostCalculator
 from app.services.nsga2 import NSGA2Optimizer, Solution, identify_pareto_frontier
 from app.services.pdf_generator import ReroutePDFGenerator
 from app.core.security import get_current_user
+from app.core.encryption import financial_encryption
 
 router = APIRouter(prefix="/api/reroute", tags=["Reroute Recommendation Engine"])
 
@@ -710,6 +711,7 @@ async def confirm_reroute(
             vessel_id=request.simulation_request.vessel_id,
             cargo_type=request.simulation_request.cargo_type,
             cargo_value_usd=request.simulation_request.cargo_value_usd,
+            encrypted_cargo_value=financial_encryption.encrypt_amount(request.simulation_request.cargo_value_usd),
             priority=request.simulation_request.priority,
             disruption_avoided_id=request.simulation_request.disruption_to_avoid,
             original_route_name=request.dijkstra_comparison.route_name,
@@ -720,6 +722,7 @@ async def confirm_reroute(
             selected_route_id=request.selected_route.id,
             selected_route_name=request.selected_route.title,
             selected_cost_usd=request.selected_route.total_cost_usd,
+            encrypted_selected_cost=financial_encryption.encrypt_amount(request.selected_route.total_cost_usd),
             selected_time_days=request.selected_route.total_time_days,
             selected_co2_tons=request.selected_route.co2_carbon_footprint_tons,
             selected_risk_level=request.selected_route.risk_level,
@@ -732,6 +735,7 @@ async def confirm_reroute(
             transit_summary=request.selected_route.transit_summary,
             corridor_name=request.selected_route.corridor_name,
             cost_saved_usd=request.selected_route.savings_vs_original.cost_usd,
+            encrypted_cost_saved=financial_encryption.encrypt_amount(request.selected_route.savings_vs_original.cost_usd),
             time_saved_days=request.selected_route.savings_vs_original.time_days,
             carbon_reduced_tons=request.dijkstra_comparison.co2_tons - request.selected_route.co2_carbon_footprint_tons,
             alternatives_considered=[alt.dict() for alt in request.alternatives_considered],

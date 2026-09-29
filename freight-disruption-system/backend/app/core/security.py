@@ -1,6 +1,7 @@
 # backend/app/core/security.py
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -10,20 +11,32 @@ from app.core.config import settings
 from app.database import get_db
 from app.models.users import User
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
-# OAuth2 / HTTP Bearer scheme for token extraction (auto_error=False for graceful fallback)
+# Password hashing implementation using direct bcrypt to avoid passlib 4.1+ wrap bug
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against a bcrypt hashed password"""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        pw_bytes = plain_password.encode("utf-8")[:72]
+        return bcrypt.checkpw(pw_bytes, hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
+def get_password_hash(password: str) -> str:
+    """Hash a password using bcrypt (safely truncated to 72 bytes)"""
+    pw_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
+
+# OAuth2 / HTTP Bearer scheme for token extraction (auto_error=False for graceful token reading)
 security_bearer = HTTPBearer(auto_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
+# ENABLE_DEMO_AUTH: when "true", allows unauthenticated access via demo_user fallback.
+# MUST be "false" (default) in production. Set to "true" ONLY for local development.
+_ENABLE_DEMO_AUTH = os.getenv("ENABLE_DEMO_AUTH", "false").strip().lower() == "true"
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token"""
@@ -56,11 +69,18 @@ def get_current_user(
 ) -> User:
     """
     Get the current authenticated user from JWT token.
-    Supports real JWT tokens as well as demo-token fallback so actions never fail with 401.
+
+    - Valid JWT token → authenticates and returns real User from DB.
+    - Missing or invalid token → raises HTTP 401 Unauthorized (production default).
+    - ENABLE_DEMO_AUTH=true → allows unauthenticated fallback to demo_user for
+      local development ONLY. This must NEVER be enabled in production.
     """
+    import logging
+    _log = logging.getLogger(__name__)
+
     token = auth.credentials if auth else None
 
-    # Handle valid real JWT token
+    # --- Attempt real JWT authentication ---
     if token and token != "demo-token":
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -69,32 +89,46 @@ def get_current_user(
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     return user
+        except JWTError:
+            pass
         except Exception:
             pass
 
-    # Fallback for demo-token or missing token: get or create default Port Manager user
-    demo_user = db.query(User).filter(User.role == "port").first()
-    if not demo_user:
-        demo_user = User(
-            username="demo_port_manager",
-            email="demo@portops.gov",
-            hashed_password=get_password_hash("demopassword123"),
-            full_name="Port Operations Officer",
-            role="port",
-            is_active=True
+    # --- Demo auth gate (strictly controlled by ENABLE_DEMO_AUTH env var) ---
+    if _ENABLE_DEMO_AUTH:
+        _log.warning(
+            "SECURITY WARNING: ENABLE_DEMO_AUTH=true — unauthenticated request allowed via "
+            "demo_user fallback. This must NOT be enabled in production."
         )
-        db.add(demo_user)
-        db.commit()
-        db.refresh(demo_user)
+        demo_user = db.query(User).filter(User.role == "port").first()
+        if not demo_user:
+            demo_user = User(
+                username="demo_port_manager",
+                email="demo@portops.gov",
+                hashed_password=get_password_hash("demopassword123"),
+                full_name="Port Operations Officer",
+                role="port",
+                is_active=True
+            )
+            db.add(demo_user)
+            db.commit()
+            db.refresh(demo_user)
+        return demo_user
 
-    return demo_user
+    # --- Production: no valid token → 401 Unauthorized ---
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated. Provide a valid Bearer token.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 def get_current_port_manager(current_user: User = Depends(get_current_user)) -> User:
-    """Ensure the current user is a port manager (or admin)"""
-    if current_user.role not in ["port", "admin"]:
+    """Ensure the current user is a port manager or admin"""
+    normalized_role = current_user.role.lower().replace(" ", "_")
+    if normalized_role not in ["port", "admin", "port_manager"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to Port Managers only"
+            detail="Access restricted to Port Managers and Administrators"
         )
     return current_user
 
@@ -103,13 +137,16 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            detail="Inactive or suspended user account"
         )
     return current_user
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    """Ensure the current user is an admin"""
-    if current_user.role != "admin":
-        # Fallback: allow any authenticated user in dev/demo mode
-        pass
+    """Strictly enforce that the current user has Administrator role"""
+    normalized_role = current_user.role.lower().replace(" ", "_")
+    if normalized_role not in ["admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges required"
+        )
     return current_user
