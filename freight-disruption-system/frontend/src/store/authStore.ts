@@ -4,7 +4,11 @@ import { persist } from 'zustand/middleware';
 import { 
   registerPortManager, 
   loginPortManager, 
+  registerLogisticsManager,
+  loginLogisticsManager,
+  loginAdmin,
   type PortManagerRegisterData as APIPortManagerData,
+  type LogisticsManagerRegisterData,
   type LoginCredentials 
 } from '@/services/api';
 
@@ -43,6 +47,7 @@ interface AuthState {
     password: string;
     name: string;
     role: UserRole;
+    organization?: string;
     employeeId?: string;
     mobileNumber?: string;
     portName?: string;
@@ -70,21 +75,29 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (emailOrUser, password, role, assignedPort) => {
         try {
-          // Call real backend API
+          // Call real backend API based on role
           const credentials: LoginCredentials = {
             username_or_email: emailOrUser,
             password,
             role: role || undefined,
           };
 
-          const response = await loginPortManager(credentials);
+          let response;
+          if (role === 'operations') {
+            response = await loginLogisticsManager(credentials);
+          } else if (role === 'admin') {
+            response = await loginAdmin(credentials);
+          } else {
+            response = await loginPortManager(credentials);
+          }
 
           // Store token in localStorage for axios interceptor
           localStorage.setItem('token', response.access_token);
+          localStorage.setItem('user', JSON.stringify(response.user));
 
           // Map backend response to frontend user structure
           set({
-            role: response.user.role as UserRole,
+            role: (response.user.role === 'operations' || response.user.role === 'Logistics Manager') ? 'operations' : (response.user.role as UserRole),
             isAuthenticated: true,
             token: response.access_token,
             user: {
@@ -100,7 +113,6 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error('Backend Login error:', error);
           
-          // Re-throw error so PortManagerAuthPage can display backend error message if backend is active
           if (error.message && !error.message.includes('Failed to fetch')) {
             throw error;
           }
@@ -115,15 +127,15 @@ export const useAuthStore = create<AuthState>()(
             localStorage.setItem('token', demoToken);
 
             set({
-              role: role || 'port',
+              role: role || 'operations',
               isAuthenticated: true,
               token: demoToken,
               user: {
                 name: userNameFormatted,
-                email: emailOrUser.includes('@') ? emailOrUser : `${emailOrUser}@portops.gov`,
+                email: emailOrUser.includes('@') ? emailOrUser : `${emailOrUser}@freightfirewall.com`,
                 username: emailOrUser,
                 portName: assignedPort || 'Port of Rotterdam',
-                employeeId: `PM-${Math.floor(10000 + Math.random() * 90000)}`,
+                employeeId: `LM-${Math.floor(10000 + Math.random() * 90000)}`,
               },
             });
             return true;
@@ -135,27 +147,41 @@ export const useAuthStore = create<AuthState>()(
 
       register: async (data) => {
         try {
-          // Map frontend data to backend API format
-          const apiData: APIPortManagerData = {
-            email: data.email,
-            password: data.password,
-            full_name: data.name,
-            username: data.username || data.email.split('@')[0],
-            employee_id: data.employeeId || `PM-${Math.floor(10000 + Math.random() * 90000)}`,
-            mobile_number: data.mobileNumber || undefined,
-            port_name: data.portName || 'Port of Rotterdam',
-            department: data.department || undefined,
-            security_pass_id: data.securityPassId || undefined,
-          };
+          let response;
+          if (data.role === 'operations') {
+            const logisticsData: LogisticsManagerRegisterData = {
+              email: data.email,
+              password: data.password,
+              full_name: data.name,
+              username: data.username || data.email.split('@')[0],
+              company_name: data.organization || 'Freight Firewall Global Logistics Ltd',
+              employee_id: data.employeeId || `LM-${Math.floor(10000 + Math.random() * 90000)}`,
+              department: data.department || 'Operations',
+              region: 'Global',
+            };
+            response = await registerLogisticsManager(logisticsData);
+          } else {
+            const apiData: APIPortManagerData = {
+              email: data.email,
+              password: data.password,
+              full_name: data.name,
+              username: data.username || data.email.split('@')[0],
+              employee_id: data.employeeId || `PM-${Math.floor(10000 + Math.random() * 90000)}`,
+              mobile_number: data.mobileNumber || undefined,
+              port_name: data.portName || 'Port of Rotterdam',
+              department: data.department || undefined,
+              security_pass_id: data.securityPassId || undefined,
+            };
+            response = await registerPortManager(apiData);
+          }
 
-          const response = await registerPortManager(apiData);
-
-          // Store token in localStorage for axios interceptor
+          // Store token in localStorage
           localStorage.setItem('token', response.access_token);
+          localStorage.setItem('user', JSON.stringify(response.user));
 
           // Set authenticated state
           set({
-            role: response.user.role as UserRole,
+            role: data.role,
             isAuthenticated: true,
             token: response.access_token,
             user: {
@@ -163,10 +189,10 @@ export const useAuthStore = create<AuthState>()(
               name: response.user.full_name,
               email: response.user.email,
               username: response.user.username,
-              employeeId: apiData.employee_id,
+              employeeId: data.employeeId,
               mobileNumber: data.mobileNumber || '+1 (555) 019-2834',
               portName: data.portName || 'Port of Rotterdam',
-              department: data.department || 'Terminal Operations Command',
+              department: data.department || 'Operations Command',
             },
           });
 
@@ -174,7 +200,6 @@ export const useAuthStore = create<AuthState>()(
         } catch (error: any) {
           console.error('Backend Registration error:', error);
           
-          // Re-throw error so PortManagerAuthPage can display backend error message if backend is active
           if (error.message && !error.message.includes('Failed to fetch')) {
             throw error;
           }

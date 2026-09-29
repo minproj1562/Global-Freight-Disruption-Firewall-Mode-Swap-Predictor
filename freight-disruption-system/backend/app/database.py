@@ -70,6 +70,35 @@ def init_db():
             db.add(default_admin)
             db.commit()
             print("[DB] Default Admin user created: admin / adminpassword123")
+
+        # Seed Default Logistics Manager User if not present
+        from app.models.users import LogisticsManager
+        logistics_user = db.query(User).filter(
+            (User.email == "logistics@freightfirewall.com") | (User.username == "logistics_demo")
+        ).first()
+        if not logistics_user:
+            from app.core.security import get_password_hash
+            logistics_user = User(
+                username="logistics_demo",
+                email="logistics@freightfirewall.com",
+                hashed_password=get_password_hash("Demo@1234"),
+                full_name="Demo Logistics Manager",
+                role="operations",
+                is_active=True
+            )
+            db.add(logistics_user)
+            db.flush()
+            
+            demo_lm = LogisticsManager(
+                user_id=logistics_user.id,
+                company_name="Freight Firewall Operations Corp",
+                employee_id="LM-00001",
+                department="Global Fleet Operations",
+                region="Asia–Europe, Trans-Pacific, Middle East"
+            )
+            db.add(demo_lm)
+            db.commit()
+            print("[DB] Default Logistics Manager created: logistics@freightfirewall.com / Demo@1234")
             
         # Seed Admin Datasets (Vessels, Logs, Disruptions, System Cards, Error Logs)
         from app.services.admin_seeding import seed_admin_datasets

@@ -33,7 +33,7 @@ class UserBase(BaseModel):
     email: EmailStr
     username: str
     full_name: str
-    role: str = Field(..., pattern="^(port|fleet_operator|admin)$")
+    role: str = Field(..., pattern="^(port|operations|fleet_operator|admin|Logistics Manager|Port Manager|Admin)$")
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
@@ -90,6 +90,41 @@ class PortManagerResponse(BaseModel):
     port_id: Optional[str]
     department: Optional[str]
     security_pass_id: Optional[str]
+    created_at: datetime
+    
+    # Nested user data
+    user: UserResponse
+    
+    class Config:
+        from_attributes = True
+
+# ============= LOGISTICS MANAGER SCHEMAS =============
+
+class LogisticsManagerCreate(BaseModel):
+    # User fields
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: str
+    username: str
+    
+    # Logistics Manager specific fields
+    company_name: str
+    employee_id: str
+    department: Optional[str] = None
+    region: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_strong_password(v)
+
+class LogisticsManagerResponse(BaseModel):
+    id: str
+    user_id: str
+    company_name: str
+    employee_id: str
+    department: Optional[str]
+    region: Optional[str]
     created_at: datetime
     
     # Nested user data

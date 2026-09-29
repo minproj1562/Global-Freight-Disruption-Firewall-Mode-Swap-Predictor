@@ -3,8 +3,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.database import get_db
-from app.schemas.user import UserCreate, UserLogin, Token, PortManagerCreate, PortManagerResponse, UserResponse
-from app.models.users import User, PortManager
+from app.schemas.user import (
+    UserCreate,
+    UserLogin,
+    Token,
+    PortManagerCreate,
+    PortManagerResponse,
+    UserResponse,
+    LogisticsManagerCreate,
+    LogisticsManagerResponse,
+)
+from app.models.users import User, PortManager, LogisticsManager
 from app.models.ports import Port
 from app.core.security import (
     get_password_hash,
@@ -223,3 +232,160 @@ async def login_admin(
         token_type="bearer",
         user=UserResponse.from_orm(user)
     )
+
+# ============= LOGISTICS MANAGER REGISTRATION =============
+
+@router.post("/logistics/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post("/logistics-manager/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def register_logistics_manager(
+    user_data: LogisticsManagerCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Register a new Logistics Manager account.
+    Creates both User and LogisticsManager records.
+    """
+    # Check if username or email already exists
+    existing_user = db.query(User).filter(
+        (User.username == user_data.username) | (User.email == user_data.email)
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered"
+        )
+    
+    # Check if employee_id already exists
+    existing_lm = db.query(LogisticsManager).filter(
+        LogisticsManager.employee_id == user_data.employee_id
+    ).first()
+    
+    if existing_lm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Employee ID already exists"
+        )
+    
+    # Create User
+    new_user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=user_data.full_name,
+        role="operations",
+        is_active=True
+    )
+    
+    db.add(new_user)
+    db.flush()
+    
+    # Create LogisticsManager
+    new_lm = LogisticsManager(
+        user_id=new_user.id,
+        company_name=user_data.company_name,
+        employee_id=user_data.employee_id,
+        department=user_data.department,
+        region=user_data.region
+    )
+    
+    db.add(new_lm)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": new_user.id, "role": new_user.role},
+        expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.from_orm(new_user)
+    )
+
+# ============= LOGISTICS MANAGER LOGIN =============
+
+@router.post("/logistics/login", response_model=Token)
+@router.post("/logistics-manager/login", response_model=Token)
+async def login_logistics_manager(
+    credentials: UserLogin,
+    db: Session = Depends(get_db)
+):
+    """
+    Authenticate Logistics Manager using username/email/employee_id and password.
+    """
+    user = db.query(User).filter(
+        (User.username == credentials.username_or_email) |
+        (User.email == credentials.username_or_email)
+    ).first()
+    
+    # If not found by username/email, try employee_id
+    if not user:
+        lm = db.query(LogisticsManager).filter(
+            LogisticsManager.employee_id == credentials.username_or_email
+        ).first()
+        if lm:
+            user = lm.user
+    
+    if not user or not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if user.role not in ("operations", "Logistics Manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to Logistics Managers"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Contact administrator."
+        )
+    
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.id, "role": user.role},
+        expires_delta=access_token_expires
+    )
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserResponse.from_orm(user)
+    )
+
+# ============= LOGISTICS MANAGER PROFILE =============
+
+@router.get("/logistics/me", response_model=LogisticsManagerResponse)
+@router.get("/logistics-manager/me", response_model=LogisticsManagerResponse)
+async def get_current_logistics_manager_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current authenticated Logistics Manager's full profile.
+    """
+    if current_user.role not in ("operations", "Logistics Manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to Logistics Managers"
+        )
+    
+    logistics_manager = db.query(LogisticsManager).filter(
+        LogisticsManager.user_id == current_user.id
+    ).first()
+    
+    if not logistics_manager:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Logistics Manager profile not found"
+        )
+    
+    return LogisticsManagerResponse.from_orm(logistics_manager)
