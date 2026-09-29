@@ -26,6 +26,7 @@ import {
   BadgeCheck,
   Ship,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -342,6 +343,74 @@ export const LogisticsManagerAuthPage: React.FC = () => {
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  // ── Demo credentials handlers ──
+  const handleDemoFill = () => {
+    setLoginEmail('logistics@freightfirewall.com');
+    setLoginPw('Demo@1234');
+    toast({
+      title: '✨ Demo Credentials Loaded',
+      description: 'Pre-filled demo account: logistics@freightfirewall.com',
+    });
+  };
+
+  const handleQuickDemoLogin = async () => {
+    setLoginEmail('logistics@freightfirewall.com');
+    setLoginPw('Demo@1234');
+    setLoginLoading(true);
+    try {
+      const response = await loginLogisticsManager({
+        username_or_email: 'logistics@freightfirewall.com',
+        password: 'Demo@1234',
+      });
+      if (response.access_token) {
+        localStorage.setItem('token', response.access_token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+      toast({
+        title: '✅ Demo Login Successful!',
+        description: 'Welcome back! Redirecting to Operations Dashboard…',
+      });
+      setTimeout(() => navigate('/dashboard/operations'), 800);
+    } catch (err: any) {
+      toast({
+        title: 'Demo Login Failed',
+        description: err?.message || 'Invalid credentials or backend unavailable.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleAutofillRegister = () => {
+    setForm({
+      fullName: 'Asmita Sharma',
+      email: `logistics_${Math.floor(1000 + Math.random() * 9000)}@freightfirewall.com`,
+      password: 'Password@1234',
+      confirmPassword: 'Password@1234',
+      phone: '+91 98765 43210',
+      companyName: 'Freight Firewall Operations Global Ltd',
+      gstin: '27AAAAA0000A1Z5',
+      orgType: 'Freight Forwarder',
+      tradeLanes: ['Asia–Europe', 'Middle East', 'Trans-Pacific'],
+      roleInOrg: 'Manager',
+      netWorth: '500000000',
+      monthlyBudget: '15000000',
+      budgetCeiling: '1000000',
+      preferredCurrency: 'USD',
+      kycFile: null,
+      incoterms: ['FOB', 'CIF', 'DDP'],
+      auditConsent: true,
+      securityQuestion: 'What is the name of your first port or vessel?',
+      securityAnswer: 'Rotterdam Port',
+      enable2FA: false,
+    });
+    toast({
+      title: '✨ Demo Form Auto-filled',
+      description: 'Registration form populated with sample logistics manager data.',
+    });
   };
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -848,6 +917,18 @@ export const LogisticsManagerAuthPage: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Demo Quick Autofill Pill */}
+                <div className="px-6 pt-4 flex items-center justify-between border-b border-slate-800/60 pb-3">
+                  <span className="text-[11px] font-mono text-slate-400">Testing registration?</span>
+                  <button
+                    type="button"
+                    onClick={handleAutofillRegister}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 transition-all shadow-sm active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Auto-fill Demo Form
+                  </button>
+                </div>
+
                 {/* Form body */}
                 <div className="px-6 py-5">
                   <AnimatePresence mode="wait">
@@ -935,6 +1016,50 @@ export const LogisticsManagerAuthPage: React.FC = () => {
                     <p className="text-sm text-slate-500 mt-1">Sign in to Operations Command Center</p>
                   </div>
 
+                  {/* Demo credentials banner with interactive Auto-fill */}
+                  <div className="p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs shadow-inner space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-mono text-[11px] text-cyan-300 font-bold flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-cyan-400" /> Demo Manager Account
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                        OFFICIAL DEMO
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-300 font-mono bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                      <div>
+                        <span className="text-slate-500">Email:</span>{' '}
+                        <span className="text-cyan-300 font-bold">logistics@freightfirewall.com</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Pass:</span>{' '}
+                        <span className="text-cyan-300 font-bold">Demo@1234</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={handleDemoFill}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-all active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        Auto-fill Fields
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleQuickDemoLogin}
+                        disabled={loginLoading}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 text-xs font-mono font-bold transition-all shadow-md shadow-cyan-500/20 active:scale-95 disabled:opacity-50"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-slate-950 fill-current" />
+                        1-Click Demo Login
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className={labelCls}>Email or Username</label>
                     <div className="relative">
@@ -970,15 +1095,6 @@ export const LogisticsManagerAuthPage: React.FC = () => {
                         {showLoginPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                  </div>
-
-                  {/* Demo credentials hint */}
-                  <div className="flex items-start gap-2 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 text-xs text-slate-400">
-                    <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
-                    <span>
-                      Demo account: <code className="text-cyan-400">logistics@freightfirewall.com</code> /{' '}
-                      <code className="text-cyan-400">Demo@1234</code>
-                    </span>
                   </div>
 
                   <button
