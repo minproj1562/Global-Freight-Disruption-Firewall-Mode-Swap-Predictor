@@ -1,3 +1,4 @@
+// frontend/src/pages/LoginPage.tsx
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
