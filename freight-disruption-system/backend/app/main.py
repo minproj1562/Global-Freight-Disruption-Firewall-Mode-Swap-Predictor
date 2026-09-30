@@ -31,6 +31,14 @@ from app.routers import (
 )
 from app.routers import currency
 from app.database import SessionLocal
+from app.routers import websocket
+from app.routers import weather
+from app.routers import ml_analytics
+from app.routers import optimization
+from app.services.fleet_update_manager import fleet_update_manager
+
+
+
 
 load_dotenv()
 
@@ -63,12 +71,18 @@ async def lifespan(app: FastAPI):
     print("Starting AIS stream (background)...")
     client._running = True
     asyncio.create_task(client.run_forever(handle_vessel_update))
+    
+    # Start Fleet Update Manager
+    print("Starting Fleet Update Manager (Redis subscriber)...")
+    await fleet_update_manager.start()
+    
     print("API is ready!")
 
     yield  # Server is running
 
     # ========== SHUTDOWN ==========
     print("Shutting down API...")
+    await fleet_update_manager.stop()
     await client.close()
     print("Shutdown complete")
 
@@ -107,6 +121,13 @@ app.include_router(risk_register.router)
 app.include_router(currency.router)
 app.include_router(port_forecast.router)
 app.include_router(historical_validator.router)
+app.include_router(websocket.router)
+app.include_router(weather.router)
+app.include_router(ml_analytics.router)
+app.include_router(optimization.router)
+
+
+
 # ============= ROOT ENDPOINTS =============
 
 @app.get("/")

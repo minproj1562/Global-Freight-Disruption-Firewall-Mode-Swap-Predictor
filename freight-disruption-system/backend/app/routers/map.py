@@ -21,35 +21,21 @@ from app.schemas.map import (
     ModeSwapOptionResponse,
 )
 
+from app.services.spatial_service import spatial_service
+
 router = APIRouter(prefix="/api/map", tags=["Live Global Map"])
 
 def _generate_polygon_from_center(lat: float, lon: float, radius_nm: float, num_points: int = 32) -> list:
-    """Generate circular polygon coordinates."""
-    radius_deg = radius_nm / 60.0
-    points = []
-    for i in range(num_points):
-        angle = 2 * math.pi * i / num_points
-        dx = radius_deg * math.cos(angle) / max(math.cos(math.radians(lat)), 0.01)
-        dy = radius_deg * math.sin(angle)
-        points.append([round(lon + dx, 6), round(lat + dy, 6)])
-    if points:
-        points.append(points[0])
-    return points
+    """Generate circular polygon coordinates using geodesic calculations."""
+    return spatial_service.generate_circle_polygon(lat, lon, radius_nm, num_points)
 
 def _assess_vessel_risk(vessel: Vessel, disruptions: list) -> tuple:
-    """Assess vessel proximity risk."""
-    if not vessel.latitude or not vessel.longitude:
-        return "normal", None
-    for d in disruptions:
-        if d.resolved:
-            continue
-        dist = math.sqrt((vessel.latitude - d.latitude)**2 + (vessel.longitude - d.longitude)**2)
-        radius_deg = (d.radius_nm or 100) / 60.0
-        if dist < radius_deg:
-            return "disrupted", f"{d.disruption_type}: {d.location_name}"
-        elif dist < radius_deg * 2:
-            return "at-risk", f"Near {d.disruption_type}: {d.location_name}"
-    return "normal", None
+    """Assess vessel proximity risk using geodesic great-circle spatial service."""
+    status_str, reason_str, _ = spatial_service.assess_vessel_disruption_proximity(
+        vessel.latitude, vessel.longitude, disruptions
+    )
+    return status_str, reason_str
+
 
 @router.get("/vessels", response_model=List[MapVesselResponse])
 def get_map_vessels(

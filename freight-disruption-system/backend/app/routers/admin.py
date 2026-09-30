@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+﻿from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/admin", tags=["Admin Services"])
 @router.get("/health-cards", response_model=List[SystemHealthCardResponse])
 def get_system_health_cards(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch health card status for DB, AIS, Weather, and Congestion pollers"""
     cards = db.query(SystemHealthCard).all()
@@ -60,7 +60,7 @@ def get_system_health_cards(
 def sync_system_poller_card(
     card_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Trigger manual resync of a specific poller card"""
     card = db.query(SystemHealthCard).filter(SystemHealthCard.id == card_id).first()
@@ -86,7 +86,7 @@ def sync_system_poller_card(
 
 @router.get("/api-usage", response_model=List[ApiUsageDataPointResponse])
 def get_api_usage_history(
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Get time-series API usage analytics data for chart rendering"""
     return [
@@ -103,7 +103,7 @@ def get_api_usage_history(
 @router.get("/error-logs", response_model=List[SystemErrorLogResponse])
 def get_system_error_logs(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch system error logs for health dashboard table"""
     logs = db.query(SystemErrorLog).order_by(SystemErrorLog.created_at.desc()).all()
@@ -125,7 +125,7 @@ def get_system_error_logs(
 def toggle_error_log_resolve(
     log_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Toggle resolve status on a system error log entry"""
     log = db.query(SystemErrorLog).filter(SystemErrorLog.id == log_id).first()
@@ -157,7 +157,7 @@ def get_global_disruptions(
     search: Optional[str] = None,
     severity: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch all global disruptions for Admin Disruption Management"""
     query = db.query(GlobalDisruption)
@@ -197,7 +197,7 @@ def get_global_disruptions(
 def create_global_disruption(
     disruption_in: GlobalDisruptionCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Add a new global disruption event"""
     new_disruption = GlobalDisruption(
@@ -237,7 +237,7 @@ def update_global_disruption(
     disruption_id: str,
     disruption_in: GlobalDisruptionUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Update details of a global disruption event"""
     d = db.query(GlobalDisruption).filter(GlobalDisruption.id == disruption_id).first()
@@ -287,7 +287,7 @@ def update_global_disruption(
 def delete_global_disruption(
     disruption_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Delete a global disruption event"""
     d = db.query(GlobalDisruption).filter(GlobalDisruption.id == disruption_id).first()
@@ -302,7 +302,7 @@ def delete_global_disruption(
 def toggle_disruption_resolve(
     disruption_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Toggle resolve status on a global disruption event"""
     d = db.query(GlobalDisruption).filter(GlobalDisruption.id == disruption_id).first()
@@ -338,7 +338,7 @@ def get_admin_users(
     status: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch registered users with optional role, status, or search filters"""
     query = db.query(User)
@@ -379,7 +379,7 @@ def get_admin_users(
 def create_admin_user(
     user_in: AdminUserCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Register a new system user with RBAC role assignment"""
     existing = db.query(User).filter(User.email == user_in.email).first()
@@ -424,7 +424,7 @@ def update_admin_user(
     user_id: str,
     user_in: AdminUserUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Update system user profile details and role assignment"""
     u = db.query(User).filter(User.id == user_id).first()
@@ -467,7 +467,7 @@ def update_admin_user(
 def toggle_user_status_endpoint(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Toggle status between Active and Inactive for a user"""
     u = db.query(User).filter(User.id == user_id).first()
@@ -490,7 +490,7 @@ def toggle_user_status_endpoint(
 def delete_admin_user_endpoint(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Delete a user from the system directory"""
     u = db.query(User).filter(User.id == user_id).first()
@@ -508,7 +508,7 @@ def delete_admin_user_endpoint(
 @router.get("/data/stats", response_model=DatabaseStatsResponse)
 def get_database_stats_endpoint(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch database health, table record counts, storage size, and engine telemetry"""
     vessels_count = db.query(Vessel).count()
@@ -595,7 +595,7 @@ def get_database_stats_endpoint(
 @router.get("/data/uploads", response_model=List[UploadHistoryResponse])
 def get_upload_history_endpoint(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch manual dataset file ingestion audit trail"""
     logs = db.query(DataUploadLog).order_by(DataUploadLog.created_at.desc()).all()
@@ -619,7 +619,7 @@ async def upload_dataset_endpoint(
     datasetType: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Ingest a manual dataset file (.csv or .json) into database tables"""
     content = await file.read()
@@ -658,7 +658,7 @@ async def upload_dataset_endpoint(
 @router.get("/data/cleanups", response_model=List[CleanupLogResponse])
 def get_cleanup_logs_endpoint(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Fetch database maintenance cleanup audit log"""
     logs = db.query(DataCleanupLog).order_by(DataCleanupLog.created_at.desc()).all()
@@ -679,7 +679,7 @@ def get_cleanup_logs_endpoint(
 def execute_data_cleanup_endpoint(
     req: CleanupRequest,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    current_user = Depends(get_current_admin_user)
 ):
     """Execute a data maintenance operation (Delete Old AIS, Delete Old Simulations, Reset Disruptions)"""
     op = req.operationType

@@ -1,6 +1,7 @@
 # backend/app/models/vessel.py
 from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Boolean
 from sqlalchemy.sql import func
+from geoalchemy2 import Geometry
 from app.database import Base
 import uuid
 
@@ -18,9 +19,10 @@ class Vessel(Base):
     dwt = Column(Float, default=0.0)  # Deadweight Tonnage
     current_port = Column(String)
     
-    # Current Position
+    # Current Position & Native PostGIS Spatial Geometry
     latitude = Column(Float)
     longitude = Column(Float)
+    geom = Column(Geometry(geometry_type='POINT', srid=4326), nullable=True)
     speed = Column(Float)  # knots
     heading = Column(Float)  # degrees
     course = Column(Float)  # degrees

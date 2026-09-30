@@ -51,20 +51,26 @@ async def handle_vessel_update(vessel_data: Dict):
         # Find existing vessel by MMSI
         vessel = db.query(Vessel).filter(Vessel.mmsi == vessel_data["mmsi"]).first()
         
+        lat = vessel_data.get("latitude")
+        lon = vessel_data.get("longitude")
+        geom_wkt = f"SRID=4326;POINT({lon} {lat})" if lat is not None and lon is not None else None
+
         if vessel:
             # Update existing vessel
-            vessel.latitude = vessel_data["latitude"]
-            vessel.longitude = vessel_data["longitude"]
-            vessel.speed = vessel_data["speed"]
-            vessel.heading = vessel_data["heading"]
-            vessel.course = vessel_data["course"]
+            vessel.latitude = lat
+            vessel.longitude = lon
+            if geom_wkt:
+                vessel.geom = geom_wkt
+            vessel.speed = vessel_data.get("speed", 0.0)
+            vessel.heading = vessel_data.get("heading", 0.0)
+            vessel.course = vessel_data.get("course", 0.0)
             vessel.last_updated = datetime.utcnow()
             
             # Update speed history (keep last 20 entries)
             if vessel.speed_history is None:
                 vessel.speed_history = []
             
-            vessel.speed_history.append(vessel_data["speed"])
+            vessel.speed_history.append(vessel_data.get("speed", 0.0))
             if len(vessel.speed_history) > 20:
                 vessel.speed_history = vessel.speed_history[-20:]
             
@@ -92,19 +98,63 @@ async def handle_vessel_update(vessel_data: Dict):
                 callsign=callsign_val,
                 vessel_type=vessel_type_name,
                 ship_type_code=vessel_data.get("ship_type", 0),
-                latitude=vessel_data["latitude"],
-                longitude=vessel_data["longitude"],
-                speed=vessel_data["speed"],
-                heading=vessel_data["heading"],
-                course=vessel_data["course"],
-                speed_history=[vessel_data["speed"]],
+                latitude=lat,
+                longitude=lon,
+                geom=geom_wkt,
+                speed=vessel_data.get("speed", 0.0),
+                heading=vessel_data.get("heading", 0.0),
+                course=vessel_data.get("course", 0.0),
+                speed_history=[vessel_data.get("speed", 0.0)],
                 status="normal"
             )
             
             db.add(new_vessel)
             print(f"[AIS] New vessel tracked: {new_vessel.name} ({new_vessel.mmsi})")
         
+        # Persist time-series position update to vessel_positions table
+        try:
+            from app.models.vessel_positions import VesselPosition
+            pos_record = VesselPosition(
+                mmsi=vessel_data["mmsi"],
+                vessel_name=vessel_data.get("vessel_name", "").strip() or "Unknown Vessel",
+                latitude=lat if lat is not None else 0.0,
+                longitude=lon if lon is not None else 0.0,
+                geom=geom_wkt,
+                speed=vessel_data.get("speed", 0.0),
+                heading=vessel_data.get("heading", 0.0),
+                course=vessel_data.get("course", 0.0),
+                vessel_type=get_vessel_type_name(vessel_data.get("ship_type", 0)),
+                status="Underway" if (vessel_data.get("speed") or 0.0) > 0.5 else "Moored"
+            )
+            db.add(pos_record)
+        except Exception as pos_err:
+            print(f"[AIS] Error recording vessel_position history: {pos_err}")
+
         db.commit()
+
+        
+        # Publish to Redis for real-time fleet updates
+        try:
+            from app.services.redis_client import publish_fleet_update
+            # Assuming vessel_data is updated correctly, we'll construct the msg
+            msg = {
+                "mmsi": vessel_data["mmsi"],
+                "vessel_name": vessel_data.get("vessel_name", "").strip() or "Unknown Vessel",
+                "latitude": vessel_data["latitude"],
+                "longitude": vessel_data["longitude"],
+                "speed": vessel_data["speed"],
+                "heading": vessel_data["heading"],
+                "course": vessel_data["course"],
+                "vessel_type": get_vessel_type_name(vessel_data.get("ship_type", 0)),
+                "status": "normal",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "update_type": "position_update"
+            }
+            # We import asyncio here to run the async publish function since handle_vessel_update is async
+            import asyncio
+            asyncio.create_task(publish_fleet_update(msg))
+        except Exception as redis_e:
+            print(f"[AIS] Error publishing to Redis: {redis_e}")
         
     except Exception as e:
         print(f"[AIS] Error processing vessel {vessel_data.get('mmsi')}: {e}")

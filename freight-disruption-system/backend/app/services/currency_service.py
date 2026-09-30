@@ -73,10 +73,10 @@ class CurrencyService:
             )
             # Test connection
             self.redis_client.ping()
-            print(f"[Currency Service] ✓ Redis connected at {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+            print(f"[Currency Service] [OK] Redis connected at {settings.REDIS_HOST}:{settings.REDIS_PORT}")
         except Exception as e:
-            print(f"[Currency Service] ✗ Redis connection failed: {e}")
-            print(f"[Currency Service] → Using in-memory cache only")
+            print(f"[Currency Service] [WARN] Redis connection failed: {e}")
+            print(f"[Currency Service] -> Using in-memory cache only")
             self.redis_client = None
     
     def get_usd_to_inr_rate(self) -> float:
@@ -99,7 +99,7 @@ class CurrencyService:
                 cached_rate = self.redis_client.get("currency:usd_inr_rate")
                 if cached_rate:
                     rate = float(cached_rate)
-                    print(f"[Currency Service] ✓ Using cached rate from Redis: 1 USD = {rate} INR")
+                    print(f"[Currency Service] [OK] Using cached rate from Redis: 1 USD = {rate} INR")
                     return rate
             except Exception as e:
                 print(f"[Currency Service] Redis read error: {e}")
@@ -109,7 +109,7 @@ class CurrencyService:
             cache_age = datetime.utcnow() - self._memory_cache["usd_inr_timestamp"]
             if cache_age < timedelta(hours=self.cache_duration_hours):
                 rate = self._memory_cache["usd_inr_rate"]
-                print(f"[Currency Service] ✓ Using in-memory cached rate: 1 USD = {rate} INR (age: {cache_age})")
+                print(f"[Currency Service] [OK] Using in-memory cached rate: 1 USD = {rate} INR (age: {cache_age})")
                 return rate
         
         # Fetch fresh rate from API
@@ -124,7 +124,7 @@ class CurrencyService:
                         self.cache_duration_hours * 3600,
                         str(rate)
                     )
-                    print(f"[Currency Service] ✓ Cached new rate in Redis (TTL: {self.cache_duration_hours}h)")
+                    print(f"[Currency Service] [OK] Cached new rate in Redis (TTL: {self.cache_duration_hours}h)")
                 except Exception as e:
                     print(f"[Currency Service] Redis write error: {e}")
             
@@ -132,12 +132,12 @@ class CurrencyService:
             self._memory_cache["usd_inr_rate"] = rate
             self._memory_cache["usd_inr_timestamp"] = datetime.utcnow()
             
-            print(f"[Currency Service] ✓ Fresh rate fetched from API: 1 USD = {rate} INR")
+            print(f"[Currency Service] [OK] Fresh rate fetched from API: 1 USD = {rate} INR")
             return rate
             
         except Exception as e:
-            print(f"[Currency Service] ✗ API fetch failed: {e}")
-            print(f"[Currency Service] → Using fallback rate: 1 USD = {self.fallback_rate} INR")
+            print(f"[Currency Service] [WARN] API fetch failed: {e}")
+            print(f"[Currency Service] -> Using fallback rate: 1 USD = {self.fallback_rate} INR")
             return self.fallback_rate
     
     def _fetch_usd_to_inr_from_api(self) -> float:
@@ -198,7 +198,7 @@ class CurrencyService:
                 cached_data = self.redis_client.get(cache_key)
                 if cached_data:
                     rates = json.loads(cached_data)
-                    print(f"[Currency Service] ✓ Using cached rates from Redis (base: {base})")
+                    print(f"[Currency Service] [OK] Using cached rates from Redis (base: {base})")
                     return rates
             except Exception as e:
                 print(f"[Currency Service] Redis read error: {e}")
@@ -210,7 +210,7 @@ class CurrencyService:
                 cache_age = datetime.utcnow() - cache_timestamp
                 if cache_age < timedelta(hours=self.cache_duration_hours):
                     rates = self._memory_cache["all_rates"][base]
-                    print(f"[Currency Service] ✓ Using in-memory cached rates (base: {base})")
+                    print(f"[Currency Service] [OK] Using in-memory cached rates (base: {base})")
                     return rates
         
         # Fetch from API
@@ -232,11 +232,11 @@ class CurrencyService:
             self._memory_cache["all_rates"][base] = rates
             self._memory_cache["all_rates_timestamp"] = datetime.utcnow()
             
-            print(f"[Currency Service] ✓ Fresh rates fetched from API (base: {base}, {len(rates)} currencies)")
+            print(f"[Currency Service] [OK] Fresh rates fetched from API (base: {base}, {len(rates)} currencies)")
             return rates
             
         except Exception as e:
-            print(f"[Currency Service] ✗ Failed to fetch all rates: {e}")
+            print(f"[Currency Service] [WARN] Failed to fetch all rates: {e}")
             return {"INR": self.fallback_rate}  # Minimal fallback
     
     def _fetch_all_rates_from_api(self, base: str) -> Dict[str, float]:
@@ -292,7 +292,7 @@ class CurrencyService:
         rates = self.get_all_rates(base=from_currency)
         
         if to_currency not in rates:
-            print(f"[Currency Service] ✗ {to_currency} not found, using fallback conversion")
+            print(f"[Currency Service] [WARN] {to_currency} not found, using fallback conversion")
             # Fallback: convert via USD
             if from_currency == "USD":
                 return amount * self.fallback_rate

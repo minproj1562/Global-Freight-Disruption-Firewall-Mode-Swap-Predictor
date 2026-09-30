@@ -50,6 +50,7 @@ class EnhancedRFTrainer:
         self.feature_names = []
         self.feature_importances = None
         self.best_features = None
+        self.evaluation_metrics = {}
         
     def load_and_prepare_data(self, dataset_path: str) -> tuple:
         """Load and prepare dataset with advanced feature engineering"""
@@ -118,32 +119,7 @@ class EnhancedRFTrainer:
         X = df[all_features].copy()
         y = df[target_col]
         
-        # Handle missing values intelligently
-        for col in X.columns:
-            if X[col].isnull().sum() > 0:
-                if col in numerical_features:
-                    # Fill numerical with median
-                    median_val = X[col].median()
-                    X[col] = X[col].fillna(median_val)
-                    print(f"  Filled {X[col].isnull().sum()} NaN in {col} with median: {median_val:.2f}")
-                else:
-                    # Fill categorical with mode
-                    mode_val = X[col].mode()[0] if not X[col].mode().empty else 0
-                    X[col] = X[col].fillna(mode_val)
-                    print(f"  Filled NaN in {col} with mode: {mode_val}")
-        
-        self.feature_names = X.columns.tolist()
-        
-        # Remove highly correlated features
-        X = self._remove_correlated_features(X, threshold=0.95)
-        self.feature_names = X.columns.tolist()
-        
-        # Scale numerical features
-        numerical_cols_in_X = [col for col in numerical_features if col in X.columns]
-        if numerical_cols_in_X:
-            X[numerical_cols_in_X] = self.scaler.fit_transform(X[numerical_cols_in_X])
-        
-        # Split with stratification
+        # 1. Split with stratification BEFORE any preprocessing to prevent data leakage
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, 
             test_size=0.2, 
@@ -151,7 +127,32 @@ class EnhancedRFTrainer:
             stratify=y
         )
         
-        print(f"\n[Enhanced RF] Final feature count: {X.shape[1]}")
+        # 2. Handle missing values: fit statistics strictly on X_train
+        for col in X_train.columns:
+            if X_train[col].isnull().sum() > 0 or X_test[col].isnull().sum() > 0:
+                if col in numerical_features:
+                    median_val = X_train[col].median()
+                    X_train[col] = X_train[col].fillna(median_val)
+                    X_test[col] = X_test[col].fillna(median_val)
+                    print(f"  Imputed NaN in {col} with X_train median: {median_val:.2f}")
+                else:
+                    mode_val = X_train[col].mode()[0] if not X_train[col].mode().empty else 0
+                    X_train[col] = X_train[col].fillna(mode_val)
+                    X_test[col] = X_test[col].fillna(mode_val)
+                    print(f"  Imputed NaN in {col} with X_train mode: {mode_val}")
+
+        # 3. Remove highly correlated features based strictly on X_train correlation matrix
+        X_train = self._remove_correlated_features(X_train, threshold=0.95)
+        self.feature_names = X_train.columns.tolist()
+        X_test = X_test[self.feature_names]
+
+        # 4. Scale numerical features: fit strictly on X_train, transform X_test
+        numerical_cols_in_X = [col for col in numerical_features if col in self.feature_names]
+        if numerical_cols_in_X:
+            X_train[numerical_cols_in_X] = self.scaler.fit_transform(X_train[numerical_cols_in_X])
+            X_test[numerical_cols_in_X] = self.scaler.transform(X_test[numerical_cols_in_X])
+
+        print(f"\n[Enhanced RF] Final feature count: {len(self.feature_names)}")
         print(f"[Enhanced RF] Training set: {X_train.shape}")
         print(f"[Enhanced RF] Test set: {X_test.shape}")
         print(f"[Enhanced RF] Train class distribution:\n{y_train.value_counts()}")
@@ -174,18 +175,18 @@ class EnhancedRFTrainer:
                     df['DayOfWeek'] = df[date_col].dt.dayofweek
                     df['Quarter'] = df[date_col].dt.quarter
                     df['IsWeekend'] = (df[date_col].dt.dayofweek >= 5).astype(int)
-                    print(f"  ✓ Extracted temporal features from {date_col}")
+                    print(f"  âœ“ Extracted temporal features from {date_col}")
                 except Exception as e:
-                    print(f"  ✗ Failed to extract temporal features from {date_col}: {e}")
+                    print(f"  âœ— Failed to extract temporal features from {date_col}: {e}")
         
         # Create interaction features
         if 'Geopolitical_Risk_Score' in df.columns and 'Distance_km' in df.columns:
             df['Risk_Distance_Interaction'] = df['Geopolitical_Risk_Score'] * np.log1p(df['Distance_km'].fillna(0))
-            print("  ✓ Created Risk × Distance interaction")
+            print("  âœ“ Created Risk Ã— Distance interaction")
         
         if 'Weather_Severity_Index' in df.columns and 'Distance_km' in df.columns:
             df['Weather_Distance_Interaction'] = df['Weather_Severity_Index'] * np.log1p(df['Distance_km'].fillna(0))
-            print("  ✓ Created Weather × Distance interaction")
+            print("  âœ“ Created Weather Ã— Distance interaction")
         elif 'Weather_Condition' in df.columns and 'Distance_km' in df.columns:
             # Convert weather condition to severity
             weather_severity_map = {
@@ -195,11 +196,11 @@ class EnhancedRFTrainer:
             }
             df['Weather_Severity'] = df['Weather_Condition'].map(weather_severity_map).fillna(3)
             df['Weather_Distance_Interaction'] = df['Weather_Severity'] * np.log1p(df['Distance_km'].fillna(0))
-            print("  ✓ Created Weather × Distance interaction (from Weather_Condition)")
+            print("  âœ“ Created Weather Ã— Distance interaction (from Weather_Condition)")
         
         if 'Port_Congestion_Level' in df.columns and 'Weather_Severity_Index' in df.columns:
             df['Congestion_Weather_Interaction'] = df['Port_Congestion_Level'].fillna(0) * df['Weather_Severity_Index'].fillna(0)
-            print("  ✓ Created Congestion × Weather interaction")
+            print("  âœ“ Created Congestion Ã— Weather interaction")
         
         # Create risk severity levels (with proper NaN handling)
         if 'Geopolitical_Risk_Score' in df.columns:
@@ -213,7 +214,7 @@ class EnhancedRFTrainer:
             )
             # Convert to int, filling any remaining NaN with 1 (medium risk)
             df['Risk_Level'] = df['Risk_Level'].cat.codes.replace(-1, 1)
-            print("  ✓ Created Risk Level categories")
+            print("  âœ“ Created Risk Level categories")
         
         # Distance-based features
         if 'Distance_km' in df.columns:
@@ -221,14 +222,14 @@ class EnhancedRFTrainer:
             df['Distance_Log'] = np.log1p(distance_filled)
             df['Distance_Sqrt'] = np.sqrt(distance_filled)
             df['Is_Long_Distance'] = (distance_filled > distance_filled.quantile(0.75)).astype(int)
-            print("  ✓ Created distance-based features")
+            print("  âœ“ Created distance-based features")
         
         # Weight-based features
         if 'Weight_MT' in df.columns:
             weight_filled = df['Weight_MT'].fillna(df['Weight_MT'].median())
             df['Weight_Log'] = np.log1p(weight_filled)
             df['Is_Heavy_Cargo'] = (weight_filled > weight_filled.quantile(0.75)).astype(int)
-            print("  ✓ Created weight-based features")
+            print("  âœ“ Created weight-based features")
         
         # Combined risk score
         risk_features = []
@@ -243,7 +244,7 @@ class EnhancedRFTrainer:
         
         if risk_features:
             df['Combined_Risk_Score'] = df[risk_features].fillna(0).mean(axis=1)
-            print(f"  ✓ Created Combined Risk Score from {len(risk_features)} features")
+            print(f"  âœ“ Created Combined Risk Score from {len(risk_features)} features")
         
         # Carrier reliability bins
         if 'Carrier_Reliability_Score' in df.columns:
@@ -255,19 +256,19 @@ class EnhancedRFTrainer:
                 include_lowest=True
             )
             df['Reliability_Category'] = df['Reliability_Category'].cat.codes.replace(-1, 1)
-            print("  ✓ Created Carrier Reliability categories")
+            print("  âœ“ Created Carrier Reliability categories")
         
         # Route complexity
         if 'Distance_km' in df.columns and 'Geopolitical_Risk_Score' in df.columns:
             distance_normalized = df['Distance_km'].fillna(0) / (df['Distance_km'].max() + 1)
             risk_normalized = df['Geopolitical_Risk_Score'].fillna(0) / 10.0
             df['Route_Complexity'] = distance_normalized * 0.5 + risk_normalized * 0.5
-            print("  ✓ Created Route Complexity score")
+            print("  âœ“ Created Route Complexity score")
         
         # Fuel price impact
         if 'Fuel_Price_Index' in df.columns and 'Distance_km' in df.columns:
             df['Fuel_Cost_Impact'] = df['Fuel_Price_Index'].fillna(1.0) * np.log1p(df['Distance_km'].fillna(0))
-            print("  ✓ Created Fuel Cost Impact feature")
+            print("  âœ“ Created Fuel Cost Impact feature")
         
         return df
     
@@ -423,6 +424,21 @@ class EnhancedRFTrainer:
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
         specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        roc_auc = roc_auc_score(y_test, y_pred_proba)
+        avg_precision = average_precision_score(y_test, y_pred_proba)
+        
+        # Store genuine calculated evaluation metrics
+        self.evaluation_metrics = {
+            "accuracy": round(float(accuracy), 4),
+            "accuracy_pct": f"{round(accuracy * 100, 2)}%",
+            "precision": round(float(precision), 4),
+            "recall": round(float(recall), 4),
+            "specificity": round(float(specificity), 4),
+            "f1_score": round(float(f1), 4),
+            "roc_auc": round(float(roc_auc), 4),
+            "average_precision": round(float(avg_precision), 4),
+            "confusion_matrix": cm.tolist()
+        }
         
         print(f"\nKey Metrics:")
         print(f"  Accuracy:    {accuracy:.4f} ({accuracy*100:.2f}%)")
@@ -430,13 +446,7 @@ class EnhancedRFTrainer:
         print(f"  Recall:      {recall:.4f}")
         print(f"  Specificity: {specificity:.4f}")
         print(f"  F1-Score:    {f1:.4f}")
-        
-        # ROC-AUC
-        roc_auc = roc_auc_score(y_test, y_pred_proba)
         print(f"\nROC-AUC Score: {roc_auc:.4f}")
-        
-        # Average Precision
-        avg_precision = average_precision_score(y_test, y_pred_proba)
         print(f"Average Precision Score: {avg_precision:.4f}")
         
         # Plot metrics
@@ -448,13 +458,13 @@ class EnhancedRFTrainer:
         # Performance summary
         print("\n" + "="*70)
         if accuracy >= 0.75 and roc_auc >= 0.80:
-            print("✓ EXCELLENT PERFORMANCE - Ready for production!")
+            print("âœ“ EXCELLENT PERFORMANCE - Ready for production!")
         elif accuracy >= 0.70 and roc_auc >= 0.75:
-            print("✓ GOOD PERFORMANCE - Acceptable for deployment")
+            print("âœ“ GOOD PERFORMANCE - Acceptable for deployment")
         elif accuracy >= 0.65 and roc_auc >= 0.70:
-            print("⚠ MODERATE PERFORMANCE - Consider further tuning")
+            print("âš  MODERATE PERFORMANCE - Consider further tuning")
         else:
-            print("✗ LOW PERFORMANCE - Requires improvement")
+            print("âœ— LOW PERFORMANCE - Requires improvement")
         print("="*70)
     
     def _plot_roc_curve(self, y_test, y_pred_proba, roc_auc):
@@ -528,8 +538,14 @@ class EnhancedRFTrainer:
             'scaler': self.scaler,
             'feature_names': self.feature_names,
             'feature_importances': self.feature_importances,
+            'metrics': self.evaluation_metrics,
+            'accuracy': self.evaluation_metrics.get('accuracy_pct', 'N/A'),
+            'roc_auc': str(self.evaluation_metrics.get('roc_auc', 'N/A')),
+            'precision': str(self.evaluation_metrics.get('precision', 'N/A')),
+            'recall': str(self.evaluation_metrics.get('recall', 'N/A')),
+            'f1_score': str(self.evaluation_metrics.get('f1_score', 'N/A')),
             'trained_at': datetime.now().isoformat(),
-            'model_type': 'Enhanced Random Forest with SMOTE and Feature Engineering'
+            'model_type': 'Enhanced Random Forest with SMOTE and Leak-Free Scaling'
         }
         
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
