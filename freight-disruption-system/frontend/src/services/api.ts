@@ -43,6 +43,18 @@ export interface LoginCredentials {
   role?: string;
 }
 
+export interface AssignedPort {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+}
+
+export interface PortManagerLookupResult {
+  found: boolean;
+  port: AssignedPort | null;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: string;
@@ -55,6 +67,8 @@ export interface AuthResponse {
     is_active: boolean;
     created_at: string;
   };
+  /** Present for Port Manager register/login responses */
+  port?: AssignedPort | null;
 }
 
 export const registerPortManager = async (data: PortManagerRegisterData): Promise<AuthResponse> => {
@@ -96,6 +110,18 @@ export const loginPortManager = async (credentials: LoginCredentials): Promise<A
     throw new Error(msg);
   }
 
+  return response.json();
+};
+
+/**
+ * Looks up the port a Port Manager registered with (by email, username or employee ID).
+ * Used on the login screen to auto-select the assigned port.
+ */
+export const lookupPortManagerPort = async (identifier: string): Promise<PortManagerLookupResult> => {
+  const response = await fetch(
+    `${API_BASE_URL}/api/auth/port-manager/lookup?identifier=${encodeURIComponent(identifier)}`
+  );
+  if (!response.ok) throw new Error('Port lookup failed');
   return response.json();
 };
 

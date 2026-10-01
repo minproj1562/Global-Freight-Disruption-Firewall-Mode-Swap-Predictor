@@ -36,6 +36,8 @@ interface AuthState {
     organization?: string;
     employeeId?: string;
     mobileNumber?: string;
+    portId?: string;   // Real DB id of the assigned port (Port Managers)
+    portCode?: string; // UN/LOCODE of the assigned port
     portName?: string;
     username?: string;
     department?: string;
@@ -57,7 +59,15 @@ interface AuthState {
   }) => Promise<boolean>;
   logout: () => void;
   setAuthSession: (
-    user: { id?: string; name: string; email: string; username?: string; portName?: string },
+    user: {
+      id?: string;
+      name: string;
+      email: string;
+      username?: string;
+      portId?: string;
+      portCode?: string;
+      portName?: string;
+    },
     token: string,
     role: UserRole
   ) => void;
@@ -95,6 +105,9 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('token', response.access_token);
           localStorage.setItem('user', JSON.stringify(response.user));
 
+          // For Port Managers the backend returns the port they registered with.
+          const assigned = response.port ?? null;
+
           // Map backend response to frontend user structure
           set({
             role: (response.user.role === 'operations' || response.user.role === 'Logistics Manager') ? 'operations' : (response.user.role as UserRole),
@@ -105,7 +118,9 @@ export const useAuthStore = create<AuthState>()(
               name: response.user.full_name,
               email: response.user.email,
               username: response.user.username,
-              portName: assignedPort || 'Port of Rotterdam',
+              portId: assigned?.id,
+              portCode: assigned?.code,
+              portName: assigned?.name ?? assignedPort,
             },
           });
 
@@ -179,6 +194,8 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('token', response.access_token);
           localStorage.setItem('user', JSON.stringify(response.user));
 
+          const assigned = response.port ?? null;
+
           // Set authenticated state
           set({
             role: data.role,
@@ -191,7 +208,9 @@ export const useAuthStore = create<AuthState>()(
               username: response.user.username,
               employeeId: data.employeeId,
               mobileNumber: data.mobileNumber || '+1 (555) 019-2834',
-              portName: data.portName || 'Port of Rotterdam',
+              portId: assigned?.id,
+              portCode: assigned?.code,
+              portName: assigned?.name ?? data.portName ?? 'Port of Rotterdam',
               department: data.department || 'Operations Command',
             },
           });
@@ -228,6 +247,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         localStorage.removeItem('auth-storage');
         set({
           role: null,

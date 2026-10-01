@@ -15,9 +15,7 @@ import {
   Loader2,
   ShieldCheck,
   Globe,
-  HelpCircle,
   KeyRound,
-  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +25,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { EXTENDED_PORTS_DATA } from '@/shared/mock/portMockData';
 import { fetchAllPorts } from '@/services/portManagerApi';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
+import { PortManagerLoginForm } from '@/components/port-manager/PortManagerLoginForm';
 
 export const PortManagerAuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'register' | 'login'>('register');
@@ -45,18 +44,10 @@ export const PortManagerAuthPage: React.FC = () => {
     securityPassId: 'SEC-GOV-' + Math.floor(1000 + Math.random() * 9000),
   });
 
-  // Login Form State
-  const [loginData, setLoginData] = useState({
-    usernameOrId: '',
-    password: '',
-    assignedPort: 'Port of Rotterdam',
-    rememberMe: true,
-  });
-
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { register, login } = useAuthStore();
+  const { register } = useAuthStore();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -99,13 +90,6 @@ export const PortManagerAuthPage: React.FC = () => {
     }));
   };
 
-  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setLoginData((prev) => ({
-      ...prev,
-      [e.target.id]: e.target.value,
-    }));
-  };
-
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -133,6 +117,7 @@ export const PortManagerAuthPage: React.FC = () => {
         portName: regData.portName,
         username: regData.username,
         department: regData.department,
+        securityPassId: regData.securityPassId,
       });
 
       if (success) {
@@ -142,55 +127,17 @@ export const PortManagerAuthPage: React.FC = () => {
         });
 
         setTimeout(() => {
-          const matchedPort = EXTENDED_PORTS_DATA.find((p) => p.name === regData.portName);
-          const targetPortId = matchedPort ? matchedPort.id : 'port-rotterdam';
-          navigate(`/dashboard/ports/${targetPortId}`);
+          // Prefer the real port id returned by the backend, then fall back to name match
+          const storedPortId = useAuthStore.getState().user?.portId;
+          const matchedPort = portsList.find((p) => p.name === regData.portName);
+          const targetPortId = storedPortId ?? matchedPort?.id;
+          navigate(targetPortId ? `/dashboard/ports/${targetPortId}` : '/dashboard/ports');
         }, 600);
       } else {
         setError('Registration failed. Username or Employee ID may already exist.');
       }
     } catch (err: any) {
       setError(err?.message || 'An error occurred during Port Manager account creation.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!loginData.usernameOrId || !loginData.password) {
-      setError('Please enter your Username/Employee ID and Password');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const success = await login(
-        loginData.usernameOrId,
-        loginData.password,
-        'port',
-        loginData.assignedPort
-      );
-
-      if (success) {
-        toast({
-          title: "Port Manager Authenticated",
-          description: `Access granted to ${loginData.assignedPort} Operations Dashboard.`,
-        });
-
-        setTimeout(() => {
-          const matchedPort = EXTENDED_PORTS_DATA.find((p) => p.name === loginData.assignedPort);
-          const targetPortId = matchedPort ? matchedPort.id : 'port-rotterdam';
-          navigate(`/dashboard/ports/${targetPortId}`);
-        }, 600);
-      } else {
-        setError('Invalid Port Manager credentials. Please check your login details.');
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Authentication failed. Please verify connection and retry.');
     } finally {
       setIsLoading(false);
     }
@@ -583,7 +530,7 @@ export const PortManagerAuthPage: React.FC = () => {
                 </motion.div>
               ) : (
                 /* ========================================================================= */
-                /* 2. PORT MANAGER LOGIN FORM */
+                /* 2. PORT MANAGER LOGIN FORM (auto-detects assigned port from identifier)   */
                 /* ========================================================================= */
                 <motion.div
                   key="login"
@@ -592,192 +539,7 @@ export const PortManagerAuthPage: React.FC = () => {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-1">
-                      Port Manager Sign In
-                    </h1>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Enter your Port Manager credentials or Employee ID to access assigned terminal
-                    </p>
-                  </div>
-
-                  {/* Quick Demo Manager Presets */}
-                  <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30">
-                    <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-amber-800 dark:text-amber-300 mb-2">
-                      <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                      1-CLICK QUICK DEMO MANAGER PRESETS:
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { name: 'Rotterdam', id: 'port-rotterdam', code: 'NLRTM', manager: 'PM-Rotterdam' },
-                        { name: 'Singapore', id: 'port-singapore', code: 'SGSIN', manager: 'PM-Singapore' },
-                        { name: 'Los Angeles', id: 'port-la', code: 'USLAX', manager: 'PM-LA' },
-                      ].map((preset) => (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          onClick={() => {
-                            setLoginData({
-                              usernameOrId: preset.manager,
-                              password: 'Password123!',
-                              assignedPort: `Port of ${preset.name}`,
-                              rememberMe: true,
-                            });
-                            login(preset.manager, 'Password123!', 'port', `Port of ${preset.name}`);
-                            toast({
-                              title: `Quick Demo Active: ${preset.name}`,
-                              description: `Launching Port Manager Console for Port of ${preset.name}...`,
-                            });
-                            setTimeout(() => {
-                              navigate(`/dashboard/ports/${preset.id}`);
-                            }, 400);
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-400 text-[11px] font-medium text-slate-800 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 transition-all flex flex-col items-center justify-center text-center shadow-sm"
-                        >
-                          <span className="font-bold font-mono">{preset.name}</span>
-                          <span className="text-[9px] text-slate-400 font-mono">{preset.code}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleLoginSubmit} className="space-y-4">
-                    {/* Username or Employee ID */}
-                    <div className="space-y-1">
-                      <Label htmlFor="usernameOrId" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Username / Employee ID / Email <span className="text-amber-500">*</span>
-                      </Label>
-                      <div className="relative">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                          id="usernameOrId"
-                          type="text"
-                          placeholder="arivera_portmgr or PM-98241"
-                          value={loginData.usernameOrId}
-                          onChange={handleLoginChange}
-                          required
-                          className="pl-10 h-10 bg-slate-50 dark:bg-slate-950/90 border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Assigned Port Selector */}
-                    <div className="space-y-1">
-                      <Label htmlFor="assignedPort" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Select Assigned Port Terminal
-                      </Label>
-                      <div className="relative">
-                        <Anchor className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500" />
-                        <select
-                          id="assignedPort"
-                          value={loginData.assignedPort}
-                          onChange={handleLoginChange}
-                          className="w-full pl-10 pr-3 h-10 bg-slate-50 dark:bg-slate-950/90 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl text-xs appearance-none cursor-pointer"
-                        >
-                          {portsList.map((p) => (
-                            <option key={p.id} value={p.name} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
-                              {p.name} ({p.code}) — {p.country}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                          Password <span className="text-amber-500">*</span>
-                        </Label>
-                        <a
-                          href="#forgot"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            toast({
-                              title: "Password Reset Triggered",
-                              description: "Reset instructions sent to your registered Port Authority email.",
-                            });
-                          }}
-                          className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-medium"
-                        >
-                          Forgot Password?
-                        </a>
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={loginData.password}
-                          onChange={handleLoginChange}
-                          required
-                          className="pl-10 h-10 bg-slate-50 dark:bg-slate-950/90 border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Remember me & Demo credentials fill */}
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
-                        <input
-                          type="checkbox"
-                          checked={loginData.rememberMe}
-                          onChange={(e) =>
-                            setLoginData((prev) => ({ ...prev, rememberMe: e.target.checked }))
-                          }
-                          className="rounded bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-800 text-amber-500 focus:ring-amber-400"
-                        />
-                        Remember this terminal console
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginData({
-                            usernameOrId: 'PM-88942',
-                            password: 'Password123!',
-                            assignedPort: 'Port of Rotterdam',
-                            rememberMe: true,
-                          });
-                        }}
-                        className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-mono font-semibold"
-                      >
-                        Auto-fill Demo Credentials
-                      </button>
-                    </div>
-
-                    {/* Error Banner */}
-                    {error && (
-                      <div className="rounded-xl bg-rose-500/15 border border-rose-500/40 p-3 text-xs text-rose-600 dark:text-rose-300 font-medium">
-                        {error}
-                      </div>
-                    )}
-
-                    {/* Login Submit Button */}
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold py-3 text-sm rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center mt-4"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin text-slate-950" />
-                          Authenticating Port Console...
-                        </>
-                      ) : (
-                        'Sign In to Port Manager Dashboard'
-                      )}
-                    </Button>
-                  </form>
-
-                  {/* Help notice */}
-                  <div className="mt-6 p-3 rounded-2xl bg-slate-100 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2.5">
-                    <HelpCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-slate-900 dark:text-slate-200">Port Manager Notice:</span> For emergency security overrides or lost harbor credentials, contact the Harbor Master Operations desk.
-                    </div>
-                  </div>
+                  <PortManagerLoginForm portsList={portsList} />
                 </motion.div>
               )}
             </AnimatePresence>

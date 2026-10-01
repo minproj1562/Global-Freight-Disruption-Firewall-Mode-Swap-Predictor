@@ -56,10 +56,28 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+# ============= PORT SUMMARY (assigned port) =============
+
+class PortSummary(BaseModel):
+    """Minimal port info returned with auth responses and the login lookup."""
+    id: str
+    name: str
+    code: str
+    country: str
+
+    class Config:
+        from_attributes = True
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    # Only populated for Port Managers
+    port: Optional[PortSummary] = None
+
+class PortManagerLookupResponse(BaseModel):
+    found: bool
+    port: Optional[PortSummary] = None
 
 # ============= PORT MANAGER SCHEMAS =============
 
@@ -131,4 +149,4 @@ class LogisticsManagerResponse(BaseModel):
     user: UserResponse
     
     class Config:
-        from_attributes = True
+        from_attributes = True
