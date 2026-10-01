@@ -25,7 +25,7 @@ export const PortManagerSidebar: React.FC<PortManagerSidebarProps> = ({ currentP
   const navItems = [
     { name: 'Port Overview', icon: Globe, route: '/dashboard/ports' },
     { name: 'Vessel Logs', icon: FileText, route: '/dashboard/vessel-logs' },
-    { name: 'Port Detail', icon: Anchor, route: `/dashboard/ports/${currentPortId || 'port-rotterdam'}` },
+    { name: 'Port Detail', icon: Anchor, route: `/dashboard/ports/${currentPortId || user?.portId || 'port-rotterdam'}` },
   ];
 
 

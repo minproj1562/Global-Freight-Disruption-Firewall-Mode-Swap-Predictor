@@ -6,13 +6,17 @@ import { Ship, Mail, Lock, ArrowLeft, Loader2, ShieldCheck, AlertCircle, X, Comp
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuthStore, UserRole } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore';
+import type { UserRole } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 
 export const LoginPage: React.FC = () => {
   const location = useLocation();
-  const preSelectedRole = (location.state as { role?: UserRole })?.role || 'operations';
+  const state = location.state as any;
+  const preSelectedRole: UserRole = (state && typeof state === 'object' && 'role' in state) 
+    ? (state.role as UserRole) 
+    : 'operations';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -323,7 +327,7 @@ export const LoginPage: React.FC = () => {
                 </Button>
               </form>
 
-              {/* Registration Link */}
+              {/* Registration Links */}
               <div className="mt-5 text-center text-xs text-slate-400 space-y-1">
                 <div>
                   Port Manager?{' '}

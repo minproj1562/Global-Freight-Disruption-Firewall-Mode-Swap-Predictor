@@ -1,10 +1,7 @@
 # backend/app/routers/auth.py
-"""
-Authentication & Access Control Router.
-Provides Port Manager and Admin registration/login, Redis-backed rate limiting,
-email verification token validation, TOTP 2FA setup & verification, and audit logging.
-"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -16,6 +13,8 @@ from app.schemas.user import (
     UserCreate,
     UserLogin,
     Token,
+    PortSummary,
+    PortManagerLookupResponse,
     PortManagerCreate,
     PortManagerResponse,
     UserResponse,
@@ -38,29 +37,38 @@ from app.services.email_service import email_service
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-# Rate limiters
-auth_rate_limiter = RateLimiter(times=5, seconds=60, key_prefix="auth_limit")
 
-# ============= REQUEST SCHEMAS =============
+# ============= HELPERS =============
 
-class VerifyEmailRequest(BaseModel):
-    token: str = Field(..., description="64-character verification token")
+def _find_port_manager_user(db: Session, identifier: str) -> Optional[User]:
+    """
+    Resolve a user from a username, email (case-insensitive) or employee ID.
+    Shared by the Port Manager login and the port lookup endpoint.
+    """
+    identifier = (identifier or "").strip()
+    if not identifier:
+        return None
 
-class ResendVerificationRequest(BaseModel):
-    email: EmailStr = Field(..., description="Registered email address")
+    user = db.query(User).filter(
+        (User.username == identifier) |
+        (func.lower(User.email) == identifier.lower())
+    ).first()
+    if user:
+        return user
 
-class TOTPSetupResponse(BaseModel):
-    secret: str
-    provisioning_uri: str
-    message: str
+    pm = db.query(PortManager).filter(
+        PortManager.employee_id == identifier
+    ).first()
+    return pm.user if pm else None
 
-class TOTPVerifyRequest(BaseModel):
-    code: str = Field(..., min_length=6, max_length=6, description="6-digit TOTP code")
 
-class LoginWithMFA(BaseModel):
-    username_or_email: str
-    password: str
-    totp_code: Optional[str] = None
+def _get_assigned_port_summary(user: User) -> Optional[PortSummary]:
+    """Return the Port a Port Manager is assigned to (None if not assigned)."""
+    pm = user.port_manager
+    if pm is None or pm.port is None:
+        return None
+    return PortSummary.model_validate(pm.port)
+
 
 # ============= PORT MANAGER REGISTRATION =============
 
@@ -166,10 +174,30 @@ async def register_port_manager(
     return Token(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse.from_orm(new_user)
+        user=UserResponse.from_orm(new_user),
+        port=PortSummary.model_validate(port),
     )
 
-# ============= LOGIN (PORT MANAGER & ADMIN) =============
+# ============= PORT MANAGER: PORT LOOKUP (login auto-detect) =============
+
+@router.get("/port-manager/lookup", response_model=PortManagerLookupResponse)
+async def lookup_port_manager_port(
+    identifier: str = Query(..., min_length=3, max_length=255),
+    db: Session = Depends(get_db)
+):
+    """
+    Given an email / username / employee ID, return the port that Port Manager
+    registered with. Used by the login screen to auto-select the assigned port.
+    Returns only port info - no personal data.
+    """
+    user = _find_port_manager_user(db, identifier)
+
+    if not user or user.role != "port" or not user.is_active:
+        return PortManagerLookupResponse(found=False, port=None)
+
+    return PortManagerLookupResponse(found=True, port=_get_assigned_port_summary(user))
+
+# ============= PORT MANAGER LOGIN =============
 
 @router.post("/port-manager/login", response_model=Token, dependencies=[Depends(auth_rate_limiter)])
 async def login_port_manager(
@@ -177,19 +205,11 @@ async def login_port_manager(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Authenticate Port Manager with password and optional TOTP MFA."""
-    client_ip = request.client.host if request.client else "127.0.0.1"
-
-    # Find user by username, email, or employee_id
-    user = db.query(User).filter(
-        (User.username == credentials.username_or_email) |
-        (User.email == credentials.username_or_email)
-    ).first()
-    
-    if not user:
-        pm = db.query(PortManager).filter(PortManager.employee_id == credentials.username_or_email).first()
-        if pm:
-            user = db.query(User).filter(User.id == pm.user_id).first()
+    """
+    Authenticate Port Manager using username/employee_id/email and password.
+    The assigned port is always derived server-side from the registration record.
+    """
+    user = _find_port_manager_user(db, credentials.username_or_email)
     
     if not user or not verify_password(credentials.password, user.hashed_password):
         if user:
@@ -268,10 +288,41 @@ async def login_port_manager(
     return Token(
         access_token=access_token,
         token_type="bearer",
-        user=UserResponse.from_orm(user)
+        user=UserResponse.from_orm(user),
+        port=_get_assigned_port_summary(user),
     )
 
-@router.post("/admin/login", response_model=Token, dependencies=[Depends(auth_rate_limiter)])
+# ============= GET CURRENT USER =============
+
+@router.get("/me", response_model=PortManagerResponse)
+async def get_current_port_manager_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current authenticated Port Manager's full profile.
+    """
+    if current_user.role != "port":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to Port Managers"
+        )
+    
+    port_manager = db.query(PortManager).filter(
+        PortManager.user_id == current_user.id
+    ).first()
+
+    if not port_manager:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Port Manager profile not found"
+        )
+    
+    return PortManagerResponse.from_orm(port_manager)
+
+# ============= ADMIN LOGIN =============
+
+@router.post("/admin/login", response_model=Token)
 async def login_admin(
     credentials: LoginWithMFA,
     request: Request,
