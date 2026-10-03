@@ -2,6 +2,8 @@
 // Vessel Arrivals & Departures — port-scoped vessel traffic log with full
 // manual-update workflow (add / edit ETA / mark arrived / cancel / mark departed),
 // built directly on the same VesselArrival data Page 3.2's berths use.
+// Also includes AIS "Sync with API" — live telemetry suggests arrival/departure
+// changes, the port manager confirms each one, keeping automated + manual in sync.
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -23,6 +25,7 @@ import {
   Lock,
   Globe,
   X,
+  Satellite,
 } from 'lucide-react';
 import {
   fetchAllPorts,
@@ -33,9 +36,11 @@ import {
   markVesselArrivedApi,
   cancelVesselArrivalApi,
   markVesselDepartedApi,
+  fetchVesselSyncSuggestions,
   BackendPort,
   BackendVesselArrival,
   VesselTrafficCategory,
+  VesselSyncSuggestion,
 } from '@/services/portManagerApi';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/components/ui/use-toast';
@@ -49,8 +54,6 @@ const TABS: { key: VesselTrafficCategory; label: string }[] = [
 ];
 
 // Sentinel used consistently across this page, portManagerApi.ts, and the backend router.
-// IMPORTANT: Must always be the capitalized 'All' string to match the checks in
-// portManagerApi.ts (`!== 'All'`) and ports.py (`!= "All"`).
 const FILTER_ALL = 'All';
 
 export const VesselLogsPage: React.FC = () => {
@@ -273,6 +276,61 @@ export const VesselLogsPage: React.FC = () => {
     }
   };
 
+  // ============= SYNC WITH API (AIS) =============
+  // Fetches AI-detected arrival/departure signals from live AIS telemetry.
+  // Nothing changes automatically — the manager confirms each suggestion,
+  // which then calls the same mark-arrived / mark-departed endpoints used
+  // by the manual action buttons above. Automated + manual stay in sync.
+
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncSuggestions, setSyncSuggestions] = useState<VesselSyncSuggestion[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
+
+  const handleSyncWithApi = async () => {
+    if (!activePortId) return;
+    setIsSyncing(true);
+    try {
+      const suggestions = await fetchVesselSyncSuggestions(activePortId);
+      setSyncSuggestions(suggestions);
+      setShowSyncModal(true);
+      if (suggestions.length === 0) {
+        toast({ title: 'AIS Sync Complete', description: 'No live signal changes detected. All records are up to date.' });
+      }
+    } catch (err) {
+      console.error('AIS sync check failed:', err);
+      toast({ title: 'Sync Failed', description: 'Could not reach AIS telemetry service.', variant: 'destructive' });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestion: VesselSyncSuggestion) => {
+    if (!activePortId) return;
+    setApplyingSuggestionId(suggestion.arrival_id);
+    try {
+      if (suggestion.suggested_status === 'Docked') {
+        await markVesselArrivedApi(activePortId, suggestion.arrival_id);
+      } else {
+        await markVesselDepartedApi(activePortId, suggestion.arrival_id);
+      }
+      toast({
+        title: 'Status Confirmed ✓',
+        description: `${suggestion.vessel_name} updated to ${suggestion.suggested_status}.`,
+      });
+      setSyncSuggestions((prev) => prev.filter((s) => s.arrival_id !== suggestion.arrival_id));
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: `Could not update ${suggestion.vessel_name}.`, variant: 'destructive' });
+    } finally {
+      setApplyingSuggestionId(null);
+    }
+  };
+
+  const handleDismissSuggestion = (arrivalId: string) => {
+    setSyncSuggestions((prev) => prev.filter((s) => s.arrival_id !== arrivalId));
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Docked':
@@ -375,7 +433,18 @@ export const VesselLogsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            {isManagedPort && (
+              <button
+                onClick={handleSyncWithApi}
+                disabled={isSyncing}
+                title="Check live AIS telemetry for arrival/departure signals"
+                className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2 disabled:opacity-60"
+              >
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Satellite className="w-4 h-4" />}
+                Sync with API
+              </button>
+            )}
             {isManagedPort && (
               <button
                 onClick={() => setShowAddArrivalModal(true)}
@@ -717,6 +786,90 @@ export const VesselLogsPage: React.FC = () => {
                   {departSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
                   Confirm Departure
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== SYNC WITH API — AIS SUGGESTIONS PANEL ===== */}
+      <AnimatePresence>
+        {showSyncModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Satellite className="w-5 h-5 text-cyan-500" />
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white">AIS Sync — Detected Signal Changes</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Live vessel telemetry vs. your port schedule. Review and confirm each change.</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowSyncModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {syncSuggestions.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 font-mono text-xs">
+                    No live AIS signal changes detected. Your schedule is up to date.
+                  </div>
+                ) : (
+                  syncSuggestions.map((s) => (
+                    <div
+                      key={s.arrival_id}
+                      className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 dark:text-white text-sm">{s.vessel_name}</span>
+                          <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">MMSI {s.vessel_mmsi}</span>
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                            s.confidence === 'high'
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400'
+                          }`}>
+                            {s.confidence.toUpperCase()} CONFIDENCE
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                          Currently <strong>{s.current_status}</strong> → AIS suggests{' '}
+                          <strong className={s.suggested_status === 'Docked' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                            {s.suggested_status}
+                          </strong>
+                        </p>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-1 flex items-center gap-3 flex-wrap">
+                          {s.distance_nm !== undefined && <span>{s.distance_nm} nm from port</span>}
+                          {s.ais_speed_knots !== undefined && <span>{s.ais_speed_knots} kts</span>}
+                          {s.last_ais_update && <span>Last AIS ping: {new Date(s.last_ais_update).toLocaleTimeString()}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleDismissSuggestion(s.arrival_id)}
+                          disabled={applyingSuggestionId === s.arrival_id}
+                          className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          onClick={() => handleApplySuggestion(s)}
+                          disabled={applyingSuggestionId === s.arrival_id}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[11px] font-bold shadow-sm transition-all disabled:opacity-60 ${
+                            s.suggested_status === 'Docked' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                          }`}
+                        >
+                          {applyingSuggestionId === s.arrival_id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : (s.suggested_status === 'Docked' ? <CheckCircle className="w-3.5 h-3.5" /> : <Navigation className="w-3.5 h-3.5" />)
+                          }
+                          Confirm {s.suggested_status}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </motion.div>
           </div>

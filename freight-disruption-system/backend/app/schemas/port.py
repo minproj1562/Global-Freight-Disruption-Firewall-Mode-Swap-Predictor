@@ -1,4 +1,3 @@
-# backend/app/schemas/port.py
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
@@ -141,3 +140,24 @@ class VesselArrivalETAUpdate(BaseModel):
 
 class VesselMarkArrivedRequest(BaseModel):
     berth_id: Optional[str] = None  # Optional berth to assign immediately
+
+# ============= PAGE 3.3: AIS SYNC SUGGESTIONS =============
+# Returned by GET /api/ports/{port_id}/vessel-traffic/sync-check.
+# These are NEVER auto-applied — the port manager must confirm each one,
+# which then calls the existing /arrived or /departed endpoints. This keeps
+# the live AIS feed and manual port-manager workflow in sync instead of
+# one silently overwriting the other.
+
+class VesselSyncSuggestion(BaseModel):
+    arrival_id: str
+    vessel_mmsi: int
+    vessel_name: str
+    current_status: str
+    suggested_status: str  # "Docked" (likely arrived) | "Departed" (likely left)
+    distance_nm: Optional[float] = None
+    ais_speed_knots: Optional[float] = None
+    last_ais_update: Optional[datetime] = None
+    confidence: str  # "high" | "medium"
+
+    class Config:
+        from_attributes = True

@@ -263,6 +263,28 @@ export const getPortVesselTrafficExportUrl = (
   return `${base}/api/ports/${portId}/vessel-traffic/export-csv?${query.toString()}`;
 };
 
+// ============= PAGE 3.3: AIS SYNC SUGGESTIONS =============
+// Returns AI-detected arrival/departure signals from the live AIS feed.
+// Nothing is auto-applied — the manager confirms each suggestion, which
+// then calls markVesselArrivedApi / markVesselDepartedApi as normal.
+
+export interface VesselSyncSuggestion {
+  arrival_id: string;
+  vessel_mmsi: number;
+  vessel_name: string;
+  current_status: string;
+  suggested_status: 'Docked' | 'Departed';
+  distance_nm?: number;
+  ais_speed_knots?: number;
+  last_ais_update?: string;
+  confidence: 'high' | 'medium';
+}
+
+export const fetchVesselSyncSuggestions = async (portId: string): Promise<VesselSyncSuggestion[]> => {
+  const response = await api.get<VesselSyncSuggestion[]>(`/api/ports/${portId}/vessel-traffic/sync-check`);
+  return response.data;
+};
+
 // ============= NETWORK TELEMETRY TYPES =============
 
 export interface VesselScheduleEntry {

@@ -1,4 +1,4 @@
-# backend/app/routers/ports.py
+#backend/app/routers/ports.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, or_, String
@@ -6,6 +6,7 @@ from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
 import csv
 import io
+import math
 from app.database import get_db
 from app.services.ai_telemetry_engine import get_full_network_telemetry
 from app.schemas.port import (
@@ -22,12 +23,28 @@ from app.schemas.port import (
     VesselArrivalCreate,
     VesselArrivalETAUpdate,
     VesselMarkArrivedRequest,
+    VesselSyncSuggestion,
 )
 from app.models.ports import Port, PortDisruption, BerthSlot, VesselArrival, PortCongestionHistory
 from app.models.users import User
+from app.models.vessels import Vessel
 from app.core.security import get_current_user, get_current_port_manager
 
 router = APIRouter(prefix="/api/ports", tags=["Ports"])
+
+# ============= GEOSPATIAL HELPER (AIS SYNC) =============
+
+def _haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two lat/lon points, in nautical miles."""
+    R_km = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.asin(math.sqrt(a))
+    return R_km * c * 0.539957  # km -> nautical miles
 
 # ============= PAGE 3.1: PORT OVERVIEW =============
 
@@ -98,8 +115,6 @@ async def get_landing_telemetry(db: Session = Depends(get_db)) -> Dict[str, Any]
     - Top critical congestion stations
     - Real berths in active operation
     """
-    from app.models.vessels import Vessel
-    
     all_ports = db.query(Port).all()
     total_ports = len(all_ports)
     
@@ -759,6 +774,106 @@ async def get_port_vessel_traffic(
         query = query.order_by(VesselArrival.eta)
 
     return query.limit(300).all()
+
+
+@router.get("/{port_id}/vessel-traffic/sync-check", response_model=List[VesselSyncSuggestion])
+async def check_vessel_traffic_ais_sync(
+    port_id: str,
+    current_user: User = Depends(get_current_port_manager),
+    db: Session = Depends(get_db),
+):
+    """
+    "Sync with API" — cross-references the live AIS vessel feed (Vessel table,
+    updated in real time by the aisstream.io background task) against this
+    port's manually-tracked Expected/Docked vessel arrivals.
+
+    This NEVER writes anything automatically. It only returns suggestions:
+    - An "Expected" vessel whose live AIS position is close to the port and
+      nearly stationary is flagged as "likely Docked".
+    - A "Docked" vessel whose live AIS position has moved far from the port
+      or is now underway at speed is flagged as "likely Departed".
+
+    The frontend shows these as a confirmation list. Only when the port
+    manager clicks Confirm does it call the existing /arrived or /departed
+    endpoint — keeping the automated feed and manual workflow in sync
+    instead of one silently overriding the other.
+    """
+    port = db.query(Port).filter(Port.id == port_id).first()
+    if not port:
+        raise HTTPException(status_code=404, detail=f"Port '{port_id}' not found")
+
+    now = datetime.utcnow()
+    freshness_cutoff = now - timedelta(hours=6)
+    suggestions: List[VesselSyncSuggestion] = []
+
+    # Arrival detection thresholds
+    ARRIVAL_RADIUS_NM = 8.0
+    ARRIVAL_MAX_SPEED_KTS = 2.0
+
+    # Departure detection thresholds
+    DEPARTURE_RADIUS_NM = 15.0
+    DEPARTURE_MIN_SPEED_KTS = 5.0
+
+    # --- Check "Expected" vessels for possible arrival ---
+    expected = db.query(VesselArrival).filter(
+        and_(
+            VesselArrival.port_id == port_id,
+            VesselArrival.status.in_(["Scheduled", "Anchored", "Delayed"])
+        )
+    ).all()
+
+    for arr in expected:
+        ais_vessel = db.query(Vessel).filter(Vessel.mmsi == arr.vessel_mmsi).first()
+        if ais_vessel is None or ais_vessel.latitude is None or ais_vessel.longitude is None:
+            continue
+        if ais_vessel.last_updated is None or ais_vessel.last_updated < freshness_cutoff:
+            continue
+
+        distance = _haversine_nm(port.latitude, port.longitude, ais_vessel.latitude, ais_vessel.longitude)
+        speed = ais_vessel.speed or 0.0
+
+        if distance <= ARRIVAL_RADIUS_NM and speed < ARRIVAL_MAX_SPEED_KTS:
+            suggestions.append(VesselSyncSuggestion(
+                arrival_id=arr.id,
+                vessel_mmsi=arr.vessel_mmsi,
+                vessel_name=arr.vessel_name,
+                current_status=arr.status,
+                suggested_status="Docked",
+                distance_nm=round(distance, 1),
+                ais_speed_knots=round(speed, 1),
+                last_ais_update=ais_vessel.last_updated,
+                confidence="high" if distance <= 4.0 else "medium",
+            ))
+
+    # --- Check "Docked" vessels for possible departure ---
+    docked = db.query(VesselArrival).filter(
+        and_(VesselArrival.port_id == port_id, VesselArrival.status == "Docked")
+    ).all()
+
+    for arr in docked:
+        ais_vessel = db.query(Vessel).filter(Vessel.mmsi == arr.vessel_mmsi).first()
+        if ais_vessel is None or ais_vessel.latitude is None or ais_vessel.longitude is None:
+            continue
+        if ais_vessel.last_updated is None or ais_vessel.last_updated < freshness_cutoff:
+            continue
+
+        distance = _haversine_nm(port.latitude, port.longitude, ais_vessel.latitude, ais_vessel.longitude)
+        speed = ais_vessel.speed or 0.0
+
+        if distance >= DEPARTURE_RADIUS_NM or speed >= DEPARTURE_MIN_SPEED_KTS:
+            suggestions.append(VesselSyncSuggestion(
+                arrival_id=arr.id,
+                vessel_mmsi=arr.vessel_mmsi,
+                vessel_name=arr.vessel_name,
+                current_status=arr.status,
+                suggested_status="Departed",
+                distance_nm=round(distance, 1),
+                ais_speed_knots=round(speed, 1),
+                last_ais_update=ais_vessel.last_updated,
+                confidence="high" if distance >= 25.0 else "medium",
+            ))
+
+    return suggestions
 
 
 @router.get("/{port_id}/vessel-traffic/export-csv")
