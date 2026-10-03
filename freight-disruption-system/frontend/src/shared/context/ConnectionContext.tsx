@@ -1,3 +1,4 @@
+// frontend/src/shared/context/ConnectionContext.tsx
 // Connection State & Auto-Refresh Context
 // FASTAPI / WEBSOCKET REPLACEMENT POINT: Replace mock 12-second polling with WebSocket push stream:
 // const ws = new WebSocket('wss://api.freightfirewall.com/ws/telemetry');

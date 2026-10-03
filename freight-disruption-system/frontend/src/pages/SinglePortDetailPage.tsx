@@ -1,4 +1,4 @@
-//frontend/src/pages/SinglePortDetailPage.tsx
+// frontend/src/pages/SinglePortDetailPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,24 +22,19 @@ import {
   AlertTriangle,
   ShieldAlert,
   Activity,
-  Calendar,
-  Search,
-  X,
-  TrendingUp,
   Download,
   Zap,
   Loader2,
   AlertCircle,
   CheckCircle,
-  Plus,
-  Edit3,
   XCircle,
   UserCheck,
-  Navigation,
-  Trash2,
   Lock,
   Globe,
   RefreshCw,
+  X,
+  ArrowRight,
+  Edit3,
 } from 'lucide-react';
 
 import { useToast } from '@/components/ui/use-toast';
@@ -51,17 +46,11 @@ import {
   fetchAllPorts,
   flagPortDisruptionApi,
   updateCongestionApi,
-  addVesselArrivalApi,
-  updateVesselETAApi,
-  markVesselArrivedApi,
-  cancelVesselArrivalApi,
   freeBerthApi,
   assignVesselToBerthApi,
-  markVesselDepartedApi,
   BackendPortDetail,
   BackendPort,
   BackendBerthSlot,
-  BackendVesselArrival,
   BackendCongestionHistory,
 } from '@/services/portManagerApi';
 import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
@@ -77,23 +66,23 @@ export const SinglePortDetailPage: React.FC = () => {
   const [allPortsList, setAllPortsList] = useState<BackendPort[]>([]);
   const [portDetail, setPortDetail] = useState<BackendPortDetail | null>(null);
 
-  // Permission check: Admin manages all, Port Manager manages only their assigned port
+  // Permission check: Admin manages all, Port Manager manages only their assigned port.
+  // Prefer the real DB port ID assigned at login; fall back to fuzzy name matching
+  // only for legacy/demo sessions that never resolved a real portId.
   const isManagedPort = React.useMemo(() => {
     if (role === 'admin') return true;
     if (!portDetail) return false;
+    if (user?.portId) return portDetail.id === user.portId;
     const userP = userPortName.toLowerCase().replace(/port\s+of\s+/i, '').trim();
     const portN = portDetail.name.toLowerCase().replace(/port\s+of\s+/i, '').trim();
-    const portI = portDetail.id.toLowerCase().replace(/^port-/, '').trim();
-    return portN.includes(userP) || userP.includes(portN) || portI.includes(userP) || userP.includes(portI);
-  }, [role, userPortName, portDetail]);
+    return portN.includes(userP) || userP.includes(portN);
+  }, [role, user?.portId, userPortName, portDetail]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [activeBerthTab, setActiveBerthTab] = useState<'diagram' | 'table'>('diagram');
-  const [activeSection, setActiveSection] = useState<'berths' | 'arrivals' | 'departures'>('berths');
-  const [arrivalsSearch, setArrivalsSearch] = useState('');
   const [berthFilter, setBerthFilter] = useState<'all' | 'occupied' | 'available'>('all');
-  const [arrivalsStatusFilter, setArrivalsStatusFilter] = useState<'all' | 'Scheduled' | 'Delayed' | 'Cancelled'>('all');
 
   // Live UTC Clock
   const [utcTime, setUtcTime] = useState<string>(new Date().toUTCString().slice(17, 25) + ' UTC');
@@ -136,10 +125,9 @@ export const SinglePortDetailPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const target = portId || 'port-rotterdam';
+    const target = portId || user?.portId || 'port-rotterdam';
     loadDetail(target);
   }, [portId]);
-
 
   // ============= MODALS STATE =============
 
@@ -204,16 +192,6 @@ export const SinglePortDetailPage: React.FC = () => {
     });
   };
 
-  // Add Arrival
-  const [showAddArrivalModal, setShowAddArrivalModal] = useState(false);
-  const [arrivalForm, setArrivalForm] = useState({ vessel_name: '', vessel_mmsi: '', vessel_type: 'Container', vessel_flag: '', eta: '', cargo_type: '' });
-  const [arrivalSubmitting, setArrivalSubmitting] = useState(false);
-
-  // Edit ETA
-  const [editEtaArrival, setEditEtaArrival] = useState<BackendVesselArrival | null>(null);
-  const [editEtaValue, setEditEtaValue] = useState('');
-  const [editEtaSubmitting, setEditEtaSubmitting] = useState(false);
-
   // Assign Vessel to Berth
   const [assignBerth, setAssignBerth] = useState<BackendBerthSlot | null>(null);
   const [assignForm, setAssignForm] = useState({ vessel_name: '', vessel_mmsi: '', vessel_type: 'Container', cargo_operation: 'Loading', estimated_departure: '' });
@@ -222,18 +200,6 @@ export const SinglePortDetailPage: React.FC = () => {
   // Free Berth Confirm
   const [freeBerthTarget, setFreeBerthTarget] = useState<BackendBerthSlot | null>(null);
   const [freeBerthSubmitting, setFreeBerthSubmitting] = useState(false);
-
-  // Mark Arrived
-  const [markArrivedTarget, setMarkArrivedTarget] = useState<BackendVesselArrival | null>(null);
-  const [markArrivedSubmitting, setMarkArrivedSubmitting] = useState(false);
-
-  // Cancel Arrival
-  const [cancelArrivalTarget, setCancelArrivalTarget] = useState<BackendVesselArrival | null>(null);
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
-
-  // Mark Departed
-  const [departTarget, setDepartTarget] = useState<BackendVesselArrival | null>(null);
-  const [departSubmitting, setDepartSubmitting] = useState(false);
 
   // Disruption Modal
   const [isDisruptionModalOpen, setIsDisruptionModalOpen] = useState(false);
@@ -245,13 +211,6 @@ export const SinglePortDetailPage: React.FC = () => {
     affectedBerths: string;
     estDurationHours: number;
   }>({ title: '', type: 'Labor Dispute', severity: 'high', description: '', affectedBerths: 'All Terminals', estDurationHours: 24 });
-
-  // Vessel Detail Drawer
-  const [selectedVesselDetail, setSelectedVesselDetail] = useState<{
-    name: string; imo: number; flag: string; vessel_type: string;
-    cargo?: string; eta_etd?: string; assigned_berth?: string; status?: string;
-    completion_pct?: number;
-  } | null>(null);
 
   // ============= HANDLERS =============
 
@@ -269,76 +228,6 @@ export const SinglePortDetailPage: React.FC = () => {
       toast({ title: 'Update Failed', description: 'Could not update congestion. Verify backend is running.', variant: 'destructive' });
     } finally {
       setCongestionSubmitting(false);
-    }
-  };
-
-  const handleAddArrival = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!portDetail) return;
-    setArrivalSubmitting(true);
-    try {
-      await addVesselArrivalApi(portDetail.id, {
-        vessel_mmsi: parseInt(arrivalForm.vessel_mmsi, 10),
-        vessel_name: arrivalForm.vessel_name,
-        vessel_type: arrivalForm.vessel_type,
-        vessel_flag: arrivalForm.vessel_flag || undefined,
-        eta: new Date(arrivalForm.eta).toISOString(),
-        cargo_type: arrivalForm.cargo_type || undefined,
-      });
-      toast({ title: 'Arrival Added ✓', description: `${arrivalForm.vessel_name} added to 72h schedule.` });
-      setShowAddArrivalModal(false);
-      setArrivalForm({ vessel_name: '', vessel_mmsi: '', vessel_type: 'Container', vessel_flag: '', eta: '', cargo_type: '' });
-      await loadDetail(portDetail.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not add arrival. Verify backend.', variant: 'destructive' });
-    } finally {
-      setArrivalSubmitting(false);
-    }
-  };
-
-  const handleEditEta = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!portDetail || !editEtaArrival) return;
-    setEditEtaSubmitting(true);
-    try {
-      await updateVesselETAApi(portDetail.id, editEtaArrival.id, new Date(editEtaValue).toISOString());
-      toast({ title: 'ETA Updated ✓', description: `${editEtaArrival.vessel_name} ETA revised.` });
-      setEditEtaArrival(null);
-      await loadDetail(portDetail.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not update ETA.', variant: 'destructive' });
-    } finally {
-      setEditEtaSubmitting(false);
-    }
-  };
-
-  const handleMarkArrived = async () => {
-    if (!portDetail || !markArrivedTarget) return;
-    setMarkArrivedSubmitting(true);
-    try {
-      await markVesselArrivedApi(portDetail.id, markArrivedTarget.id);
-      toast({ title: 'Vessel Arrived ✓', description: `${markArrivedTarget.vessel_name} marked as docked.` });
-      setMarkArrivedTarget(null);
-      await loadDetail(portDetail.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not mark vessel as arrived.', variant: 'destructive' });
-    } finally {
-      setMarkArrivedSubmitting(false);
-    }
-  };
-
-  const handleCancelArrival = async () => {
-    if (!portDetail || !cancelArrivalTarget) return;
-    setCancelSubmitting(true);
-    try {
-      await cancelVesselArrivalApi(portDetail.id, cancelArrivalTarget.id);
-      toast({ title: 'Arrival Cancelled', description: `${cancelArrivalTarget.vessel_name} removed from schedule.` });
-      setCancelArrivalTarget(null);
-      await loadDetail(portDetail.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not cancel arrival.', variant: 'destructive' });
-    } finally {
-      setCancelSubmitting(false);
     }
   };
 
@@ -377,21 +266,6 @@ export const SinglePortDetailPage: React.FC = () => {
       toast({ title: 'Error', description: 'Could not free berth.', variant: 'destructive' });
     } finally {
       setFreeBerthSubmitting(false);
-    }
-  };
-
-  const handleMarkDeparted = async () => {
-    if (!portDetail || !departTarget) return;
-    setDepartSubmitting(true);
-    try {
-      await markVesselDepartedApi(portDetail.id, departTarget.id);
-      toast({ title: 'Vessel Departed ✓', description: `${departTarget.vessel_name} marked as departed. Berth freed.` });
-      setDepartTarget(null);
-      await loadDetail(portDetail.id);
-    } catch {
-      toast({ title: 'Error', description: 'Could not mark vessel as departed.', variant: 'destructive' });
-    } finally {
-      setDepartSubmitting(false);
     }
   };
 
@@ -456,13 +330,6 @@ export const SinglePortDetailPage: React.FC = () => {
     }
   };
 
-  // Filtered data
-  const filteredArrivals = (portDetail?.vessel_arrivals || []).filter((arr) => {
-    const matchSearch = arr.vessel_name.toLowerCase().includes(arrivalsSearch.toLowerCase()) || arr.vessel_mmsi.toString().includes(arrivalsSearch);
-    const matchStatus = arrivalsStatusFilter === 'all' || arr.status === arrivalsStatusFilter;
-    return matchSearch && matchStatus;
-  });
-
   const filteredBerths = (portDetail?.berth_slots || []).filter((b) => {
     if (berthFilter === 'occupied') return b.is_occupied;
     if (berthFilter === 'available') return !b.is_occupied;
@@ -487,10 +354,10 @@ export const SinglePortDetailPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-sm font-bold font-mono text-slate-900 dark:text-white tracking-tight leading-none">
-              {portDetail ? `${portDetail.name} (${portDetail.code})` : 'SINGLE PORT DETAIL'}
+              {portDetail ? `${portDetail.name} (${portDetail.code})` : 'PORT TERMINAL MANAGEMENT'}
             </h1>
             <p className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-medium tracking-wider mt-0.5">
-              PAGE 3.2 — PORT OPERATIONS & TERMINAL MANAGEMENT
+              BERTHS • CONGESTION • DISRUPTIONS
             </p>
           </div>
         </div>
@@ -574,7 +441,7 @@ export const SinglePortDetailPage: React.FC = () => {
               <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-2.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span><strong>ASSIGNED MANAGED STATION:</strong> Full operational controls active for <strong>{portDetail.name}</strong>. Terminal berths, congestion overrides, arrivals & departures are editable.</span>
+                  <span><strong>ASSIGNED MANAGED STATION:</strong> Full operational controls active for <strong>{portDetail.name}</strong>. Terminal berths and congestion overrides are editable.</span>
                 </div>
                 <span className="font-mono text-[11px] bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">OPERATIONAL AUTHORITY ACTIVE</span>
               </div>
@@ -618,6 +485,23 @@ export const SinglePortDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {/* ===== LINK TO VESSEL TRAFFIC (PAGE 3.3) ===== */}
+            <button
+              onClick={() => navigate(`/dashboard/vessel-logs/${portDetail.id}`)}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-950/30 dark:to-teal-950/20 border border-emerald-500/30 hover:border-emerald-500/60 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                  <Ship className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white">Vessel Arrivals & Departures</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Manage expected vessels, dockings, and departures for {portDetail.name}</div>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-emerald-500 group-hover:translate-x-1 transition-transform shrink-0" />
+            </button>
+
             {/* ===== SECTION 1: 4 KPI BOXES ===== */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-lg flex flex-col justify-between">
@@ -628,9 +512,6 @@ export const SinglePortDetailPage: React.FC = () => {
                 <div className="my-3">
                   <div className={`text-3xl font-black font-mono flex items-baseline gap-2 ${getCongestionStyle(portDetail.congestion_percent).color}`}>
                     {portDetail.congestion_percent}%
-                    <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 flex items-center">
-                      <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> Real-time
-                    </span>
                   </div>
                   {portDetail.congestion_source === 'manual' && (
                     <p className="text-[10px] text-amber-500 font-mono mt-1">✎ Manual by {portDetail.congestion_updated_by}</p>
@@ -649,7 +530,6 @@ export const SinglePortDetailPage: React.FC = () => {
                 <div className="my-3">
                   <div className="text-3xl font-black text-slate-900 dark:text-white font-mono flex items-baseline gap-2">
                     {portDetail.active_berths_used} / {portDetail.berth_capacity}
-                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">({Math.round((portDetail.active_berths_used / portDetail.berth_capacity) * 100)}% Used)</span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Currently Docked & Operating</p>
                 </div>
@@ -683,7 +563,6 @@ export const SinglePortDetailPage: React.FC = () => {
                 <div className="my-3">
                   <div className="text-3xl font-black text-slate-900 dark:text-white font-mono flex items-baseline gap-2">
                     {portDetail.avg_wait_hours}h
-                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">(~{(portDetail.avg_wait_hours / 24).toFixed(1)} Days)</span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Average Anchorage Dwell Time</p>
                 </div>
@@ -750,341 +629,158 @@ export const SinglePortDetailPage: React.FC = () => {
               </div>
             </section>
 
-            {/* ===== SECTION TABS: BERTHS | ARRIVALS | DEPARTURES ===== */}
+            {/* ===== BERTH MANAGEMENT ===== */}
             <section className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
-                  {[
-                    { key: 'berths', label: '⚓ Berth Management', icon: Anchor },
-                    { key: 'arrivals', label: '📅 Vessel Arrivals', icon: Calendar },
-                    { key: 'departures', label: '🚢 Departures', icon: Navigation },
-                  ].map(({ key, label }) => (
-                    <button
-                      key={key}
-                      onClick={() => setActiveSection(key as 'berths' | 'arrivals' | 'departures')}
-                      className={`px-4 py-2 rounded-xl font-bold transition-all ${activeSection === key ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
-                    >
-                      {label}
+                <div className="flex items-center gap-2">
+                  <Anchor className="w-5 h-5 text-amber-500" />
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Terminal Berth Management</h3>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {(['all', 'occupied', 'available'] as const).map((f) => (
+                    <button key={f} onClick={() => setBerthFilter(f)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${berthFilter === f ? 'bg-amber-500/20 border border-amber-500/40 text-amber-800 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs ml-2">
+                    <button onClick={() => setActiveBerthTab('diagram')} className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeBerthTab === 'diagram' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Diagram</button>
+                    <button onClick={() => setActiveBerthTab('table')} className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeBerthTab === 'table' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Table</button>
+                  </div>
                 </div>
               </div>
 
-              {/* ---- BERTHS ---- */}
-              {activeSection === 'berths' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 mr-1">Filter:</span>
-                      {(['all', 'occupied', 'available'] as const).map((f) => (
-                        <button key={f} onClick={() => setBerthFilter(f)}
-                          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${berthFilter === f ? 'bg-amber-500/20 border border-amber-500/40 text-amber-800 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                          {f.charAt(0).toUpperCase() + f.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                      <button onClick={() => setActiveBerthTab('diagram')} className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeBerthTab === 'diagram' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Diagram</button>
-                      <button onClick={() => setActiveBerthTab('table')} className={`px-3 py-1.5 rounded-lg font-bold transition-all ${activeBerthTab === 'table' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Table</button>
-                    </div>
-                  </div>
+              {activeBerthTab === 'diagram' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredBerths.map((berth) => (
+                    <div key={berth.id} className={`p-4 rounded-2xl border transition-all ${berth.is_occupied ? 'bg-slate-50 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800' : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30'}`}>
+                      <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                        <div>
+                          <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-300">{berth.berth_number}</span>
+                          <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">{berth.berth_name || 'Quay Slot'}</div>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${berth.is_occupied ? 'bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'}`}>
+                          {berth.is_occupied ? 'Occupied' : 'Available'}
+                        </span>
+                      </div>
 
-                  {activeBerthTab === 'diagram' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredBerths.map((berth) => (
-                        <div key={berth.id} className={`p-4 rounded-2xl border transition-all ${berth.is_occupied ? 'bg-slate-50 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800' : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30'}`}>
-                          <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                      {berth.is_occupied ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <Ship className="w-4 h-4 text-amber-500 shrink-0" />
                             <div>
-                              <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-300">{berth.berth_number}</span>
-                              <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">{berth.berth_name || 'Quay Slot'}</div>
+                              <div className="text-sm font-bold text-slate-900 dark:text-white">{berth.current_vessel_name || 'Vessel Docked'}</div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400">MMSI: {berth.current_vessel_mmsi || 'N/A'} • {berth.crane_count} Cranes</div>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${berth.is_occupied ? 'bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'}`}>
+                          </div>
+                          <div className="space-y-1 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <div className="flex justify-between text-[11px]">
+                              <span className="text-slate-500 dark:text-slate-400">Cargo Progress:</span>
+                              <span className="font-bold text-amber-600 dark:text-amber-300">{berth.loading_progress_percent}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400" style={{ width: `${berth.loading_progress_percent}%` }} />
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            ETD: {berth.estimated_departure ? new Date(berth.estimated_departure).toLocaleString() : 'TBD'}
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!isManagedPort) {
+                                toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot modify berths at ${portDetail.name}.`, variant: "destructive" });
+                                return;
+                              }
+                              setFreeBerthTarget(berth);
+                            }}
+                            className={isManagedPort
+                              ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all"
+                              : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
+                          >
+                            {isManagedPort ? <XCircle className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
+                            {isManagedPort ? "FREE BERTH" : "FREE BERTH (Read-Only)"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="py-3 text-center">
+                            <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">Ready for Next Vessel</div>
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">Max: {berth.max_vessel_length_meters || 350}m | Depth: {berth.max_draught_meters || 16}m</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!isManagedPort) {
+                                toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot assign berths at ${portDetail.name}.`, variant: "destructive" });
+                                return;
+                              }
+                              setAssignBerth(berth);
+                            }}
+                            className={isManagedPort
+                              ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all"
+                              : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
+                          >
+                            {isManagedPort ? <UserCheck className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
+                            {isManagedPort ? "ASSIGN VESSEL" : "ASSIGN VESSEL (Read-Only)"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
+                      <tr>
+                        <th className="p-3 text-white">Berth #</th>
+                        <th className="p-3 text-white">Docked Vessel</th>
+                        <th className="p-3 text-white">MMSI</th>
+                        <th className="p-3 text-white">Type</th>
+                        <th className="p-3 text-white">Progress</th>
+                        <th className="p-3 text-white">ETD</th>
+                        <th className="p-3 text-white">Status</th>
+                        <th className="p-3 text-white">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
+                      {(portDetail.berth_slots || []).map((berth) => (
+                        <tr key={berth.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-300">{berth.berth_number}</td>
+                          <td className="p-3 font-bold text-slate-900 dark:text-white">
+                            {berth.is_occupied ? berth.current_vessel_name || 'Occupied' : <span className="text-slate-400 font-normal">—</span>}
+                          </td>
+                          <td className="p-3 font-mono text-slate-600 dark:text-slate-400">{berth.current_vessel_mmsi || '—'}</td>
+                          <td className="p-3 text-slate-700 dark:text-slate-300">{berth.berth_type || 'General'}</td>
+                          <td className="p-3 font-mono">{berth.is_occupied ? <span className="text-amber-600 dark:text-amber-400 font-bold">{berth.loading_progress_percent}%</span> : '—'}</td>
+                          <td className="p-3 font-mono text-slate-700 dark:text-slate-300">
+                            {berth.estimated_departure ? new Date(berth.estimated_departure).toLocaleString() : '—'}
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${berth.is_occupied ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300' : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'}`}>
                               {berth.is_occupied ? 'Occupied' : 'Available'}
                             </span>
-                          </div>
-
-                          {berth.is_occupied ? (
-                            <div className="space-y-2.5">
-                              <div className="flex items-center gap-2">
-                                <Ship className="w-4 h-4 text-amber-500 shrink-0" />
-                                <div>
-                                  <div className="text-sm font-bold text-slate-900 dark:text-white">{berth.current_vessel_name || 'Vessel Docked'}</div>
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400">MMSI: {berth.current_vessel_mmsi || 'N/A'} • {berth.crane_count} Cranes</div>
-                                </div>
-                              </div>
-                              <div className="space-y-1 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
-                                <div className="flex justify-between text-[11px]">
-                                  <span className="text-slate-500 dark:text-slate-400">Cargo Progress:</span>
-                                  <span className="font-bold text-amber-600 dark:text-amber-300">{berth.loading_progress_percent}%</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400" style={{ width: `${berth.loading_progress_percent}%` }} />
-                                </div>
-                              </div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                                ETD: {berth.estimated_departure ? new Date(berth.estimated_departure).toLocaleString() : 'TBD'}
-                              </div>
-                              {/* FREE BERTH button */}
-                              <button
-                                onClick={() => {
-                                  if (!isManagedPort) {
-                                    toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot modify berths at ${portDetail.name}.`, variant: "destructive" });
-                                    return;
-                                  }
-                                  setFreeBerthTarget(berth);
-                                }}
-                                className={isManagedPort
-                                  ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all"
-                                  : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
-                              >
-                                {isManagedPort ? <XCircle className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
-                                {isManagedPort ? "FREE BERTH" : "FREE BERTH (Read-Only)"}
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="py-3 text-center">
-                                <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">Ready for Next Vessel</div>
-                                <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">Max: {berth.max_vessel_length_meters || 350}m | Depth: {berth.max_draught_meters || 16}m</div>
-                              </div>
-                              {/* ASSIGN VESSEL button */}
-                              <button
-                                onClick={() => {
-                                  if (!isManagedPort) {
-                                    toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot assign berths at ${portDetail.name}.`, variant: "destructive" });
-                                    return;
-                                  }
-                                  setAssignBerth(berth);
-                                }}
-                                className={isManagedPort
-                                  ? "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all"
-                                  : "w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[11px] font-mono cursor-not-allowed opacity-60"}
-                              >
-                                {isManagedPort ? <UserCheck className="w-3.5 h-3.5" /> : <Lock className="w-3 h-3" />}
-                                {isManagedPort ? "ASSIGN VESSEL" : "ASSIGN VESSEL (Read-Only)"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
-                          <tr>
-                            <th className="p-3 text-white">Berth #</th>
-                            <th className="p-3 text-white">Docked Vessel</th>
-                            <th className="p-3 text-white">MMSI</th>
-                            <th className="p-3 text-white">Type</th>
-                            <th className="p-3 text-white">Progress</th>
-                            <th className="p-3 text-white">ETD</th>
-                            <th className="p-3 text-white">Status</th>
-                            <th className="p-3 text-white">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
-                          {(portDetail.berth_slots || []).map((berth) => (
-                            <tr key={berth.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                              <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-300">{berth.berth_number}</td>
-                              <td className="p-3 font-bold text-slate-900 dark:text-white">
-                                {berth.is_occupied ? berth.current_vessel_name || 'Occupied' : <span className="text-slate-400 font-normal">—</span>}
-                              </td>
-                              <td className="p-3 font-mono text-slate-600 dark:text-slate-400">{berth.current_vessel_mmsi || '—'}</td>
-                              <td className="p-3 text-slate-700 dark:text-slate-300">{berth.berth_type || 'General'}</td>
-                              <td className="p-3 font-mono">{berth.is_occupied ? <span className="text-amber-600 dark:text-amber-400 font-bold">{berth.loading_progress_percent}%</span> : '—'}</td>
-                              <td className="p-3 font-mono text-slate-700 dark:text-slate-300">
-                                {berth.estimated_departure ? new Date(berth.estimated_departure).toLocaleString() : '—'}
-                              </td>
-                              <td className="p-3">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${berth.is_occupied ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300' : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'}`}>
-                                  {berth.is_occupied ? 'Occupied' : 'Available'}
-                                </span>
-                              </td>
-                              <td className="p-3">
-                                {isManagedPort ? (
-                                  berth.is_occupied ? (
-                                    <button onClick={() => setFreeBerthTarget(berth)} className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-bold hover:bg-rose-500/25 transition-all border border-rose-500/20">
-                                      Free Berth
-                                    </button>
-                                  ) : (
-                                    <button onClick={() => setAssignBerth(berth)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/25 transition-all border border-emerald-500/20">
-                                      Assign Vessel
-                                    </button>
-                                  )
-                                ) : (
-                                  <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                                    <Lock className="w-3 h-3 text-slate-400" /> Read-Only
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ---- ARRIVALS ---- */}
-              {activeSection === 'arrivals' && (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                        <input type="text" placeholder="Filter vessel..." value={arrivalsSearch} onChange={(e) => setArrivalsSearch(e.target.value)}
-                          className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none w-44" />
-                      </div>
-                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px]">
-                        {['all', 'Scheduled', 'Delayed', 'Cancelled'].map((st) => (
-                          <button key={st} onClick={() => setArrivalsStatusFilter(st as typeof arrivalsStatusFilter)}
-                            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${arrivalsStatusFilter === st ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40' : 'text-slate-600 dark:text-slate-400'}`}>
-                            {st === 'all' ? 'All' : st}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (!isManagedPort) {
-                          toast({ title: "Operational Access Restricted", description: `You are assigned to ${userPortName}. You cannot add arrivals for ${portDetail.name}.`, variant: "destructive" });
-                          return;
-                        }
-                        setShowAddArrivalModal(true);
-                      }}
-                      className={isManagedPort
-                        ? "flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
-                        : "flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold transition-all cursor-not-allowed opacity-70"}
-                    >
-                      {isManagedPort ? <Plus className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5" />}
-                      {isManagedPort ? "ADD ARRIVAL" : "ADD ARRIVAL (Read-Only)"}
-                    </button>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
-                        <tr>
-                          <th className="p-3 text-white">ETA</th>
-                          <th className="p-3 text-white">Vessel Name</th>
-                          <th className="p-3 text-white">MMSI / Type</th>
-                          <th className="p-3 text-white">Cargo</th>
-                          <th className="p-3 text-white">Berth</th>
-                          <th className="p-3 text-white">Status</th>
-                          <th className="p-3 text-white">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
-                        {filteredArrivals.length === 0 ? (
-                          <tr><td colSpan={7} className="p-6 text-center text-slate-500 font-mono text-xs">No arrivals in 72h window.</td></tr>
-                        ) : filteredArrivals.map((arr) => (
-                          <tr key={arr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
-                            <td className="p-3 font-mono font-bold text-amber-600 dark:text-amber-300">
-                              <div className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-amber-500" />{new Date(arr.eta).toLocaleString()}</div>
-                            </td>
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{arr.vessel_name}</td>
-                            <td className="p-3 font-mono text-slate-600 dark:text-slate-300">MMSI {arr.vessel_mmsi} • {arr.vessel_type || 'Container'}</td>
-                            <td className="p-3 text-slate-700 dark:text-slate-300">{arr.cargo_type || '—'}</td>
-                            <td className="p-3 font-mono text-slate-700 dark:text-slate-300">{arr.berth_assignment_status || 'Pending'}</td>
-                            <td className="p-3">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${arr.status === 'Scheduled' || arr.status === 'Expected' ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : arr.status === 'Cancelled' ? 'bg-slate-500/20 text-slate-500 dark:text-slate-400' : 'bg-rose-500/20 text-rose-700 dark:text-rose-300'}`}>
-                                {arr.status}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              {isManagedPort ? (
-                                arr.status !== 'Cancelled' && arr.status !== 'Docked' && arr.status !== 'Departed' ? (
-                                  <div className="flex items-center gap-1">
-                                    <button onClick={() => setMarkArrivedTarget(arr)} title="Mark Arrived"
-                                      className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all">
-                                      <CheckCircle className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button onClick={() => { setEditEtaArrival(arr); setEditEtaValue(arr.eta.slice(0, 16)); }} title="Edit ETA"
-                                      className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/20 transition-all">
-                                      <Edit3 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button onClick={() => setCancelArrivalTarget(arr)} title="Cancel"
-                                      className="p-1.5 rounded-lg bg-slate-500/15 hover:bg-rose-500/20 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 transition-all">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[11px] text-slate-400 font-mono">—</span>
-                                )
-                              ) : (
-                                <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                                  <Lock className="w-3 h-3 text-slate-400" /> Read-Only
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* ---- DEPARTURES ---- */}
-              {activeSection === 'departures' && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
-                      <Navigation className="w-4 h-4 text-amber-500" />
-                      Currently Docked Vessels — Mark for Departure
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Marking a vessel as departed will automatically free its berth.</p>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/95 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none bg-white">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900 dark:bg-slate-950 text-white dark:text-slate-300 font-mono uppercase text-[11px] border-b border-slate-900 dark:border-slate-800">
-                        <tr>
-                          <th className="p-3 text-white">Vessel Name</th>
-                          <th className="p-3 text-white">MMSI</th>
-                          <th className="p-3 text-white">Type</th>
-                          <th className="p-3 text-white">Berth Assignment</th>
-                          <th className="p-3 text-white">Arrived (ATA)</th>
-                          <th className="p-3 text-white">Status</th>
-                          <th className="p-3 text-white">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
-                        {(portDetail.docked_vessels || []).length === 0 ? (
-                          <tr><td colSpan={7} className="p-6 text-center text-slate-500 font-mono text-xs">No vessels currently docked.</td></tr>
-                        ) : (portDetail.docked_vessels || []).map((vessel) => (
-                          <tr key={vessel.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
-                            <td className="p-3 font-bold text-slate-900 dark:text-white">{vessel.vessel_name}</td>
-                            <td className="p-3 font-mono text-slate-600 dark:text-slate-400">{vessel.vessel_mmsi}</td>
-                            <td className="p-3 text-slate-700 dark:text-slate-300">{vessel.vessel_type || 'Container'}</td>
-                            <td className="p-3 font-mono text-slate-700 dark:text-slate-300">{vessel.berth_assignment_status || 'Docked'}</td>
-                            <td className="p-3 font-mono text-slate-600 dark:text-slate-400">
-                              {vessel.ata ? new Date(vessel.ata).toLocaleString() : '—'}
-                            </td>
-                            <td className="p-3">
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300">Docked</span>
-                            </td>
-                            <td className="p-3">
-                              {isManagedPort ? (
-                                <button
-                                  onClick={() => setDepartTarget(vessel)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold shadow-sm transition-all"
-                                >
-                                  <Navigation className="w-3 h-3" /> MARK DEPARTED
+                          </td>
+                          <td className="p-3">
+                            {isManagedPort ? (
+                              berth.is_occupied ? (
+                                <button onClick={() => setFreeBerthTarget(berth)} className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-bold hover:bg-rose-500/25 transition-all border border-rose-500/20">
+                                  Free Berth
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
-                                  <Lock className="w-3 h-3 text-slate-400" /> Read-Only
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                <button onClick={() => setAssignBerth(berth)} className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold hover:bg-emerald-500/25 transition-all border border-emerald-500/20">
+                                  Assign Vessel
+                                </button>
+                              )
+                            ) : (
+                              <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                                <Lock className="w-3 h-3 text-slate-400" /> Read-Only
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>
@@ -1149,138 +845,12 @@ export const SinglePortDetailPage: React.FC = () => {
       </main>
 
       <footer className="py-4 text-center text-xs text-slate-500 font-mono border-t border-slate-200 dark:border-slate-800 ml-16">
-        PORT OPERATIONS & TERMINAL DETAIL • PAGE 3.2 © 2026
+        PORT TERMINAL & BERTH MANAGEMENT © 2026
       </footer>
 
       {/* ======================================================== */}
       {/* MODALS                                                   */}
       {/* ======================================================== */}
-
-      {/* Congestion Update Modal */}
-      <AnimatePresence>
-        {showCongestionModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2"><Gauge className="w-5 h-5 text-amber-500" /><h3 className="font-bold text-slate-900 dark:text-white">Update Port Congestion</h3></div>
-                <button onClick={() => setShowCongestionModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
-              </div>
-              <form onSubmit={handleCongestionSubmit} className="space-y-4 text-sm">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-2">
-                    Congestion: <span className={`font-black text-lg ${getCongestionStyle(congestionValue).color}`}>{congestionValue}%</span>
-                  </label>
-                  <input type="range" min={0} max={100} step={1} value={congestionValue} onChange={(e) => setCongestionValue(Number(e.target.value))} className="w-full accent-amber-500" />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-                    <span>0% — Clear</span><span>50% — Busy</span><span>100% — Critical</span>
-                  </div>
-                </div>
-                <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div className={`h-full ${getCongestionStyle(congestionValue).bar} transition-all duration-200`} style={{ width: `${congestionValue}%` }} />
-                </div>
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Note / Reason <span className="text-slate-400">(optional)</span></label>
-                  <textarea rows={3} placeholder="e.g. Emergency drill — all berths occupied" value={congestionNote} onChange={(e) => setCongestionNote(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs resize-none focus:border-amber-500 focus:outline-none" />
-                </div>
-                <div className="flex justify-end gap-3 pt-1">
-                  <button type="button" onClick={() => setShowCongestionModal(false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
-                  <button type="submit" disabled={congestionSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm disabled:opacity-60 transition-all">
-                    {congestionSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    Submit Override
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Arrival Modal */}
-      <AnimatePresence>
-        {showAddArrivalModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2"><Plus className="w-5 h-5 text-blue-500" /><h3 className="font-bold text-slate-900 dark:text-white">Add Vessel Arrival</h3></div>
-                <button onClick={() => setShowAddArrivalModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
-              </div>
-              <form onSubmit={handleAddArrival} className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Vessel Name *</label>
-                    <input type="text" required placeholder="e.g. MSC Magna" value={arrivalForm.vessel_name} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_name: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">MMSI *</label>
-                    <input type="number" required placeholder="357431000" value={arrivalForm.vessel_mmsi} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_mmsi: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Vessel Type</label>
-                    <select value={arrivalForm.vessel_type} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
-                      {['Container', 'Bulk Carrier', 'Tanker', 'RoRo', 'General Cargo'].map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Cargo Type</label>
-                    <input type="text" placeholder="Electronics, Steel..." value={arrivalForm.cargo_type} onChange={(e) => setArrivalForm(f => ({ ...f, cargo_type: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white" />
-                  </div>
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Flag</label>
-                    <input type="text" placeholder="Panama" value={arrivalForm.vessel_flag} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_flag: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">ETA *</label>
-                    <input type="datetime-local" required value={arrivalForm.eta} onChange={(e) => setArrivalForm(f => ({ ...f, eta: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAddArrivalModal(false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
-                  <button type="submit" disabled={arrivalSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm disabled:opacity-60 transition-all">
-                    {arrivalSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ship className="w-4 h-4" />}
-                    Add to Schedule
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Edit ETA Modal */}
-      <AnimatePresence>
-        {editEtaArrival && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2"><Edit3 className="w-5 h-5 text-amber-500" /><h3 className="font-bold text-slate-900 dark:text-white">Edit ETA</h3></div>
-                <button onClick={() => setEditEtaArrival(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Revising ETA for <span className="font-bold text-slate-900 dark:text-white">{editEtaArrival.vessel_name}</span></p>
-              <form onSubmit={handleEditEta} className="space-y-4">
-                <input type="datetime-local" required value={editEtaValue} onChange={(e) => setEditEtaValue(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-amber-500 focus:outline-none" />
-                <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setEditEtaArrival(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
-                  <button type="submit" disabled={editEtaSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm disabled:opacity-60 transition-all">
-                    {editEtaSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    Update ETA
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Assign Vessel to Berth Modal */}
       <AnimatePresence>
@@ -1355,81 +925,6 @@ export const SinglePortDetailPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Confirm Mark Arrived */}
-      <AnimatePresence>
-        {markArrivedTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-emerald-500/15 text-emerald-500"><CheckCircle className="w-6 h-6" /></div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white">Mark as Arrived?</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{markArrivedTarget.vessel_name}</span> will be marked as docked.</p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setMarkArrivedTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
-                <button onClick={handleMarkArrived} disabled={markArrivedSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm disabled:opacity-60 transition-all">
-                  {markArrivedSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  Confirm Arrival
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Confirm Cancel Arrival */}
-      <AnimatePresence>
-        {cancelArrivalTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-slate-500/15 text-slate-500"><Trash2 className="w-6 h-6" /></div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white">Cancel Arrival?</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{cancelArrivalTarget.vessel_name}</span> will be removed from the schedule.</p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setCancelArrivalTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Keep</button>
-                <button onClick={handleCancelArrival} disabled={cancelSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-sm disabled:opacity-60 transition-all">
-                  {cancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  Cancel Arrival
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Confirm Mark Departed */}
-      <AnimatePresence>
-        {departTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-rose-500/15 text-rose-500"><Navigation className="w-6 h-6" /></div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white">Mark as Departed?</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{departTarget.vessel_name}</span> will depart and its berth will be freed.</p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setDepartTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
-                <button onClick={handleMarkDeparted} disabled={departSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm disabled:opacity-60 transition-all">
-                  {departSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
-                  Confirm Departure
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Flag Disruption Modal */}
       <AnimatePresence>
         {isDisruptionModalOpen && (
@@ -1491,32 +986,6 @@ export const SinglePortDetailPage: React.FC = () => {
                   <Button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-bold">Broadcast Disruption Flag</Button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Vessel Detail Drawer */}
-      <AnimatePresence>
-        {selectedVesselDetail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end p-4 bg-slate-950/70 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl max-w-md w-full max-h-[600px] overflow-y-auto space-y-4 text-xs text-slate-900 dark:text-white">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2"><Ship className="w-5 h-5 text-amber-500" />
-                  <div><h3 className="font-bold text-base">{selectedVesselDetail.name}</h3><span className="text-[11px] text-slate-500 dark:text-slate-400">{selectedVesselDetail.flag}</span></div>
-                </div>
-                <button onClick={() => setSelectedVesselDetail(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono">
-                <div><span className="text-slate-500 dark:text-slate-400 block">IMO / MMSI</span><span className="font-bold">{selectedVesselDetail.imo}</span></div>
-                <div><span className="text-slate-500 dark:text-slate-400 block">Vessel Type</span><span className="text-amber-600 dark:text-amber-300 font-bold">{selectedVesselDetail.vessel_type}</span></div>
-                <div><span className="text-slate-500 dark:text-slate-400 block">Assigned Berth</span><span className="font-bold">{selectedVesselDetail.assigned_berth || 'Anchorage Queue'}</span></div>
-                <div><span className="text-slate-500 dark:text-slate-400 block">Status</span><span className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedVesselDetail.status || 'Active'}</span></div>
-              </div>
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-                <Button onClick={() => setSelectedVesselDetail(null)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Close Vessel Dossier</Button>
-              </div>
             </motion.div>
           </div>
         )}

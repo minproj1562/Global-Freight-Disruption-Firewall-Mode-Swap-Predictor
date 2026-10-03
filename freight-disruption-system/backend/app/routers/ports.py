@@ -1,9 +1,11 @@
 # backend/app/routers/ports.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_, String
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta
+import csv
+import io
 from app.database import get_db
 from app.services.ai_telemetry_engine import get_full_network_telemetry
 from app.schemas.port import (
@@ -683,6 +685,126 @@ async def mark_vessel_departed(
     db.commit()
     db.refresh(arrival)
     return arrival
+
+
+# ============= PAGE 3.3: PORT-SCOPED VESSEL TRAFFIC LOG =============
+# Replaces the old disconnected /api/vessel-logs endpoint (VesselLog table had
+# no arrive/depart/cancel workflow). This is built directly on VesselArrival,
+# the same table Page 3.2's berth operations use, strictly filtered by port_id
+# so a Port Manager only ever sees vessels tied to their own station.
+
+def _filter_vessel_traffic_query(
+    db: Session,
+    port_id: str,
+    category: Optional[str],
+    search: Optional[str],
+    vessel_type: Optional[str],
+    flag: Optional[str],
+):
+    query = db.query(VesselArrival).filter(VesselArrival.port_id == port_id)
+
+    if category == "Expected":
+        query = query.filter(VesselArrival.status.in_(["Scheduled", "Anchored", "Delayed"]))
+    elif category == "Docked":
+        query = query.filter(VesselArrival.status == "Docked")
+    elif category == "Departed":
+        query = query.filter(VesselArrival.status == "Departed")
+    elif category and category != "All":
+        query = query.filter(VesselArrival.status == category)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                VesselArrival.vessel_name.ilike(pattern),
+                VesselArrival.vessel_mmsi.cast(String).ilike(pattern),
+                VesselArrival.cargo_type.ilike(pattern),
+            )
+        )
+
+    if vessel_type and vessel_type != "All":
+        query = query.filter(VesselArrival.vessel_type == vessel_type)
+
+    if flag and flag != "All":
+        query = query.filter(VesselArrival.vessel_flag.ilike(f"%{flag}%"))
+
+    return query
+
+
+@router.get("/{port_id}/vessel-traffic", response_model=List[VesselArrivalResponse])
+async def get_port_vessel_traffic(
+    port_id: str,
+    category: Optional[str] = Query("Expected", description="Expected, Docked, Departed, or All"),
+    search: Optional[str] = None,
+    vessel_type: Optional[str] = Query(None, alias="type"),
+    flag: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Unified, port-scoped vessel traffic log for Page 3.3.
+    Vessels returned are strictly tied to the given port_id — Expected
+    (not yet arrived), Docked (currently berthed), or Departed (history).
+    """
+    port = db.query(Port).filter(Port.id == port_id).first()
+    if not port:
+        raise HTTPException(status_code=404, detail=f"Port '{port_id}' not found")
+
+    ensure_docked_and_upcoming_vessels(port_id, db)
+
+    query = _filter_vessel_traffic_query(db, port_id, category, search, vessel_type, flag)
+
+    if category == "Departed":
+        query = query.order_by(desc(VesselArrival.atd))
+    else:
+        query = query.order_by(VesselArrival.eta)
+
+    return query.limit(300).all()
+
+
+@router.get("/{port_id}/vessel-traffic/export-csv")
+async def export_port_vessel_traffic_csv(
+    port_id: str,
+    category: Optional[str] = Query("Expected"),
+    search: Optional[str] = None,
+    vessel_type: Optional[str] = Query(None, alias="type"),
+    flag: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Export the port-scoped vessel traffic log as a CSV download."""
+    port = db.query(Port).filter(Port.id == port_id).first()
+    if not port:
+        raise HTTPException(status_code=404, detail=f"Port '{port_id}' not found")
+
+    query = _filter_vessel_traffic_query(db, port_id, category, search, vessel_type, flag)
+    if category == "Departed":
+        query = query.order_by(desc(VesselArrival.atd))
+    else:
+        query = query.order_by(VesselArrival.eta)
+
+    records = query.limit(1000).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Vessel Name", "MMSI", "Type", "Flag", "ETA", "ATA", "ETD", "ATD",
+        "Status", "Berth Assignment", "Cargo Type", "Cargo Tonnage", "TEU Count"
+    ])
+    for r in records:
+        writer.writerow([
+            r.vessel_name, r.vessel_mmsi, r.vessel_type or "", r.vessel_flag or "",
+            r.eta.isoformat() if r.eta else "", r.ata.isoformat() if r.ata else "",
+            r.etd.isoformat() if r.etd else "", r.atd.isoformat() if r.atd else "",
+            r.status, r.berth_assignment_status, r.cargo_type or "", r.cargo_tonnage or "",
+            r.teu_count or ""
+        ])
+
+    csv_data = output.getvalue()
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=port_{port.code}_vessel_traffic_{category}.csv"}
+    )
+
 
 # ============= FLAG PORT DISRUPTION =============
 

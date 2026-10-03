@@ -232,6 +232,37 @@ export const markVesselDepartedApi = async (
   return response.data;
 };
 
+// ============= PAGE 3.3: PORT-SCOPED VESSEL TRAFFIC LOG =============
+
+export type VesselTrafficCategory = 'Expected' | 'Docked' | 'Departed' | 'All';
+
+export const fetchPortVesselTraffic = async (
+  portId: string,
+  params?: { category?: VesselTrafficCategory; search?: string; type?: string; flag?: string }
+): Promise<BackendVesselArrival[]> => {
+  const query: Record<string, string> = {};
+  if (params?.category) query.category = params.category;
+  if (params?.search) query.search = params.search;
+  if (params?.type && params.type !== 'All') query.type = params.type;
+  if (params?.flag && params.flag !== 'All') query.flag = params.flag;
+
+  const response = await api.get<BackendVesselArrival[]>(`/api/ports/${portId}/vessel-traffic`, { params: query });
+  return response.data;
+};
+
+export const getPortVesselTrafficExportUrl = (
+  portId: string,
+  params?: { category?: VesselTrafficCategory; search?: string; type?: string; flag?: string }
+): string => {
+  const query = new URLSearchParams();
+  if (params?.category) query.append('category', params.category);
+  if (params?.search) query.append('search', params.search);
+  if (params?.type && params.type !== 'All') query.append('type', params.type);
+  if (params?.flag && params.flag !== 'All') query.append('flag', params.flag);
+  const base = api.defaults.baseURL || '';
+  return `${base}/api/ports/${portId}/vessel-traffic/export-csv?${query.toString()}`;
+};
+
 // ============= NETWORK TELEMETRY TYPES =============
 
 export interface VesselScheduleEntry {
@@ -336,5 +367,3 @@ export const fetchLandingTelemetryApi = async (): Promise<LandingTelemetryData> 
   const response = await api.get<LandingTelemetryData>('/api/ports/landing-telemetry');
   return response.data;
 };
-
-

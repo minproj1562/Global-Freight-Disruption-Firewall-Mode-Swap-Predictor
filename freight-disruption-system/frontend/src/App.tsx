@@ -85,6 +85,7 @@ function App() {
 
           {/* Page 3.3 — Vessel Arrival/Departure Log */}
           <Route path="/dashboard/vessel-logs" element={<VesselLogsPage />} />
+          <Route path="/dashboard/vessel-logs/:portId" element={<VesselLogsPage />} />
           <Route path="/dashboard/vessels/logs" element={<VesselLogsPage />} />
 
           {/* Page 1.1 — Operations Command / Freight Firewall */}

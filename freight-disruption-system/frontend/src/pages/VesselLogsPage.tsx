@@ -1,10 +1,11 @@
 // frontend/src/pages/VesselLogsPage.tsx
-// Page 3.3 — Vessel Arrival/Departure Log
-// Tabs: Arrivals, Departures, Expected. Table with vessel details. Filter by date/type/flag, search, export CSV.
+// Vessel Arrivals & Departures — port-scoped vessel traffic log with full
+// manual-update workflow (add / edit ETA / mark arrived / cancel / mark departed),
+// built directly on the same VesselArrival data Page 3.2's berths use.
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Ship,
   Anchor,
@@ -12,45 +13,122 @@ import {
   Download,
   Clock,
   RefreshCw,
-  Activity,
-  Settings,
+  Loader2,
+  AlertCircle,
+  Plus,
+  Edit3,
+  CheckCircle,
+  XCircle,
+  Navigation,
+  Lock,
+  Globe,
+  X,
 } from 'lucide-react';
-import { getVesselLogs, getVesselLogsExportUrl, VesselLogEntry } from '@/services/api';
+import {
+  fetchAllPorts,
+  fetchPortVesselTraffic,
+  getPortVesselTrafficExportUrl,
+  addVesselArrivalApi,
+  updateVesselETAApi,
+  markVesselArrivedApi,
+  cancelVesselArrivalApi,
+  markVesselDepartedApi,
+  BackendPort,
+  BackendVesselArrival,
+  VesselTrafficCategory,
+} from '@/services/portManagerApi';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/components/ui/use-toast';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
-
 import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';
 
+const TABS: { key: VesselTrafficCategory; label: string }[] = [
+  { key: 'Expected', label: 'Expected Arrivals' },
+  { key: 'Docked', label: 'Currently Docked' },
+  { key: 'Departed', label: 'Departed' },
+];
+
+// Sentinel used consistently across this page, portManagerApi.ts, and the backend router.
+// IMPORTANT: Must always be the capitalized 'All' string to match the checks in
+// portManagerApi.ts (`!== 'All'`) and ports.py (`!= "All"`).
+const FILTER_ALL = 'All';
+
 export const VesselLogsPage: React.FC = () => {
-  const { user } = useAuthStore();
+  const { portId: portIdParam } = useParams<{ portId: string }>();
+  const navigate = useNavigate();
+  const { user, role } = useAuthStore();
+  const { toast } = useToast();
 
-  // Logs state
-  const [logs, setLogs] = useState<VesselLogEntry[]>([]);
+  const [allPortsList, setAllPortsList] = useState<BackendPort[]>([]);
+  const [activePortId, setActivePortId] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState<boolean>(true);
+
+  const activePort = useMemo(
+    () => allPortsList.find((p) => p.id === activePortId) || null,
+    [allPortsList, activePortId]
+  );
+
+  const isManagedPort = useMemo(() => {
+    if (role === 'admin') return true;
+    if (!activePortId) return false;
+    if (user?.portId) return activePortId === user.portId;
+    return false;
+  }, [role, user?.portId, activePortId]);
+
+  const [logs, setLogs] = useState<BackendVesselArrival[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  // Tab State: 'Arrivals' | 'Departures' | 'Expected'
-  const [activeTab, setActiveTab] = useState<'Arrivals' | 'Departures' | 'Expected'>('Arrivals');
-
-  // Search & Filter States
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<VesselTrafficCategory>('Expected');
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [flagFilter, setFlagFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>(FILTER_ALL);
+  const [flagFilter, setFlagFilter] = useState<string>(FILTER_ALL);
 
-  // Fetch vessel logs from Backend API
-  const fetchLogs = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getVesselLogs({
-        category: activeTab,
-        search: searchTerm,
-        type: typeFilter,
-        flag: flagFilter
-      });
-      if (data && data.length > 0) {
-        setLogs(data);
+  // ============= INITIAL PORT RESOLUTION =============
+
+  useEffect(() => {
+    const init = async () => {
+      setInitializing(true);
+      try {
+        const ports = await fetchAllPorts();
+        setAllPortsList(ports);
+        const target = portIdParam || user?.portId || ports[0]?.id || null;
+        setActivePortId(target);
+      } catch (err) {
+        console.error('Failed to load ports list:', err);
+        setLoadError('Could not connect to backend server.');
+      } finally {
+        setInitializing(false);
       }
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (portIdParam && portIdParam !== activePortId) {
+      setActivePortId(portIdParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portIdParam]);
+
+  // ============= FETCH VESSEL TRAFFIC =============
+
+  const fetchLogs = async () => {
+    if (!activePortId) return;
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await fetchPortVesselTraffic(activePortId, {
+        category: activeTab,
+        search: searchTerm || undefined,
+        type: typeFilter,
+        flag: flagFilter,
+      });
+      setLogs(data);
     } catch (err) {
-      console.warn('Backend API connection fallback to mock data:', err);
+      console.error('Failed to fetch vessel traffic:', err);
+      setLoadError('Could not load vessel traffic for this port.');
+      setLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -58,274 +136,333 @@ export const VesselLogsPage: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, [activeTab, searchTerm, typeFilter, flagFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePortId, activeTab, searchTerm, typeFilter, flagFilter]);
 
-  // Extract unique vessel types and flags for dropdown filters
   const vesselTypes = useMemo(() => {
-    const types = new Set(logs.map((log) => log.type));
-    return ['all', ...Array.from(types)];
+    const types = new Set(logs.map((l) => l.vessel_type).filter(Boolean) as string[]);
+    return [FILTER_ALL, ...Array.from(types)];
   }, [logs]);
 
   const vesselFlags = useMemo(() => {
-    const flags = new Set(logs.map((log) => log.flag));
-    return ['all', ...Array.from(flags)];
+    const flags = new Set(logs.map((l) => l.vessel_flag).filter(Boolean) as string[]);
+    return [FILTER_ALL, ...Array.from(flags)];
   }, [logs]);
 
-  // Filtered dataset
-  const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
-      // Tab matching
-      if (log.category !== activeTab) return false;
-
-      // Search matching (name, mmsi, imo, port, cargo)
-      const matchesSearch =
-        log.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.mmsi.toString().includes(searchTerm) ||
-        log.imo.toString().includes(searchTerm) ||
-        log.port.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.cargo.toLowerCase().includes(searchTerm.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      // Type filter
-      if (typeFilter !== 'all' && log.type !== typeFilter) return false;
-
-      // Flag filter
-      if (flagFilter !== 'all' && log.flag !== flagFilter) return false;
-
-      return true;
-    });
-  }, [logs, activeTab, searchTerm, typeFilter, flagFilter]);
-
-  // Export to CSV feature (fetches directly from API endpoint or triggers download)
   const handleExportCSV = () => {
-    const exportUrl = getVesselLogsExportUrl({
+    if (!activePortId) return;
+    const url = getPortVesselTrafficExportUrl(activePortId, {
       category: activeTab,
-      search: searchTerm,
+      search: searchTerm || undefined,
       type: typeFilter,
-      flag: flagFilter
+      flag: flagFilter,
     });
-    window.open(exportUrl, '_blank');
+    window.open(url, '_blank');
   };
 
+  // ============= ADD ARRIVAL MODAL =============
 
-  const getStatusBadge = (status: VesselLogEntry['status']) => {
+  const [showAddArrivalModal, setShowAddArrivalModal] = useState(false);
+  const [arrivalForm, setArrivalForm] = useState({ vessel_name: '', vessel_mmsi: '', vessel_type: 'Container', vessel_flag: '', eta: '', cargo_type: '' });
+  const [arrivalSubmitting, setArrivalSubmitting] = useState(false);
+
+  const handleAddArrival = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activePortId) return;
+    setArrivalSubmitting(true);
+    try {
+      await addVesselArrivalApi(activePortId, {
+        vessel_mmsi: parseInt(arrivalForm.vessel_mmsi, 10),
+        vessel_name: arrivalForm.vessel_name,
+        vessel_type: arrivalForm.vessel_type,
+        vessel_flag: arrivalForm.vessel_flag || undefined,
+        eta: new Date(arrivalForm.eta).toISOString(),
+        cargo_type: arrivalForm.cargo_type || undefined,
+      });
+      toast({ title: 'Arrival Added ✓', description: `${arrivalForm.vessel_name} added to the schedule.` });
+      setShowAddArrivalModal(false);
+      setArrivalForm({ vessel_name: '', vessel_mmsi: '', vessel_type: 'Container', vessel_flag: '', eta: '', cargo_type: '' });
+      setActiveTab('Expected');
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: 'Could not add arrival. Verify backend.', variant: 'destructive' });
+    } finally {
+      setArrivalSubmitting(false);
+    }
+  };
+
+  // ============= EDIT ETA =============
+
+  const [editEtaTarget, setEditEtaTarget] = useState<BackendVesselArrival | null>(null);
+  const [editEtaValue, setEditEtaValue] = useState('');
+  const [editEtaSubmitting, setEditEtaSubmitting] = useState(false);
+
+  const handleEditEta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activePortId || !editEtaTarget) return;
+    setEditEtaSubmitting(true);
+    try {
+      await updateVesselETAApi(activePortId, editEtaTarget.id, new Date(editEtaValue).toISOString());
+      toast({ title: 'ETA Updated ✓', description: `${editEtaTarget.vessel_name} ETA revised.` });
+      setEditEtaTarget(null);
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: 'Could not update ETA.', variant: 'destructive' });
+    } finally {
+      setEditEtaSubmitting(false);
+    }
+  };
+
+  // ============= MARK ARRIVED =============
+
+  const [markArrivedTarget, setMarkArrivedTarget] = useState<BackendVesselArrival | null>(null);
+  const [markArrivedSubmitting, setMarkArrivedSubmitting] = useState(false);
+
+  const handleMarkArrived = async () => {
+    if (!activePortId || !markArrivedTarget) return;
+    setMarkArrivedSubmitting(true);
+    try {
+      await markVesselArrivedApi(activePortId, markArrivedTarget.id);
+      toast({ title: 'Vessel Arrived ✓', description: `${markArrivedTarget.vessel_name} marked as docked.` });
+      setMarkArrivedTarget(null);
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: 'Could not mark vessel as arrived.', variant: 'destructive' });
+    } finally {
+      setMarkArrivedSubmitting(false);
+    }
+  };
+
+  // ============= CANCEL ARRIVAL =============
+
+  const [cancelTarget, setCancelTarget] = useState<BackendVesselArrival | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const handleCancelArrival = async () => {
+    if (!activePortId || !cancelTarget) return;
+    setCancelSubmitting(true);
+    try {
+      await cancelVesselArrivalApi(activePortId, cancelTarget.id);
+      toast({ title: 'Arrival Cancelled', description: `${cancelTarget.vessel_name} removed from schedule.` });
+      setCancelTarget(null);
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: 'Could not cancel arrival.', variant: 'destructive' });
+    } finally {
+      setCancelSubmitting(false);
+    }
+  };
+
+  // ============= MARK DEPARTED =============
+
+  const [departTarget, setDepartTarget] = useState<BackendVesselArrival | null>(null);
+  const [departSubmitting, setDepartSubmitting] = useState(false);
+
+  const handleMarkDeparted = async () => {
+    if (!activePortId || !departTarget) return;
+    setDepartSubmitting(true);
+    try {
+      await markVesselDepartedApi(activePortId, departTarget.id);
+      toast({ title: 'Vessel Departed ✓', description: `${departTarget.vessel_name} marked as departed. Berth freed.` });
+      setDepartTarget(null);
+      await fetchLogs();
+    } catch {
+      toast({ title: 'Error', description: 'Could not mark vessel as departed.', variant: 'destructive' });
+    } finally {
+      setDepartSubmitting(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Berthed':
       case 'Docked':
         return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400';
-      case 'In Transit':
-        return 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400';
-      case 'Clearing Customs':
-        return 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400';
+      case 'Scheduled':
       case 'Anchored':
-        return 'bg-blue-500/15 border-blue-500/40 text-blue-600 dark:text-blue-400';
+        return 'bg-cyan-500/15 border-cyan-500/40 text-cyan-600 dark:text-cyan-400';
+      case 'Delayed':
+        return 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400';
       case 'Departed':
         return 'bg-slate-500/15 border-slate-500/40 text-slate-600 dark:text-slate-300';
-      case 'Expected':
-        return 'bg-purple-500/15 border-purple-500/40 text-purple-600 dark:text-purple-400';
+      case 'Cancelled':
+        return 'bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400';
       default:
         return 'bg-slate-200 dark:bg-slate-700/40 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300';
     }
   };
 
+  const loading = initializing || isLoading;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col transition-colors duration-300">
-      <PortManagerSidebar />
+      <PortManagerSidebar currentPortId={activePortId || undefined} />
+
       {/* ======== TOP NAVIGATION BAR ======== */}
       <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md px-4 lg:px-8 py-3 flex items-center justify-between ml-16">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 group-hover:scale-105 transition-transform">
-              <Ship className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-bold text-sm text-white tracking-wide block">FREIGHT FIREWALL</span>
-              <span className="text-[10px] text-amber-400 font-mono">PORT OPERATIONS LOGS (PAGE 3.3)</span>
-            </div>
-          </Link>
-
-          {/* Quick Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 ml-6 border-l border-slate-800 pl-6">
-            <Link
-              to="/dashboard/ports"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5"
-            >
-              <Anchor className="w-3.5 h-3.5 text-emerald-400" />
-              Port Overview (3.1)
-            </Link>
-            <Link
-              to="/dashboard/vessel-logs"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 transition-all flex items-center gap-1.5"
-            >
-              <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              Vessel Logs (3.3)
-            </Link>
-            <Link
-              to="/dashboard/operations"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5"
-            >
-              <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              Fleet Command
-            </Link>
-            <Link
-              to="/dashboard/admin"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5"
-            >
-              <Settings className="w-3.5 h-3.5 text-purple-400" />
-              Admin Command (4.0)
-            </Link>
-          </nav>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30">
+            <Ship className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="font-bold text-sm text-slate-900 dark:text-white tracking-wide block">
+              {activePort ? `${activePort.name} (${activePort.code})` : 'Vessel Arrivals & Departures'}
+            </h1>
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">VESSEL TRAFFIC LOG</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
-          {user && (
-            <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
-              <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center font-bold text-xs">
-                {user.username?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <span className="text-xs text-slate-300 font-mono hidden sm:inline">{user.username}</span>
+          {allPortsList.length > 0 && (
+            <div className="hidden md:flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Switch Port:</span>
+              <select
+                value={activePortId || ''}
+                onChange={(e) => navigate(`/dashboard/vessel-logs/${e.target.value}`)}
+                className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-amber-700 dark:text-amber-300 font-bold text-xs rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
+              >
+                {allPortsList.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-white dark:bg-slate-950 text-slate-900 dark:text-white">
+                    {p.name} ({p.code})
+                  </option>
+                ))}
+              </select>
             </div>
           )}
+          <ThemeToggle />
         </div>
       </header>
 
       {/* ======== MAIN CONTENT AREA ======== */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-6 ml-16">
 
+        {loadError && (
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-500" />
+              <span>{loadError}</span>
+            </div>
+            <button onClick={fetchLogs} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold font-mono text-[11px]">Retry</button>
+          </div>
+        )}
+
+        {/* ACCESS BANNER */}
+        {activePort && (
+          isManagedPort ? (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>Full operational control active for <strong>{activePort.name}</strong>. Vessel arrivals and departures are editable.</span>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center gap-2.5">
+              <Globe className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>Viewing <strong>{activePort.name}</strong> in read-only network mode.</span>
+            </div>
+          )
+        )}
+
         {/* PAGE HEADER */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-emerald-600 dark:text-emerald-400 mb-1">
               <Clock className="w-4 h-4" />
-              <span>TERMINAL TELEMETRY ENGINE • PAGE 3.3</span>
+              <span>TERMINAL TELEMETRY ENGINE</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Vessel Arrival & Departure Log
             </h1>
-            <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-              Real-time maritime entry/exit logs, terminal quay allocation, ETA/ATA timestamps, and cargo manifests across global port facilities.
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+              Expected arrivals, currently docked vessels, and departure history — strictly scoped to {activePort?.name || 'the selected port'}.
             </p>
           </div>
 
-          {/* Export CSV Button */}
           <div className="flex items-center gap-3 shrink-0">
+            {isManagedPort && (
+              <button
+                onClick={() => setShowAddArrivalModal(true)}
+                className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add Arrival
+              </button>
+            )}
             <button
               onClick={handleExportCSV}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-400 transition-all flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
-              Export CSV ({filteredLogs.length})
+              Export CSV ({logs.length})
             </button>
           </div>
         </div>
 
         {/* TABS & FILTER TOOLBAR */}
         <div className="space-y-4">
-          
-          {/* TABS: Arrivals, Departures, Expected */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
             <div className="flex items-center gap-2">
-              {(['Arrivals', 'Departures', 'Expected'] as const).map((tab) => {
-                const count = logs.filter((l) => l.category === tab).length;
-                const isActive = activeTab === tab;
+              {TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
                 return (
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`relative px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                       isActive
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg shadow-emerald-950/40'
-                        : 'bg-slate-900/60 text-slate-400 hover:text-white border border-slate-800'
+                        ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800'
                     }`}
                   >
-                    <span>{tab}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                        isActive ? 'bg-emerald-500/30 text-emerald-200' : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {count}
-                    </span>
+                    {tab.label}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-400 font-mono hidden sm:flex">
-              {isLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />}
-              <span>
-                Showing <strong className="text-white">{filteredLogs.length}</strong> records
-              </span>
+            <div className="hidden sm:flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 font-mono">
+              {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500" />}
+              <span>Showing <strong className="text-slate-900 dark:text-white">{logs.length}</strong> records</span>
             </div>
           </div>
 
-          {/* FILTERS ROW */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-md shadow-slate-100 dark:shadow-none">
-            
-            {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search Vessel, MMSI, Port..."
+                placeholder="Search Vessel, MMSI, Cargo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
               />
             </div>
 
-            {/* Type Filter */}
-            <div className="relative">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50 capitalize"
-              >
-                <option value="all">All Vessel Types</option>
-                {vesselTypes.filter((t) => t !== 'all').map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50 capitalize"
+            >
+              <option value={FILTER_ALL}>All Vessel Types</option>
+              {vesselTypes.filter((t) => t !== FILTER_ALL).map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
 
-            {/* Flag Filter */}
-            <div className="relative">
-              <select
-                value={flagFilter}
-                onChange={(e) => setFlagFilter(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50"
-              >
-                <option value="all">All Flag Registries</option>
-                {vesselFlags.filter((f) => f !== 'all').map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={flagFilter}
+              onChange={(e) => setFlagFilter(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500/50"
+            >
+              <option value={FILTER_ALL}>All Flag Registries</option>
+              {vesselFlags.filter((f) => f !== FILTER_ALL).map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
 
-            {/* Reset Filters */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setTypeFilter('all');
-                  setFlagFilter('all');
-                }}
-                className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Reset Filters
-              </button>
-            </div>
+            <button
+              onClick={() => { setSearchTerm(''); setTypeFilter(FILTER_ALL); setFlagFilter(FILTER_ALL); }}
+              className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Reset Filters
+            </button>
           </div>
         </div>
 
-        {/* ======== VESSEL LOGS TABLE ======== */}
+        {/* ======== VESSEL TRAFFIC TABLE ======== */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xl shadow-slate-100 dark:shadow-none overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -333,108 +470,258 @@ export const VesselLogsPage: React.FC = () => {
                 <tr>
                   <th className="py-3.5 px-4 font-semibold text-white">Vessel / MMSI</th>
                   <th className="py-3.5 px-4 font-semibold text-white">Type & Flag</th>
-                  <th className="py-3.5 px-4 font-semibold text-white">Port & Terminal</th>
-                  <th className="py-3.5 px-4 font-semibold text-white">Berth / Quay</th>
-                  <th className="py-3.5 px-4 font-semibold text-white">Arrival (ATA/ETA)</th>
-                  <th className="py-3.5 px-4 font-semibold text-white">Departure (ATD/ETD)</th>
-                  <th className="py-3.5 px-4 font-semibold text-white">Cargo Manifest</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">ETA / ATA</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">ETD / ATD</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Berth</th>
+                  <th className="py-3.5 px-4 font-semibold text-white">Cargo</th>
                   <th className="py-3.5 px-4 font-semibold text-white">Status</th>
+                  {isManagedPort && <th className="py-3.5 px-4 font-semibold text-white">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900/60">
-                {filteredLogs.length > 0 ? (
-                  filteredLogs.map((log) => (
-                    <motion.tr
-                      key={log.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="hover:bg-amber-50/40 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800"
-                    >
-                      {/* Vessel / MMSI */}
+                {loading ? (
+                  <tr><td colSpan={8} className="py-14 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-500" /></td></tr>
+                ) : logs.length > 0 ? (
+                  logs.map((log) => (
+                    <motion.tr key={log.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-4 px-4">
                         <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
                           <Ship className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          <span>{log.name}</span>
+                          <span>{log.vessel_name}</span>
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                          MMSI: {log.mmsi} | IMO: {log.imo}
-                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">MMSI: {log.vessel_mmsi}</div>
                       </td>
-
-                      {/* Type & Flag */}
                       <td className="py-4 px-4">
-                        <div className="font-semibold text-slate-800 dark:text-slate-200">{log.type}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{log.flag}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{log.vessel_type || '—'}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{log.vessel_flag || '—'}</div>
                       </td>
-
-                      {/* Port & Terminal */}
-                      <td className="py-4 px-4">
-                        <div className="font-bold text-slate-900 dark:text-slate-100">{log.port}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{log.terminal}</div>
-                      </td>
-
-                      {/* Berth / Quay */}
-                      <td className="py-4 px-4">
-                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded-lg border border-amber-200/80 dark:border-amber-800/60 inline-block text-[11px]">
-                          {log.berth}
-                        </span>
-                      </td>
-
-                      {/* Arrival */}
                       <td className="py-4 px-4 font-mono text-slate-800 dark:text-slate-200">
                         {log.ata ? (
-                          <div className="text-emerald-700 dark:text-emerald-400 font-bold">{log.ata} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ATA Actual)</span></div>
+                          <div className="text-emerald-700 dark:text-emerald-400 font-bold">{new Date(log.ata).toLocaleString()} <span className="text-[9px] text-slate-400 font-normal block">(ATA)</span></div>
                         ) : (
-                          <div className="text-slate-700 dark:text-slate-300">{log.arrivalDate} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ETA Estimated)</span></div>
+                          <div>{new Date(log.eta).toLocaleString()} <span className="text-[9px] text-slate-400 font-normal block">(ETA)</span></div>
                         )}
                       </td>
-
-                      {/* Departure */}
                       <td className="py-4 px-4 font-mono text-slate-800 dark:text-slate-200">
                         {log.atd ? (
-                          <div className="text-purple-700 dark:text-purple-400 font-bold">{log.atd} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ATD Actual)</span></div>
+                          <div className="text-purple-700 dark:text-purple-400 font-bold">{new Date(log.atd).toLocaleString()} <span className="text-[9px] text-slate-400 font-normal block">(ATD)</span></div>
+                        ) : log.etd ? (
+                          <div>{new Date(log.etd).toLocaleString()} <span className="text-[9px] text-slate-400 font-normal block">(ETD)</span></div>
                         ) : (
-                          <div className="text-slate-700 dark:text-slate-300">{log.departureDate} <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal block">(ETD Estimated)</span></div>
+                          <span className="text-slate-400">—</span>
                         )}
                       </td>
-
-                      {/* Cargo Manifest */}
                       <td className="py-4 px-4">
-                        <div className="text-slate-800 dark:text-slate-200 font-medium max-w-[200px] truncate" title={log.cargo}>
-                          {log.cargo}
-                        </div>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Agent: {log.agent}</div>
+                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-1 rounded-lg border border-amber-200/80 dark:border-amber-800/60 inline-block text-[11px]">
+                          {log.berth_assignment_status}
+                        </span>
                       </td>
-
-                      {/* Status */}
                       <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(
-                            log.status
-                          )}`}
-                        >
+                        <div className="text-slate-800 dark:text-slate-200 font-medium max-w-[160px] truncate" title={log.cargo_type}>{log.cargo_type || '—'}</div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(log.status)}`}>
                           {log.status}
                         </span>
                       </td>
+                      {isManagedPort && (
+                        <td className="py-4 px-4">
+                          {activeTab === 'Expected' && (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setMarkArrivedTarget(log)} title="Mark Arrived" className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => { setEditEtaTarget(log); setEditEtaValue(log.eta.slice(0, 16)); }} title="Edit ETA" className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/20 transition-all">
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => setCancelTarget(log)} title="Cancel" className="p-1.5 rounded-lg bg-slate-500/15 hover:bg-rose-500/20 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 transition-all">
+                                <XCircle className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          {activeTab === 'Docked' && (
+                            <button onClick={() => setDepartTarget(log)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold shadow-sm transition-all">
+                              <Navigation className="w-3 h-3" /> MARK DEPARTED
+                            </button>
+                          )}
+                          {activeTab === 'Departed' && <span className="text-[11px] text-slate-400 font-mono">—</span>}
+                        </td>
+                      )}
                     </motion.tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 font-mono">
-                      No vessel records found matching your filters.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={8} className="py-12 text-center text-slate-400 font-mono">No vessel records found matching your filters.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
 
           <div className="bg-slate-50 dark:bg-slate-950/90 px-6 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
-            <span>Showing {filteredLogs.length} of {logs.length} Vessel Log Entries</span>
-            <span>Last Terminal Log Sync: Just Now (Live AIS Ingest)</span>
+            <span>Showing {logs.length} record(s) for {activePort?.name || '—'}</span>
+            <span>Live sync with terminal operations database</span>
           </div>
         </div>
       </main>
+
+      {/* ===== ADD ARRIVAL MODAL ===== */}
+      <AnimatePresence>
+        {showAddArrivalModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2"><Plus className="w-5 h-5 text-blue-500" /><h3 className="font-bold text-slate-900 dark:text-white">Add Vessel Arrival</h3></div>
+                <button onClick={() => setShowAddArrivalModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <form onSubmit={handleAddArrival} className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Vessel Name *</label>
+                    <input type="text" required placeholder="e.g. MSC Magna" value={arrivalForm.vessel_name} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_name: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">MMSI *</label>
+                    <input type="number" required placeholder="357431000" value={arrivalForm.vessel_mmsi} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_mmsi: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Vessel Type</label>
+                    <select value={arrivalForm.vessel_type} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_type: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
+                      {['Container', 'Bulk Carrier', 'Tanker', 'RoRo', 'General Cargo', 'LNG Carrier'].map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Cargo Type</label>
+                    <input type="text" placeholder="Electronics, Steel..." value={arrivalForm.cargo_type} onChange={(e) => setArrivalForm(f => ({ ...f, cargo_type: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">Flag</label>
+                    <input type="text" placeholder="Panama" value={arrivalForm.vessel_flag} onChange={(e) => setArrivalForm(f => ({ ...f, vessel_flag: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">ETA *</label>
+                    <input type="datetime-local" required value={arrivalForm.eta} onChange={(e) => setArrivalForm(f => ({ ...f, eta: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setShowAddArrivalModal(false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
+                  <button type="submit" disabled={arrivalSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm disabled:opacity-60 transition-all">
+                    {arrivalSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ship className="w-4 h-4" />}
+                    Add to Schedule
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== EDIT ETA MODAL ===== */}
+      <AnimatePresence>
+        {editEtaTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2"><Edit3 className="w-5 h-5 text-amber-500" /><h3 className="font-bold text-slate-900 dark:text-white">Edit ETA</h3></div>
+                <button onClick={() => setEditEtaTarget(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Revising ETA for <span className="font-bold text-slate-900 dark:text-white">{editEtaTarget.vessel_name}</span></p>
+              <form onSubmit={handleEditEta} className="space-y-4">
+                <input type="datetime-local" required value={editEtaValue} onChange={(e) => setEditEtaValue(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-amber-500 focus:outline-none" />
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setEditEtaTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
+                  <button type="submit" disabled={editEtaSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm disabled:opacity-60 transition-all">
+                    {editEtaSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    Update ETA
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== CONFIRM MARK ARRIVED ===== */}
+      <AnimatePresence>
+        {markArrivedTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-500/15 text-emerald-500"><CheckCircle className="w-6 h-6" /></div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white">Mark as Arrived?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{markArrivedTarget.vessel_name}</span> will be marked as docked.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setMarkArrivedTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
+                <button onClick={handleMarkArrived} disabled={markArrivedSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm disabled:opacity-60 transition-all">
+                  {markArrivedSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Confirm Arrival
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== CONFIRM CANCEL ARRIVAL ===== */}
+      <AnimatePresence>
+        {cancelTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-slate-500/15 text-slate-500"><XCircle className="w-6 h-6" /></div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white">Cancel Arrival?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{cancelTarget.vessel_name}</span> will be removed from the schedule.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setCancelTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Keep</button>
+                <button onClick={handleCancelArrival} disabled={cancelSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-bold text-sm disabled:opacity-60 transition-all">
+                  {cancelSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  Cancel Arrival
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== CONFIRM MARK DEPARTED ===== */}
+      <AnimatePresence>
+        {departTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md pl-16">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-rose-500/15 text-rose-500"><Navigation className="w-6 h-6" /></div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white">Mark as Departed?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5"><span className="font-bold">{departTarget.vessel_name}</span> will depart and its berth will be freed.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setDepartTarget(null)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-all">Cancel</button>
+                <button onClick={handleMarkDeparted} disabled={departSubmitting} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm disabled:opacity-60 transition-all">
+                  {departSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                  Confirm Departure
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
