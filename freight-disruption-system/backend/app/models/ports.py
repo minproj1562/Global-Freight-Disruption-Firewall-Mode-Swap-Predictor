@@ -1,4 +1,4 @@
-# backend/app/models/port.py
+# backend/app/models/ports.py
 from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, Boolean, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func

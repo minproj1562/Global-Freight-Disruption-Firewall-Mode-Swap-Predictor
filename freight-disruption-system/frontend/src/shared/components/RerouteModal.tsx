@@ -1,3 +1,4 @@
+// frontend/src/shared/components/RerouteModal.tsx
 // Mode-Swap Reroute Plan Execution Modal
 // FASTAPI REPLACEMENT POINT: Connect "Execute Reroute Plan" to POST /api/v1/reroutes/execute
 

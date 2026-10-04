@@ -57,7 +57,9 @@ async def get_all_ports(
 ):
     """
     Get all ports for Port Overview Page (Page 3.1).
-    Returns port health cards data.
+    Returns port health cards data, annotated with `relation`
+    ("self" | "network" | "other") relative to the requesting manager's
+    assigned port.
     """
     query = db.query(Port)
 
@@ -72,23 +74,32 @@ async def get_all_ports(
     if congestion_level and congestion_level != "all":
         query = query.filter(Port.congestion_level == congestion_level)
 
-    ports = query.all()
+    # Deterministic ordering — never rely on unordered DB row order for the
+    # owner_port fallback below, otherwise which port is treated as "home"
+    # (and therefore the entire network relation calculation) can silently
+    # change between requests/environments.
+    ports = query.order_by(Port.id).all()
 
-    # Calculate network relation context
     owner_port = None
-    network_port_ids = set()
+    network_port_ids: set = set()
 
     if assigned_port_id:
         owner_port = db.query(Port).filter(Port.id == assigned_port_id).first()
 
-    if not owner_port and ports:
-        # Default to first port (Rotterdam) if assigned_port_id not specified
-        owner_port = ports[0]
-    
+    if not owner_port:
+        # Deterministic fallback: prefer the canonical Rotterdam anchor port,
+        # otherwise fall back to the first port in stable (id-ordered) sequence.
+        owner_port = db.query(Port).filter(Port.id == "port-rotterdam").first()
+        if not owner_port and ports:
+            owner_port = ports[0]
+
     if owner_port:
-        from app.services.port_services import ensure_network_connections_for_port
-        network_corridors = ensure_network_connections_for_port(owner_port.id, db)
-        network_port_ids = {c.dest_port_id for c in network_corridors}
+        from app.services.port_services import (
+            ensure_network_connections_for_port,
+            get_network_port_ids_bidirectional,
+        )
+        ensure_network_connections_for_port(owner_port.id, db)
+        network_port_ids = get_network_port_ids_bidirectional(owner_port.id, db)
 
     for p in ports:
         if owner_port and p.id == owner_port.id:

@@ -1,10 +1,24 @@
-# backend/app/services/port_service.py
+# backend/app/services/port_services.py
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
 from datetime import datetime, timedelta
 from app.models.ports import Port, PortCongestionHistory, PortNetwork
-from typing import List
+from typing import List, Set
 import random
 import math
+
+# Network corridor generation targets. The system guarantees every port has
+# at least MIN_NETWORK_SIZE trading partners, but will not keep adding past
+# MAX_NETWORK_SIZE once that's satisfied.
+MIN_NETWORK_SIZE = 4
+MAX_NETWORK_SIZE = 6
+
+GLOBAL_TRADE_HUBS = {
+    "port-rotterdam", "port-singapore", "port-shanghai", "port-la",
+    "port-dubai", "port-hamburg", "port-busan", "port-ningbo",
+    "port-santos", "port-tokyo"
+}
+
 
 def calculate_haversine_distance_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance in nautical miles between two lat/lon coordinates."""
@@ -16,73 +30,106 @@ def calculate_haversine_distance_nm(lat1: float, lon1: float, lat2: float, lon2:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R_nm * c, 1)
 
+
+def get_network_port_ids_bidirectional(port_id: str, db: Session) -> Set[str]:
+    """
+    Returns the set of port IDs connected to `port_id` in EITHER direction.
+
+    PortNetwork rows are stored once per corridor (A -> B), never duplicated
+    as (B -> A). This helper is what makes the relationship symmetric: no
+    matter which port initiated the corridor, both sides see each other as
+    "network" partners.
+    """
+    forward = db.query(PortNetwork.dest_port_id).filter(PortNetwork.source_port_id == port_id).all()
+    backward = db.query(PortNetwork.source_port_id).filter(PortNetwork.dest_port_id == port_id).all()
+    ids = {row[0] for row in forward} | {row[0] for row in backward}
+    ids.discard(port_id)
+    return ids
+
+
 def ensure_network_connections_for_port(port_id: str, db: Session) -> List[PortNetwork]:
     """
-    Dynamically generates and saves 4 to 6 realistic trading partner network connections 
-    for ANY port in the database using geographic proximity and global trade hubs.
+    Dynamically generates and persists 4–6 realistic trading partner network
+    connections for ANY port, using geographic proximity + global trade hubs.
+
+    Relationships are bidirectional: a connection is considered to already
+    exist whether it was originally stored as (A -> B) or (B -> A), so
+    querying the network from either port returns a consistent, symmetric
+    result instead of depending on which port happened to be queried first.
     """
     port = db.query(Port).filter(Port.id == port_id).first()
     if not port:
         return []
-        
-    existing = db.query(PortNetwork).filter(PortNetwork.source_port_id == port_id).all()
-    if len(existing) >= 3:
-        return existing
-        
-    all_ports = db.query(Port).filter(Port.id != port_id).all()
+
+    existing_ids = get_network_port_ids_bidirectional(port_id, db)
+    if len(existing_ids) >= MIN_NETWORK_SIZE:
+        return db.query(PortNetwork).filter(
+            or_(PortNetwork.source_port_id == port_id, PortNetwork.dest_port_id == port_id)
+        ).all()
+
+    all_ports = db.query(Port).filter(Port.id != port_id).order_by(Port.id).all()
     if not all_ports:
         return []
-        
-    # Calculate distance to all other ports
+
+    # Calculate distance to all other ports (stable ordering since all_ports is id-ordered)
     port_distances = []
     for other in all_ports:
         dist_nm = calculate_haversine_distance_nm(port.latitude, port.longitude, other.latitude, other.longitude)
         port_distances.append((other, dist_nm))
-        
-    # Sort by distance
     port_distances.sort(key=lambda x: x[1])
-    
-    # Major global hub IDs
-    global_hubs = {"port-rotterdam", "port-singapore", "port-shanghai", "port-la", "port-jebel-ali", "port-hamburg", "port-busan", "port-ningbo", "port-santos", "port-tokyo"}
-    
-    selected_dest_ids = set()
-    
-    # 1. Select 3 closest regional ports
+
+    selected_dest_ids: Set[str] = set(existing_ids)  # preserve whatever already exists (either direction)
+
+    # 1. Closest regional ports first (up to 4 new additions)
+    regional_added = 0
     for p_other, _ in port_distances:
-        if len(selected_dest_ids) >= 3:
+        if len(selected_dest_ids) >= MAX_NETWORK_SIZE or regional_added >= 4:
             break
-        selected_dest_ids.add(p_other.id)
-        
-    # 2. Select 2-3 major global hubs that are not the port itself
-    for hub_id in global_hubs:
-        if len(selected_dest_ids) >= 5:
+        if p_other.id not in selected_dest_ids:
+            selected_dest_ids.add(p_other.id)
+            regional_added += 1
+
+    # 2. Fill remaining slots with major global trade hubs not already included
+    for hub_id in GLOBAL_TRADE_HUBS:
+        if len(selected_dest_ids) >= MAX_NETWORK_SIZE:
             break
-        if hub_id != port_id and any(p.id == hub_id for p, _ in port_distances):
+        if hub_id == port_id or hub_id in selected_dest_ids:
+            continue
+        if any(p.id == hub_id for p, _ in port_distances):
             selected_dest_ids.add(hub_id)
-            
-    # Save network connections to DB
-    new_networks = []
-    for dest_id in selected_dest_ids:
-        already_exists = db.query(PortNetwork).filter(
-            PortNetwork.source_port_id == port_id,
-            PortNetwork.dest_port_id == dest_id
-        ).first()
-        if not already_exists:
-            dest_p = next((p for p, _ in port_distances if p.id == dest_id), None)
-            dist_nm = calculate_haversine_distance_nm(port.latitude, port.longitude, dest_p.latitude, dest_p.longitude) if dest_p else 1500.0
-            avg_transit = max(1.5, round(dist_nm / 450.0, 1))
-            
-            nw = PortNetwork(
-                source_port_id=port_id,
-                dest_port_id=dest_id,
-                distance_nautical_miles=dist_nm,
-                avg_transit_days=avg_transit
+
+    # Persist only the genuinely NEW connections
+    new_ids = selected_dest_ids - existing_ids
+    for dest_id in new_ids:
+        already = db.query(PortNetwork).filter(
+            or_(
+                and_(PortNetwork.source_port_id == port_id, PortNetwork.dest_port_id == dest_id),
+                and_(PortNetwork.source_port_id == dest_id, PortNetwork.dest_port_id == port_id),
             )
-            db.add(nw)
-            new_networks.append(nw)
-            
+        ).first()
+        if already:
+            continue
+
+        dest_p = next((p for p, _ in port_distances if p.id == dest_id), None)
+        dist_nm = (
+            calculate_haversine_distance_nm(port.latitude, port.longitude, dest_p.latitude, dest_p.longitude)
+            if dest_p else 1500.0
+        )
+        avg_transit = max(1.5, round(dist_nm / 450.0, 1))
+
+        nw = PortNetwork(
+            source_port_id=port_id,
+            dest_port_id=dest_id,
+            distance_nautical_miles=dist_nm,
+            avg_transit_days=avg_transit
+        )
+        db.add(nw)
+
     db.commit()
-    return db.query(PortNetwork).filter(PortNetwork.source_port_id == port_id).all()
+
+    return db.query(PortNetwork).filter(
+        or_(PortNetwork.source_port_id == port_id, PortNetwork.dest_port_id == port_id)
+    ).all()
 
 
 def calculate_port_congestion(port: Port, db: Session) -> dict:
@@ -90,19 +137,16 @@ def calculate_port_congestion(port: Port, db: Session) -> dict:
     Calculate real-time port congestion metrics.
     Updates port.congestion_percent, congestion_level, avg_wait_hours.
     """
-    # Calculate berth utilization
     if port.berth_capacity > 0:
         berth_utilization = (port.active_berths_used / port.berth_capacity) * 100
     else:
         berth_utilization = 0
-    
-    # Estimate wait time based on waiting vessels and berth capacity
+
     if port.berth_capacity > 0:
-        avg_wait_hours = (port.waiting_vessels / port.berth_capacity) * 12  # Rough estimate
+        avg_wait_hours = (port.waiting_vessels / port.berth_capacity) * 12
     else:
         avg_wait_hours = 0
-    
-    # Determine congestion level
+
     if berth_utilization < 25:
         congestion_level = "low"
     elif berth_utilization < 50:
@@ -111,13 +155,11 @@ def calculate_port_congestion(port: Port, db: Session) -> dict:
         congestion_level = "high"
     else:
         congestion_level = "critical"
-    
-    # Update port
+
     port.congestion_percent = int(berth_utilization)
     port.congestion_level = congestion_level
     port.avg_wait_hours = round(avg_wait_hours, 1)
-    
-    # Update status label
+
     if congestion_level == "critical":
         port.status_label = "Critical Congestion"
     elif congestion_level == "high":
@@ -126,14 +168,15 @@ def calculate_port_congestion(port: Port, db: Session) -> dict:
         port.status_label = "Moderate Traffic"
     else:
         port.status_label = "Operational"
-    
+
     db.commit()
-    
+
     return {
         "congestion_percent": port.congestion_percent,
         "congestion_level": port.congestion_level,
         "avg_wait_hours": port.avg_wait_hours
     }
+
 
 def record_congestion_history(port_id: str, db: Session):
     """
@@ -141,18 +184,18 @@ def record_congestion_history(port_id: str, db: Session):
     Called periodically (e.g., every hour).
     """
     port = db.query(Port).filter(Port.id == port_id).first()
-    
+
     if not port:
         return
-    
+
     history_record = PortCongestionHistory(
         port_id=port_id,
         congestion_percent=port.congestion_percent,
         waiting_vessels=port.waiting_vessels,
         avg_wait_hours=port.avg_wait_hours,
-        disruption_flag=False  # Will be set by disruption flagging
+        disruption_flag=False
     )
-    
+
     db.add(history_record)
     db.commit()
 
@@ -967,17 +1010,14 @@ def seed_sample_ports(db: Session):
     ]
     
     for port_data in sample_ports:
-        # Check if port already exists
         existing = db.query(Port).filter(Port.id == port_data["id"]).first()
         if existing:
             continue
         
-        # Create port
         port = Port(**port_data)
         db.add(port)
         db.flush()
         
-        # Create sample berth slots
         for i in range(1, min(10, port_data["berth_capacity"]) + 1):
             is_occupied = i <= port_data["active_berths_used"]
             berth = BerthSlot(
@@ -998,7 +1038,6 @@ def seed_sample_ports(db: Session):
             )
             db.add(berth)
         
-        # Create sample vessel arrivals (next 72 hours)
         for j in range(random.randint(5, 15)):
             arrival = VesselArrival(
                 port_id=port.id,
@@ -1015,7 +1054,6 @@ def seed_sample_ports(db: Session):
             )
             db.add(arrival)
         
-        # Create 7-day congestion history
         for day in range(7):
             timestamp = datetime.utcnow() - timedelta(days=6-day)
             history = PortCongestionHistory(
@@ -1029,18 +1067,15 @@ def seed_sample_ports(db: Session):
             )
             db.add(history)
     
-    # Create sample network connections
     from app.models.ports import PortNetwork
     if db.query(PortNetwork).count() == 0:
         print("[DB] Seeding default port network corridors...")
         networks = [
-            # Rotterdam connections
             {"source_port_id": "port-rotterdam", "dest_port_id": "port-singapore", "distance_nautical_miles": 8300.0, "avg_transit_days": 18.5},
             {"source_port_id": "port-rotterdam", "dest_port_id": "port-shanghai", "distance_nautical_miles": 10550.0, "avg_transit_days": 23.0},
             {"source_port_id": "port-rotterdam", "dest_port_id": "port-la", "distance_nautical_miles": 7800.0, "avg_transit_days": 17.0},
             {"source_port_id": "port-rotterdam", "dest_port_id": "port-dubai", "distance_nautical_miles": 6400.0, "avg_transit_days": 14.2},
             {"source_port_id": "port-rotterdam", "dest_port_id": "port-ningbo", "distance_nautical_miles": 10400.0, "avg_transit_days": 22.8},
-            # Singapore connections
             {"source_port_id": "port-singapore", "dest_port_id": "port-shanghai", "distance_nautical_miles": 2200.0, "avg_transit_days": 5.0},
             {"source_port_id": "port-singapore", "dest_port_id": "port-dubai", "distance_nautical_miles": 3400.0, "avg_transit_days": 7.5},
             {"source_port_id": "port-singapore", "dest_port_id": "port-busan", "distance_nautical_miles": 2500.0, "avg_transit_days": 5.8},
