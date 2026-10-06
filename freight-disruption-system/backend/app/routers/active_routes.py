@@ -1,13 +1,15 @@
 # backend/app/routers/active_routes.py
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 import random
 
 from app.database import get_db
 from app.models.vessels import Vessel
+from app.models.vessel_positions import VesselPosition
 from app.schemas.active_routes import ActiveRouteItem, ActiveRoutesStatsResponse
+from app.ml.lstm_eta_predictor import lstm_eta_predictor
 
 router = APIRouter(prefix="/api/routes", tags=["Active Fleet & Routes Monitor"])
 
@@ -58,7 +60,6 @@ def _calculate_ml_risk_and_delay(
     3. Speed anomalies & sea-state resistance (18% weight)
     4. Vessel type maneuverability/draft constraints (12% weight)
     """
-    # Feature 1: Disruption Proximity
     max_disruption_penalty = 0.0
     threat_cause = None
     for disr in db_disruptions:
@@ -73,15 +74,12 @@ def _calculate_ml_risk_and_delay(
                 max_disruption_penalty = proximity_score
                 threat_cause = disr.location_name
 
-    # Feature 2: Destination Port Congestion
     dest_port = db_ports_map.get(dest_code)
     dest_congestion = (dest_port.congestion_percent if dest_port else 45.0) / 100.0
 
-    # Feature 3: Speed Anomaly
     nominal_speed = 19.5
     speed_penalty = max(0.0, min(1.0, (nominal_speed - avg_speed) / 8.0))
 
-    # Feature 4: Vessel Vulnerability
     vessel_weights = {
         "LNG Carrier": 0.70,
         "Tanker": 0.65,
@@ -91,14 +89,12 @@ def _calculate_ml_risk_and_delay(
     }
     v_vuln = vessel_weights.get(v_type, 0.45)
 
-    # ML Composite Score (0.0 to 1.0)
     raw_score = (
         0.38 * max_disruption_penalty +
         0.32 * dest_congestion +
         0.18 * speed_penalty +
         0.12 * v_vuln
     )
-    # Calibrated ML risk score
     ml_risk_score = round(max(0.05, min(0.96, raw_score)), 2)
     delay_prob = round(ml_risk_score * 100, 1)
 
@@ -127,6 +123,7 @@ def _calculate_ml_risk_and_delay(
     return ml_risk_score, delay_prob, delay_hrs, risk_lvl, status_val, action_val, risk_reason
 
 def _generate_synthetic_active_routes(
+    db: Session,
     db_vessels: list,
     db_ports: list,
     db_disruptions: list,
@@ -134,7 +131,20 @@ def _generate_synthetic_active_routes(
 ) -> List[ActiveRouteItem]:
     routes = []
     ports_map = {p.code: p for p in db_ports}
-    
+
+    # Pull real tracked position history (Page 1.4 LSTM ETA model input).
+    # Vessels with fewer than SEQ_LEN (8) tracked reports automatically use
+    # the transparent kinematic fallback inside lstm_eta_predictor.
+    position_rows = db.query(VesselPosition).order_by(VesselPosition.timestamp.asc()).limit(5000).all()
+    position_map: Dict[int, List[Dict[str, float]]] = {}
+    for pr in position_rows:
+        position_map.setdefault(pr.mmsi, []).append({
+            "lat": pr.latitude,
+            "lon": pr.longitude,
+            "speed": pr.speed or 0.0,
+            "heading": pr.heading or 0.0,
+        })
+
     for i in range(count):
         avg_spd = round(random.uniform(14.2, 22.0), 1)
         if i < len(db_vessels):
@@ -179,7 +189,27 @@ def _generate_synthetic_active_routes(
         )
 
         base_eta = datetime.utcnow() + timedelta(days=(i % 14) + 2, hours=(i * 3) % 24)
-        ml_pred_eta = base_eta + timedelta(hours=delay_hrs)
+
+        # ============= LSTM Sequence ETA Prediction (Page 1.4) =============
+        vessel_position_history = position_map.get(v_mmsi, []) if i < len(db_vessels) else []
+        dest_port_obj = ports_map.get(dest[1])
+        dest_congestion_val = float(dest_port_obj.congestion_percent) if dest_port_obj else 45.0
+        weather_severity_proxy = round(ml_risk_score * 10.0, 1)
+
+        lstm_result = lstm_eta_predictor.predict_eta(
+            current_lat=cur_lat,
+            current_lon=cur_lon,
+            dest_lat=dest[2],
+            dest_lon=dest[3],
+            current_speed_knots=avg_spd,
+            weather_severity=weather_severity_proxy,
+            position_history=vessel_position_history,
+            dest_congestion_pct=dest_congestion_val,
+        )
+        fallback_eta_str = (base_eta + timedelta(hours=delay_hrs)).strftime("%Y-%m-%d %H:%M UTC")
+        ml_pred_eta_str = lstm_result.get("predicted_eta_formatted") or fallback_eta_str
+        eta_confidence = lstm_result.get("confidence_interval_90", {}) or {}
+        eta_prediction_mode = lstm_result.get("inference_mode", "kinematic")
 
         mode_val = "multimodal" if (i % 7 == 0) else ("rail" if (i % 15 == 0) else "sea")
         multimodal_list = ["sea", "rail"] if mode_val == "multimodal" else ["sea"]
@@ -209,7 +239,10 @@ def _generate_synthetic_active_routes(
             mode=mode_val,
             multimodal_modes=multimodal_list,
             eta=base_eta.strftime("%Y-%m-%d %H:%M UTC"),
-            eta_predicted_ml=ml_pred_eta.strftime("%Y-%m-%d %H:%M UTC"),
+            eta_predicted_ml=ml_pred_eta_str,
+            eta_confidence_earliest=eta_confidence.get("earliest"),
+            eta_confidence_latest=eta_confidence.get("latest"),
+            eta_prediction_mode=eta_prediction_mode,
             delay_hours=delay_hrs,
             delay_probability_pct=delay_prob,
             ml_risk_score=ml_risk_score,
@@ -225,7 +258,7 @@ def _generate_synthetic_active_routes(
             avg_speed_knots=avg_spd,
             distance_remaining_nm=dist_remain,
         ))
-        
+
     return routes
 
 @router.get("/active", response_model=List[ActiveRouteItem])
@@ -241,12 +274,13 @@ def get_active_routes(
     db_ports = db.query(Port).all()
     db_disruptions = db.query(GlobalDisruption).all()
     all_routes = _generate_synthetic_active_routes(
+        db=db,
         db_vessels=db_vessels,
         db_ports=db_ports,
         db_disruptions=db_disruptions,
         count=limit
     )
-    
+
     if vessel_type and vessel_type.lower() != "all":
         all_routes = [r for r in all_routes if r.vessel_type.lower() == vessel_type.lower()]
     if status_filter and status_filter.lower() != "all":
@@ -259,7 +293,7 @@ def get_active_routes(
             r for r in all_routes
             if comp_lower in (r.consignor_company or "").lower() or comp_lower in (r.carrier_name or "").lower()
         ]
-        
+
     return all_routes
 
 @router.get("/stats", response_model=ActiveRoutesStatsResponse)
@@ -268,6 +302,7 @@ def get_active_routes_stats(db: Session = Depends(get_db)):
     db_ports = db.query(Port).all()
     db_disruptions = db.query(GlobalDisruption).all()
     routes = _generate_synthetic_active_routes(
+        db=db,
         db_vessels=db_vessels,
         db_ports=db_ports,
         db_disruptions=db_disruptions,

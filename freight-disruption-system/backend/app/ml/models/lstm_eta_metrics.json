@@ -1,0 +1,8 @@
+{
+  "mae_hours": 4.67,
+  "rmse_hours": 7.1,
+  "mape_percent": 3.07,
+  "r2_score": 0.9978,
+  "test_windows": 17279,
+  "trained_at": "2026-10-05T23:06:33.895062"
+}

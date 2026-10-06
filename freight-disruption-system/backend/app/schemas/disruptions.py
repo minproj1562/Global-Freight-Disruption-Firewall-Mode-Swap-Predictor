@@ -25,6 +25,17 @@ class RecommendedRerouteOption(BaseModel):
     transit_summary: str = ""
     suggested_carrier: str = ""
 
+class RippleDelayDays(BaseModel):
+    d3: float = 0.0
+    d7: float = 0.0
+    d14: float = 0.0
+
+class RipplePredictionItem(BaseModel):
+    port_code: str
+    port_name: str
+    congestion_increase_pct: float = 0.0
+    delay_days: RippleDelayDays
+
 class AlertCenterDisruptionItem(BaseModel):
     id: str
     name: str
@@ -45,6 +56,9 @@ class AlertCenterDisruptionItem(BaseModel):
     description: str = ""
     mitigation_advice: str = ""
     recommended_action: Optional[RecommendedRerouteOption] = None
+    # AI-predicted ripple port impacts (Network Influence — GNN / BFS simulation)
+    predicted_ripple_ports: List[str] = []
+    ripple_predictions: List[RipplePredictionItem] = []
 
 class DisruptionActionResponse(BaseModel):
     id: str

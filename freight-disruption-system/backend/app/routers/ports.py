@@ -29,7 +29,7 @@ from app.models.ports import Port, PortDisruption, BerthSlot, VesselArrival, Por
 from app.models.users import User
 from app.models.vessels import Vessel
 from app.core.security import get_current_user, get_current_port_manager
-
+from app.services.route_mapping_service import publish_congestion_alert
 router = APIRouter(prefix="/api/ports", tags=["Ports"])
 
 # ============= GEOSPATIAL HELPER (AIS SYNC) =============
@@ -373,7 +373,10 @@ async def update_port_congestion(
 ):
     """
     Manually override port congestion percentage (Port Manager only).
-    Records who made the update and when, logs to congestion history.
+    Records who made the update, logs to congestion history, and triggers
+    Task 2 (Port Propagation): resolves which active routes touch this
+    port via the route-port mapping table and pushes a targeted WebSocket
+    alert to only those logistics managers.
     """
     port = db.query(Port).filter(Port.id == port_id).first()
     if not port:
@@ -381,7 +384,6 @@ async def update_port_congestion(
 
     pct = data.congestion_percent
 
-    # Derive congestion level
     if pct < 25:
         level = "low"
     elif pct < 50:
@@ -397,7 +399,6 @@ async def update_port_congestion(
     port.congestion_updated_at = datetime.utcnow()
     port.congestion_source = "manual"
 
-    # Log to history
     history_entry = PortCongestionHistory(
         port_id=port_id,
         congestion_percent=pct,
@@ -409,6 +410,13 @@ async def update_port_congestion(
     db.add(history_entry)
     db.commit()
     db.refresh(port)
+
+    # ===== Task 2: Port Propagation =====
+    try:
+        await publish_congestion_alert(port, db, updated_by=current_user.full_name)
+    except Exception as e:
+        print(f"[Ports] Congestion alert propagation failed (non-fatal): {e}")
+
     return port
 
 # ============= BERTH MANAGEMENT =============

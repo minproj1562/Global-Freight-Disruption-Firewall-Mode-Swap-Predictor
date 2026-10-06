@@ -36,7 +36,10 @@ from app.routers import weather
 from app.routers import ml_analytics
 from app.routers import optimization
 from app.services.fleet_update_manager import fleet_update_manager
-
+from app.services.congestion_alert_manager import congestion_alert_manager
+from app.services.route_mapping_service import ensure_sample_monitored_routes
+from app.services.congestion_history_seeder import seed_extended_congestion_history
+from app.routers import network_analyzer
 
 
 
@@ -63,6 +66,12 @@ async def lifespan(app: FastAPI):
     if port_count < 50:
         print(f"[SEED] Seeding sample ports (current count: {port_count})...")
         seed_sample_ports(db)
+
+    # Task 2 — Port Propagation: seed demo monitored routes + route-port mappings
+    print("[SEED] Ensuring sample monitored routes (route-port mapping)...")
+    ensure_sample_monitored_routes(db)
+    print("[SEED] Ensuring extended port congestion history for Prophet forecasting...")
+    seed_extended_congestion_history(db)
     db.close()
     
     # Start AIS stream as a non-blocking background task.
@@ -75,6 +84,10 @@ async def lifespan(app: FastAPI):
     # Start Fleet Update Manager
     print("Starting Fleet Update Manager (Redis subscriber)...")
     await fleet_update_manager.start()
+
+    # Start Congestion Alert Manager (Task 2 — Port Propagation)
+    print("Starting Congestion Alert Manager (Redis subscriber)...")
+    await congestion_alert_manager.start()
     
     print("API is ready!")
 
@@ -83,6 +96,7 @@ async def lifespan(app: FastAPI):
     # ========== SHUTDOWN ==========
     print("Shutting down API...")
     await fleet_update_manager.stop()
+    await congestion_alert_manager.stop()
     await client.close()
     print("Shutdown complete")
 
@@ -125,7 +139,7 @@ app.include_router(websocket.router)
 app.include_router(weather.router)
 app.include_router(ml_analytics.router)
 app.include_router(optimization.router)
-
+app.include_router(network_analyzer.router)
 
 
 # ============= ROOT ENDPOINTS =============
@@ -152,6 +166,8 @@ async def root():
             "admin_users": "/api/admin/users",
             "admin_data": "/api/admin/data/stats",
             "simulation": "/api/simulation",
+            "websocket_fleet": "/ws/fleet",
+            "websocket_alerts": "/ws/alerts",
             "docs": "/docs"
         }
     }

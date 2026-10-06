@@ -11,6 +11,7 @@ from app.models.system import SystemErrorLog, SystemHealthCard
 from app.models.data_management import DataUploadLog, DataCleanupLog
 from app.models.reroute import RerouteDecision, RouteAlternative, RouteLeg, CostBreakdown
 from app.models.audit_log import AuditLog
+from app.models.route_mapping import MonitoredRoute, RoutePortMapping
 
 __all__ = [
     "User",
@@ -33,6 +34,8 @@ __all__ = [
     "DataUploadLog",
     "DataCleanupLog",
     "RerouteDecision",
+    "MonitoredRoute",
+    "RoutePortMapping",
     "RouteAlternative",
     "RouteLeg",
     "CostBreakdown",

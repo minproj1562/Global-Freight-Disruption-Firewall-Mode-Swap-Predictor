@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict
 from pydantic import BaseModel
+from datetime import datetime
 
 from app.database import get_db
 from app.services.port_forecast_service import PortForecastService
@@ -29,20 +30,37 @@ class ForecastResponse(BaseModel):
 @router.get("/congestion/heatmap")
 def get_congestion_heatmap(db: Session = Depends(get_db)):
     """
-    Get congestion heatmap data for all ports
-    
-    Returns:
-        list: Port congestion data with lat/lon for map visualization
+    Get real-time congestion dot-heatmap data for all ports.
     """
-    
     forecast_service = PortForecastService(db)
     heatmap_data = forecast_service.get_congestion_heatmap()
-    
+
     return {
         "ports": heatmap_data,
         "total_ports": len(heatmap_data),
         "critical_count": len([p for p in heatmap_data if p['congestion_level'] == 'critical']),
         "high_count": len([p for p in heatmap_data if p['congestion_level'] == 'high'])
+    }
+
+
+@router.get("/congestion-forecast/ripple-map")
+def get_congestion_ripple_map(
+    top_n: int = Query(10, ge=1, le=30, description="Number of busiest ports to include"),
+    db: Session = Depends(get_db)
+):
+    """
+    Page 1.5 — Congestion Forecast (Ripple-Heat) Map.
+    Returns short-horizon (now / +24h / +48h / +72h) congestion projections
+    for the busiest ports, each with nearby alternative ports attached,
+    derived from the same Prophet model used for the 7/14/30-day forecast.
+    """
+    forecast_service = PortForecastService(db)
+    data = forecast_service.get_ripple_heatmap_data(top_n_ports=top_n)
+
+    return {
+        "forecasts": data,
+        "count": len(data),
+        "generated_at": datetime.utcnow().isoformat() + "Z",
     }
 
 
@@ -54,31 +72,20 @@ def get_port_forecast(
     db: Session = Depends(get_db)
 ):
     """
-    Get congestion forecast for a specific port
-    
-    Args:
-        port_id: Port ID
-        horizon: Forecast horizon (7, 14, or 30 days)
-        retrain: Force retrain even if cached forecast exists
-    
-    Returns:
-        dict: Forecast with confidence intervals
+    Get congestion forecast for a specific port (7/14/30-day Port Dashboard view)
     """
-    
-    # Validate horizon
+
     if horizon not in [7, 14, 30]:
         raise HTTPException(status_code=400, detail="Horizon must be 7, 14, or 30 days")
-    
-    # Get port
+
     port = db.query(Port).filter(Port.id == port_id).first()
-    
+
     if not port:
         raise HTTPException(status_code=404, detail=f"Port {port_id} not found")
-    
-    # Generate forecast
+
     forecast_service = PortForecastService(db)
     forecast = forecast_service.train_and_forecast(port_id, horizon, retrain)
-    
+
     return {
         "port_id": port_id,
         "port_name": port.name,
@@ -97,29 +104,21 @@ def get_port_congestion_history(
 ):
     """
     Get historical congestion data for a port
-    
-    Args:
-        port_id: Port ID
-        days: Number of days of history to return
-    
-    Returns:
-        dict: Historical congestion data
     """
-    
     from datetime import datetime, timedelta
-    
+
     port = db.query(Port).filter(Port.id == port_id).first()
-    
+
     if not port:
         raise HTTPException(status_code=404, detail=f"Port {port_id} not found")
-    
+
     cutoff_date = datetime.utcnow() - timedelta(days=days)
-    
+
     history = db.query(PortCongestionHistory).filter(
         PortCongestionHistory.port_id == port_id,
         PortCongestionHistory.timestamp >= cutoff_date
     ).order_by(PortCongestionHistory.timestamp).all()
-    
+
     history_data = [
         {
             "timestamp": h.timestamp.isoformat(),
@@ -130,7 +129,7 @@ def get_port_congestion_history(
         }
         for h in history
     ]
-    
+
     return {
         "port_id": port_id,
         "port_name": port.name,
@@ -148,24 +147,15 @@ def get_alternative_ports(
 ):
     """
     Get alternative ports with lower congestion
-    
-    Args:
-        port_id: Source port ID
-        max_distance_km: Maximum distance from source port
-        max_results: Maximum number of alternatives to return
-    
-    Returns:
-        list: Alternative ports sorted by suitability
     """
-    
     port = db.query(Port).filter(Port.id == port_id).first()
-    
+
     if not port:
         raise HTTPException(status_code=404, detail=f"Port {port_id} not found")
-    
+
     forecast_service = PortForecastService(db)
     alternatives = forecast_service.find_alternative_ports(port_id, max_distance_km, max_results)
-    
+
     return {
         "source_port_id": port_id,
         "source_port_name": port.name,
