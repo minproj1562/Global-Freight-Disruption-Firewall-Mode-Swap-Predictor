@@ -10,7 +10,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Ship,
-  Anchor,
   Search,
   Download,
   Clock,
@@ -22,7 +21,6 @@ import {
   CheckCircle,
   XCircle,
   Navigation,
-  Lock,
   Globe,
   X,
   Satellite,

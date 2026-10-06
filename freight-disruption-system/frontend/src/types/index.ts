@@ -1,3 +1,4 @@
+// frontend/src/types/index.ts
 // TypeScript Interfaces for Freight Firewall & Mode-Swap Predictor
 // Aligned with FastAPI & Pydantic backend models
 
@@ -252,6 +253,13 @@ export interface ActiveRoute {
   delay_hours?: number;
   recommended_action?: string | RecommendedAction;
   eta_predicted_ml?: string;
+  /** Earliest realistic arrival time in the predicted window (plain label: "Expected From") */
+  eta_confidence_earliest?: string;
+  /** Latest realistic arrival time in the predicted window (plain label: "Expected By") */
+  eta_confidence_latest?: string;
+  /** "lstm_sequence" = Smart Forecast (built from this vessel's own tracked movement history)
+   *  "kinematic" = Standard Estimate (distance & speed based, used until enough tracking history is collected) */
+  eta_prediction_mode?: 'lstm_sequence' | 'kinematic' | string;
   delay_probability_pct?: number;
   ml_risk_score?: number;
   carrier_name?: string;
@@ -306,5 +314,3 @@ export interface CongestionTrendPoint {
   selectedPortScore: number;
   [altPortName: string]: string | number;
 }
-
-

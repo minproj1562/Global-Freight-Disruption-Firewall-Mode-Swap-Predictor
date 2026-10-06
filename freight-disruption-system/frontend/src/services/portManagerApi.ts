@@ -356,6 +356,76 @@ export const fetchNetworkPortTelemetry = async (
   return response.data;
 };
 
+// ============= RIPPLE DASHBOARD (Network Analyzer — Port Manager primary view) =============
+
+export interface IncomingThreat {
+  upstream_port_id: string;
+  upstream_port_name: string;
+  upstream_port_code: string;
+  upstream_congestion_now_pct: number;
+  upstream_trend_label: string;
+  predicted_congestion_increase_pct: number;
+  additional_waiting_vessels: number;
+  additional_dwell_days: number;
+  time_to_impact_days: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  confidence_pct: number;
+  prediction_engine: string;
+  plain_language_summary: string;
+}
+
+export interface OutgoingImpact {
+  downstream_port_id: string;
+  downstream_port_name: string;
+  downstream_port_code: string;
+  predicted_congestion_increase_pct: number;
+  additional_waiting_vessels: number;
+  time_to_impact_days: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  recommended_coordination: string;
+  plain_language_summary: string;
+}
+
+export interface PortHealthBanner {
+  port_id: string;
+  port_name: string;
+  status: 'GREEN' | 'AMBER' | 'RED' | string;
+  headline: string;
+  hours_to_prepare: number | null;
+  confidence_pct: number;
+  outgoing_ports_affected_count: number;
+  generated_at: string;
+}
+
+export interface PreparationAction {
+  time_window: string;
+  action: string;
+  resource_required: string;
+  expected_outcome: string;
+  status: string;
+}
+
+export interface HistoricalPrecedent {
+  event_name: string;
+  location: string;
+  duration_days: number;
+  vessels_affected: number;
+  avg_industry_delay_days: number;
+  summary: string;
+}
+
+export interface RippleDashboard {
+  banner: PortHealthBanner;
+  incoming_threats: IncomingThreat[];
+  outgoing_impacts: OutgoingImpact[];
+  preparation_plan: PreparationAction[];
+  historical_precedents: HistoricalPrecedent[];
+}
+
+export const fetchRippleDashboard = async (portId: string): Promise<RippleDashboard> => {
+  const response = await api.get<RippleDashboard>(`/api/network-analyzer/${portId}/ripple-dashboard`);
+  return response.data;
+};
 // ============= LANDING PAGE REAL-TIME TELEMETRY =============
 
 export interface CriticalPortSummary {
@@ -387,5 +457,97 @@ export interface LandingTelemetryData {
 
 export const fetchLandingTelemetryApi = async (): Promise<LandingTelemetryData> => {
   const response = await api.get<LandingTelemetryData>('/api/ports/landing-telemetry');
+  return response.data;
+};
+// ============= NETWORK IMPACT ANALYZER (Network Science + GNN) =============
+
+export interface DirectTradePartner {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  avg_transit_days: number;
+}
+
+export interface NetworkOverview {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  trade_chokepoint_score_pct: number;
+  trade_chokepoint_label: string;
+  trade_chokepoint_explainer: string;
+  direct_trade_partners_count: number;
+  direct_connectivity_pct: number;
+  single_point_of_failure_risk_label: string;
+  single_point_of_failure_explainer: string;
+  vulnerability_score_0_100: number;
+  risk_tier: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL' | string;
+  global_rank_by_importance: number;
+  total_ports_in_network: number;
+  direct_trade_partners: DirectTradePartner[];
+}
+
+export interface AlternativeRoute {
+  from_port_name: string;
+  to_port_name: string;
+  has_alternative: boolean;
+  alternate_path_names: string[];
+  extra_transit_days: number | null;
+  plain_language_summary: string;
+}
+
+export interface ShutdownAffectedPort {
+  port_name: string;
+  port_code: string;
+  congestion_increase_pct: number;
+  risk_level: string;
+  days_3: number;
+  days_7: number;
+  days_14: number;
+}
+
+export interface ShutdownSimulationResult {
+  port_id: string;
+  port_name: string;
+  severity_simulated: string;
+  prediction_engine: string;
+  plain_language_summary: string;
+  affected_ports: ShutdownAffectedPort[];
+}
+
+export interface TechnicalDetails {
+  port_id: string;
+  degree_centrality: number;
+  betweenness_centrality: number;
+  closeness_centrality: number;
+  eigenvector_centrality: number;
+  is_articulation_point: boolean;
+  vulnerability_score: number;
+  total_network_nodes: number;
+  total_network_edges: number;
+  gnn_model_info: Record<string, any>;
+}
+
+export const fetchNetworkOverview = async (portId: string): Promise<NetworkOverview> => {
+  const response = await api.get<NetworkOverview>(`/api/network-analyzer/${portId}/overview`);
+  return response.data;
+};
+
+export const fetchAlternativeRoutes = async (portId: string): Promise<AlternativeRoute[]> => {
+  const response = await api.get<AlternativeRoute[]>(`/api/network-analyzer/${portId}/alternative-routes`);
+  return response.data;
+};
+
+export const simulatePortShutdown = async (
+  portId: string,
+  severity: 'low' | 'medium' | 'high' | 'critical' = 'critical'
+): Promise<ShutdownSimulationResult> => {
+  const response = await api.get<ShutdownSimulationResult>(`/api/network-analyzer/${portId}/simulate-shutdown`, {
+    params: { severity },
+  });
+  return response.data;
+};
+
+export const fetchNetworkTechnicalDetails = async (portId: string): Promise<TechnicalDetails> => {
+  const response = await api.get<TechnicalDetails>(`/api/network-analyzer/${portId}/technical-details`);
   return response.data;
 };

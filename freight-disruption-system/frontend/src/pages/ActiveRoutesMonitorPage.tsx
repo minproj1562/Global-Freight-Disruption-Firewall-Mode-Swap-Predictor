@@ -1,3 +1,4 @@
+// frontend/src/pages/ActiveRoutesMonitorPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -44,6 +45,23 @@ type SortField =
   | 'risk_level'
   | 'progress_percent';
 type SortOrder = 'asc' | 'desc';
+
+// Formats a raw ISO timestamp into a short, readable time for the "Expected Window" sub-label
+const formatShortWindowTime = (iso?: string): string => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '';
+  }
+};
 
 export const ActiveRoutesMonitorPage: React.FC = () => {
   const navigate = useNavigate();
@@ -121,8 +139,8 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
       console.error('[Active Routes API Error]:', err);
       setErrorMessage(err?.message || 'Failed to connect to Active Fleet API');
       toast({
-        title: 'Fleet API Connection Error',
-        description: err?.message || 'Unable to load real-time active routes from backend.',
+        title: 'Connection Problem',
+        description: err?.message || 'Could not load the latest fleet positions. Please try refreshing again.',
         variant: 'destructive',
       });
     } finally {
@@ -341,14 +359,14 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold font-mono tracking-tight text-slate-900 dark:text-white">
-                  PAGE 1.4 — ACTIVE FLEET MONITOR
+                  ACTIVE FLEET MONITOR
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
-                  ML GRADIENT BOOSTING ACTIVE
+                  ARRIVAL FORECASTS ACTIVE
                 </span>
               </div>
               <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                Real-time tracking of 220+ active commercial voyages with ML delay & risk scoring
+                Track all active voyages, predicted arrival times, and delay warnings
               </p>
             </div>
           </div>
@@ -360,7 +378,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all disabled:opacity-50 shadow-sm"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Syncing...' : 'Sync Fleet API'}</span>
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Fleet Data'}</span>
             </button>
             <ConnectionIndicator />
             <ThemeToggle />
@@ -376,7 +394,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
               <div className="text-xl font-bold text-slate-900 dark:text-white mt-1">{routes.length} Vessels</div>
             </div>
             <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-sm">
-              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">ACTIVE DELAYS</div>
+              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">RUNNING LATE</div>
               <div className="text-xl font-bold text-amber-600 dark:text-amber-300 mt-1">
                 {routes.filter((r) => (r.delay_hours ?? 0) > 0).length}
               </div>
@@ -388,7 +406,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
               </div>
             </div>
             <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-sm">
-              <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">AVG ML PREDICTED DELAY</div>
+              <div className="text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">AVERAGE DELAY</div>
               <div className="text-xl font-bold text-cyan-600 dark:text-cyan-300 mt-1">
                 {routes.length > 0
                   ? (routes.reduce((acc, r) => acc + (r.delay_hours ?? 0), 0) / routes.length).toFixed(1)
@@ -397,7 +415,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
               </div>
             </div>
             <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-sm">
-              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">ON SCHEDULE RATE</div>
+              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">ON TIME RATE</div>
               <div className="text-xl font-bold text-emerald-600 dark:text-emerald-300 mt-1">
                 {routes.length > 0
                   ? (
@@ -565,7 +583,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
           </div>
 
           {/* ========================================================================= */}
-          {/* 2. MAIN 200+ ACTIVE FLEET TABLE */}
+          {/* 2. MAIN ACTIVE FLEET TABLE */}
           {/* ========================================================================= */}
           <div className="rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 backdrop-blur-xl shadow-xl overflow-hidden transition-colors duration-300">
             <div className="overflow-x-auto">
@@ -587,21 +605,21 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                     </th>
                     <th className="py-3.5 px-4">Mode</th>
                     <th className="py-3.5 px-4 cursor-pointer hover:text-slate-900 dark:hover:text-white" onClick={() => handleSort('eta')}>
-                      ETA Original {sortField === 'eta' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      Scheduled Arrival {sortField === 'eta' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="py-3.5 px-4 text-cyan-600 dark:text-cyan-400">ETA Predicted (ML)</th>
+                    <th className="py-3.5 px-4 text-cyan-600 dark:text-cyan-400">Expected Arrival</th>
                     <th
                       className="py-3.5 px-4 cursor-pointer hover:text-slate-900 dark:hover:text-white"
                       onClick={() => handleSort('delay_hours')}
                     >
-                      Delay (Hrs + Prob %){' '}
+                      Expected Delay{' '}
                       {sortField === 'delay_hours' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       className="py-3.5 px-4 cursor-pointer hover:text-slate-900 dark:hover:text-white"
                       onClick={() => handleSort('risk_level')}
                     >
-                      ML Risk {sortField === 'risk_level' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      Delay Risk {sortField === 'risk_level' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th
                       className="py-3.5 px-4 cursor-pointer hover:text-slate-900 dark:hover:text-white"
@@ -618,18 +636,20 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                     <tr>
                       <td colSpan={10} className="py-16 text-center text-slate-500 dark:text-slate-400 space-y-3">
                         <RefreshCw className="w-8 h-8 animate-spin text-cyan-500 mx-auto" />
-                        <div>Loading 220+ active fleet voyages from live API...</div>
+                        <div>Loading the latest fleet positions...</div>
                       </td>
                     </tr>
                   ) : paginatedRoutes.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                        No active routes match the specified filter criteria.
+                        No active voyages match the selected filters.
                       </td>
                     </tr>
                   ) : (
                     paginatedRoutes.map((route) => {
                       const isSelected = selectedVesselForMap?.id === route.id;
+                      const isSmartForecast = route.eta_prediction_mode === 'lstm_sequence';
+                      const hasWindow = route.eta_confidence_earliest && route.eta_confidence_latest;
 
                       return (
                         <tr
@@ -696,17 +716,40 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                             </span>
                           </td>
 
-                          {/* ETA Original */}
+                          {/* Scheduled Arrival (original plan) */}
                           <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {route.eta}
                           </td>
 
-                          {/* ETA Predicted (ML) */}
-                          <td className="py-3 px-4 text-cyan-600 dark:text-cyan-300 font-bold whitespace-nowrap">
-                            {route.eta_predicted_ml}
+                          {/* Expected Arrival (plain-language smart forecast) */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="text-cyan-600 dark:text-cyan-300 font-bold">
+                              {route.eta_predicted_ml}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span
+                                className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${
+                                  isSmartForecast
+                                    ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                                }`}
+                                title={
+                                  isSmartForecast
+                                    ? "Predicted from this vessel's recent voyage history"
+                                    : 'Estimated from distance and speed'
+                                }
+                              >
+                                {isSmartForecast ? 'Tracked Forecast' : 'Distance Estimate'}
+                              </span>
+                            </div>
+                            {hasWindow && (
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                Expect between {formatShortWindowTime(route.eta_confidence_earliest)} – {formatShortWindowTime(route.eta_confidence_latest)}
+                              </div>
+                            )}
                           </td>
 
-                          {/* Delay (Hrs + Prob %) */}
+                          {/* Delay (Hrs + Chance) */}
                           <td className="py-3 px-4">
                             {(route.delay_hours ?? 0) > 0 ? (
                               <div>
@@ -714,7 +757,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                                   +{route.delay_hours} hrs
                                 </span>
                                 <div className="text-[10px] text-amber-600 dark:text-amber-400">
-                                  {route.delay_probability_pct}% prob
+                                  {route.delay_probability_pct}% chance
                                 </div>
                               </div>
                             ) : (
@@ -722,7 +765,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                             )}
                           </td>
 
-                          {/* Risk Level & ML Risk Score */}
+                          {/* Risk Level & Risk Score */}
                           <td className="py-3 px-4">
                             <div className="space-y-0.5">
                               <span
@@ -733,7 +776,7 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                                 {route.risk_level}
                               </span>
                               <div className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400">
-                                Score: <strong className="text-slate-800 dark:text-slate-200">{route.ml_risk_score ?? (route.delay_probability_pct ? (route.delay_probability_pct / 100).toFixed(2) : '0.15')}</strong>
+                                Risk Score: <strong className="text-slate-800 dark:text-slate-200">{route.ml_risk_score ?? (route.delay_probability_pct ? (route.delay_probability_pct / 100).toFixed(2) : '0.15')}</strong>
                               </div>
                             </div>
                           </td>
@@ -829,13 +872,13 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                   <Compass className="w-4 h-4" />
                 </div>
                 <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white tracking-wide">
-                  LIVE MINI MAP — ALL FLEET POSITIONS & THREAT OVERLAYS (LIVE API)
+                  LIVE MAP — ALL FLEET POSITIONS & THREAT ZONES
                 </h3>
               </div>
               <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
                 {selectedVesselForMap
-                  ? `Focused Vessel: ${selectedVesselForMap.vessel_name}`
-                  : 'Click any row in the table above to highlight on map'}
+                  ? `Showing: ${selectedVesselForMap.vessel_name}`
+                  : 'Click any row in the table above to locate it on the map'}
               </span>
             </div>
 

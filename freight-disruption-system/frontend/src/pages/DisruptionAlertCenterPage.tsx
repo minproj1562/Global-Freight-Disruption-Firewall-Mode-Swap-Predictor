@@ -7,7 +7,7 @@
 // POST /api/v1/disruptions/{id}/resolve
 // POST /api/v1/recommendations/disruption/{id}
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -52,6 +52,7 @@ import {
   getMapRoutes,
   getSecondaryInfrastructure,
 } from '@/services/api';
+import { useCongestionAlerts } from '@/shared/hooks/useCongestionAlerts';
 
 export const DisruptionAlertCenterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -98,6 +99,49 @@ export const DisruptionAlertCenterPage: React.FC = () => {
     getMapRoutes().then(setMapRoutes).catch(console.error);
     getSecondaryInfrastructure().then(setMapInfra).catch(console.error);
   }, []);
+
+  // ============= TASK 2: PORT PROPAGATION — LIVE WEBSOCKET CONGESTION ALERTS =============
+  // Resolves via backend route-port mapping table: only alerts whose
+  // affected_routes actually touch a port this logistics manager's
+  // monitored routes pass through will ever arrive here.
+  const { latestAlert, status: alertSocketStatus } = useCongestionAlerts();
+  const processedAlertKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!latestAlert) return;
+    const alertKey = `${latestAlert.port_id}-${latestAlert.timestamp}`;
+    if (processedAlertKeysRef.current.has(alertKey)) return;
+    processedAlertKeysRef.current.add(alertKey);
+
+    const routeNames = latestAlert.affected_routes.map((r) => r.route_name).join(', ');
+    const newId = `congestion-alert-${latestAlert.port_id}-${Date.now()}`;
+
+    const liveAlert: Disruption = {
+      id: newId,
+      name: `Port Congestion Surge — ${latestAlert.port_name} (${latestAlert.congestion_percent}%)`,
+      type: 'Port Congestion Propagation',
+      severity: (latestAlert.congestion_level as DisruptionSeverity) || 'medium',
+      status: 'unacknowledged',
+      description: latestAlert.affected_routes.length
+        ? `Your monitored route(s) pass through ${latestAlert.port_name} (${latestAlert.port_code}), which just reported ${latestAlert.congestion_percent}% congestion. Affected routes: ${routeNames}.`
+        : `${latestAlert.port_name} (${latestAlert.port_code}) congestion updated to ${latestAlert.congestion_percent}% by ${latestAlert.updated_by || 'Port Manager'}.`,
+      polygon_coordinates: [],
+      affected_vessels_count: latestAlert.affected_routes.length,
+      active_since: new Date(latestAlert.timestamp).toISOString().replace('T', ' ').substring(0, 16),
+      time_since_detected: 'Just now',
+      location_name: `${latestAlert.port_name} (${latestAlert.port_code})`,
+      mitigation_advice: 'Review affected routes in the Active Fleet Monitor and consider rerouting via an alternative port.',
+      is_new: true,
+    };
+
+    setDisruptions((prev) => [liveAlert, ...prev]);
+    setSelectedDisruptionId(newId);
+
+    toast({
+      title: `⚡ Port Congestion Alert — ${latestAlert.port_name}`,
+      description: `Congestion now at ${latestAlert.congestion_percent}% — ${latestAlert.affected_routes.length} of your route(s) affected.`,
+    });
+  }, [latestAlert, toast]);
 
   // Export Impact Report PDF handler
   const handleExportImpactReport = () => {
@@ -321,7 +365,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
       estimated_duration_remaining: '4 days remaining',
       mitigation_advice: 'Execute immediate speed reduction or reroute via Sunda Strait.',
       is_new: true,
-      affected_vessels_list: [MOCK_VESSELS[1], MOCK_VESSELS[10]],
+      affected_vessels_list: mapVessels.slice(0, 2),
       recommended_action: {
         id: `rec-sim-${Date.now()}`,
         disruption_id: newId,
@@ -399,12 +443,15 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                 <h1 className="text-sm font-bold font-mono text-slate-900 dark:text-white tracking-tight">
                   DISRUPTION ALERT CENTER
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                  {disruptions.filter((d) => d.status !== 'resolved').length} ACTIVE
-                </span>
+
+                {alertSocketStatus === 'live' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    ● LIVE ALERTS
+                  </span>
+                )}
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono hidden sm:block">
-                PAGE 1.2 • REAL-TIME MARITIME THREAT FIREWALL & DISRUPTION TELEMETRY
+                PAGE 1.2 • Live disruption monitoring and impact tracking
               </p>
             </div>
           </div>
@@ -728,7 +775,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                   </button>
                   <div>
                     <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider block">
-                      SELECTED THREAT DETAILS
+                      DISRUPTION DETAILS
                     </span>
                     <h2 className="text-lg lg:text-xl font-bold font-mono text-slate-900 dark:text-white">
                       {selectedDisruption.name}
@@ -793,7 +840,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] font-mono text-rose-400 font-bold uppercase tracking-wider block">
-                      ESTIMATED FINANCIAL IMPACT EXPOSURE
+                      ESTIMATED FINANCIAL IMPACT
                     </span>
                     <span className="text-xl font-extrabold font-mono text-white">
                       ${((selectedDisruption.financial_impact_usd || 48500000) / 1000000).toFixed(1)}M USD
@@ -813,10 +860,10 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>AI AUTO-GENERATED RECOMMENDED ACTION</span>
+                    <span>RECOMMENDED RESPONSE</span>
                   </div>
                   <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-md font-bold">
-                    {selectedDisruption.recommended_action?.confidence_score || 96}% CONFIDENCE
+                    {selectedDisruption.recommended_action?.confidence_score || 96}% RELIABILITY
                   </span>
                 </div>
 
@@ -840,7 +887,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                   </div>
 
                   <div className="col-span-2 sm:col-span-1 bg-white/80 dark:bg-slate-950/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800/80">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">TARGET VESSELS</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">VESSELS AFFECTED</span>
                     <span className="text-sky-600 dark:text-sky-400 font-bold text-sm">
                       {selectedDisruption.affected_vessels_count} Vessels
                     </span>
@@ -849,7 +896,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
 
                 <div className="mt-3 text-[10px] text-slate-500 font-mono italic">
                   {/* FASTAPI REPLACEMENT POINT: Backend Endpoint POST /api/v1/recommendations/disruption/{id} */}
-                  * Recommendation synthesized via Monte Carlo threat optimization model.
+                  * Generated by automated route optimization analysis.
                 </div>
               </div>
 
@@ -858,10 +905,10 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400" />
-                    AI-PREDICTED RIPPLE EFFECTS (3 / 7 / 14-DAY HORIZONS)
+                    HOW THIS DISRUPTION SPREADS TO OTHER PORTS (3 / 7 / 14-DAY FORECAST)
                   </h3>
                   <span className="text-[10px] font-mono text-purple-400 font-bold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30">
-                    CASCADE PREDICTOR
+                    SPREAD FORECAST
                   </span>
                 </div>
 
@@ -871,7 +918,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 uppercase">
                           <th className="pb-2">Affected Port</th>
-                          <th className="pb-2">Congestion Δ</th>
+                          <th className="pb-2">Congestion Change</th>
                           <th className="pb-2 text-center">3-Day Delay</th>
                           <th className="pb-2 text-center">7-Day Delay</th>
                           <th className="pb-2 text-center">14-Day Delay</th>
@@ -942,7 +989,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
 
                           <div className="text-right font-mono">
                             <span className="px-2 py-0.5 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px] font-bold block">
-                              +3.5d ETA Impact
+                              +3.5 days delay expected
                             </span>
                             <span className="text-[10px] text-slate-500 block mt-0.5">
                               {vessel.capacity_teu ? `${vessel.capacity_teu.toLocaleString()} TEU` : 'Bulk Carrier'}

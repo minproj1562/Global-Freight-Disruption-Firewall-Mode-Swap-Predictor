@@ -51,7 +51,7 @@ export const OperationsDashboard: React.FC = () => {
     last_updated: 'Just now',
   });
   const [secondaryInfra, setSecondaryInfra] = useState<SecondaryInfrastructure[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [_isLoading, setIsLoading] = useState<boolean>(true);
 
   // Load live map data from Backend REST API
   useEffect(() => {

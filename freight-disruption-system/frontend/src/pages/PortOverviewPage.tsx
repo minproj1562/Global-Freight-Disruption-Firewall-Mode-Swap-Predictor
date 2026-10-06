@@ -1,5 +1,5 @@
 // frontend/src/pages/PortOverviewPage.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,13 +19,6 @@ import {
   Map as MapIcon,
   Globe,
   RefreshCw,
-  Search,
-  Navigation,
-  Calendar,
-  Edit3,
-  Trash2,
-  Lock,
-  ArrowRight,
 } from 'lucide-react';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { PortManagerSidebar } from '@/components/port-manager/PortManagerSidebar';

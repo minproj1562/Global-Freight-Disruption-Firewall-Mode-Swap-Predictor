@@ -16,7 +16,6 @@ import {
   Eye,
   EyeOff,
   Check,
-  X,
   Upload,
   Info,
   HelpCircle,
@@ -25,12 +24,8 @@ import {
   ArrowLeft,
   BadgeCheck,
   Ship,
-  AlertTriangle,
   Sparkles,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { AnimatedBackground } from '@/components/landing/AnimatedBackground';
 import { useToast } from '@/components/ui/use-toast';
 import { registerLogisticsManager, loginLogisticsManager, LogisticsManagerRegisterData } from '@/services/api';

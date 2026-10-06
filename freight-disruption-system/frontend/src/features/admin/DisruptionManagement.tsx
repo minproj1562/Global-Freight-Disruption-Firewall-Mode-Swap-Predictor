@@ -26,7 +26,6 @@ import {
 
 export const DisruptionManagement: React.FC = () => {
   const [disruptions, setDisruptions] = useState<ManagedDisruption[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Form State for Adding Disruption
   const [formData, setFormData] = useState<Omit<ManagedDisruption, 'id' | 'affectedVesselsCount' | 'resolved'>>({

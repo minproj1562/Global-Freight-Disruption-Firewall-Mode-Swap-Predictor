@@ -7,6 +7,7 @@ import { OperationsDashboard } from './pages/OperationsDashboard';
 import { PortManagerAuthPage } from './pages/PortManagerAuthPage';
 import { PortOverviewPage } from './pages/PortOverviewPage';
 import { SinglePortDetailPage } from './pages/SinglePortDetailPage';
+import { NetworkImpactAnalyzerPage } from './pages/NetworkImpactAnalyzerPage';
 import { VesselLogsPage } from './pages/VesselLogsPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AdminAuthPage } from './pages/AdminAuthPage';
@@ -80,6 +81,7 @@ function App() {
 
           {/* Page 3.2 — Single Port Detail & Terminal Management */}
           <Route path="/dashboard/ports/:portId" element={<SinglePortDetailPage />} />
+          <Route path="/dashboard/network-analyzer/:portId" element={<NetworkImpactAnalyzerPage />} />
           <Route path="/ports/:portId" element={<SinglePortDetailPage />} />
           <Route path="/port-detail/:portId" element={<SinglePortDetailPage />} />
 

@@ -1016,14 +1016,61 @@ export const getActiveRoutesStats = async () => {
   return response.json();
 };
 
-// ============= PAGE 1.5: PORT CONGESTION FORECAST =============
+// ============= PAGE 1.5: REAL PROPHET CONGESTION FORECAST =============
 
-export const getPortCongestionOverview = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/congestion/forecast`);
-  if (!response.ok) throw new Error('Failed to fetch congestion overview');
+export interface PortForecastPoint {
+  ds: string;
+  yhat: number;
+  yhat_lower: number;
+  yhat_upper: number;
+}
+
+export interface PortForecastDetail {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  current_congestion_percent: number;
+  forecast_horizon_days: number;
+  forecast_data: PortForecastPoint[];
+  mae: number;
+  mape: number;
+  confidence_score: number;
+  cached: boolean;
+  mock?: boolean;
+}
+
+export interface PortHistoryPoint {
+  timestamp: string;
+  congestion_percent: number;
+  waiting_vessels: number;
+  avg_wait_hours: number;
+  disruption_flag: boolean;
+}
+
+export interface PortHistoryResponse {
+  port_id: string;
+  port_name: string;
+  history: PortHistoryPoint[];
+  count: number;
+}
+
+export const fetchCongestionRippleMap = async (topN: number = 10): Promise<{ forecasts: any[]; count: number; generated_at: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/ports/congestion-forecast/ripple-map?top_n=${topN}`);
+  if (!response.ok) throw new Error('Failed to fetch congestion ripple map');
   return response.json();
 };
 
+export const fetchPortForecastDetail = async (portId: string, horizon: 7 | 14 | 30 = 14): Promise<PortForecastDetail> => {
+  const response = await fetch(`${API_BASE_URL}/api/ports/${portId}/forecast?horizon=${horizon}`);
+  if (!response.ok) throw new Error('Failed to fetch port forecast detail');
+  return response.json();
+};
+
+export const fetchPortCongestionHistory = async (portId: string, days: number = 14): Promise<PortHistoryResponse> => {
+  const response = await fetch(`${API_BASE_URL}/api/ports/${portId}/history?days=${days}`);
+  if (!response.ok) throw new Error('Failed to fetch port congestion history');
+  return response.json();
+};
 // ============= PAGE 1.6: RISK REGISTER & EXECUTIVE SUMMARY =============
 
 export const getRiskRegisterSummary = async () => {

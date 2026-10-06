@@ -6,6 +6,7 @@ import {
   Globe, 
   Anchor, 
   FileText,
+  Network,
   LogOut, 
   Menu, 
   ChevronLeft 
@@ -26,6 +27,7 @@ export const PortManagerSidebar: React.FC<PortManagerSidebarProps> = ({ currentP
     { name: 'Port Overview', icon: Globe, route: '/dashboard/ports' },
     { name: 'Vessel Traffic', icon: FileText, route: `/dashboard/vessel-logs/${currentPortId || user?.portId || 'port-rotterdam'}` },
     { name: 'Berths & Terminal', icon: Anchor, route: `/dashboard/ports/${currentPortId || user?.portId || 'port-rotterdam'}` },
+    { name: 'Network Watch', icon: Network, route: `/dashboard/network-analyzer/${currentPortId || user?.portId || 'port-rotterdam'}` },
   ];
 
   const handleLogout = () => {
@@ -81,7 +83,6 @@ export const PortManagerSidebar: React.FC<PortManagerSidebarProps> = ({ currentP
 
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {navItems.map((item) => {
-          // Highlight active if exact match or if it's a prefix (e.g. /dashboard/ports/123)
           const isActive = location.pathname === item.route || 
             (item.route !== '/dashboard/ports' && location.pathname.startsWith(item.route));
 
