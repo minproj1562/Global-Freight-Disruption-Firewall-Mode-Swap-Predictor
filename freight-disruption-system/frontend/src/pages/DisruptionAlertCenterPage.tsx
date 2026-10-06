@@ -365,7 +365,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
       estimated_duration_remaining: '4 days remaining',
       mitigation_advice: 'Execute immediate speed reduction or reroute via Sunda Strait.',
       is_new: true,
-      affected_vessels_list: [MOCK_VESSELS[1], MOCK_VESSELS[10]],
+      affected_vessels_list: mapVessels.slice(0, 2),
       recommended_action: {
         id: `rec-sim-${Date.now()}`,
         disruption_id: newId,

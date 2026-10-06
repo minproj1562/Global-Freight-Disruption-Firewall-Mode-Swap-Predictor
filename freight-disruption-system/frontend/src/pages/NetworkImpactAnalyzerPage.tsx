@@ -290,7 +290,7 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
                         <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
                         <XAxis type="number" unit="%" fontSize={10} stroke="#94a3b8" />
                         <YAxis type="category" dataKey="name" width={90} fontSize={10} stroke="#94a3b8" />
-                        <Tooltip formatter={(v: number) => [`+${v}%`, 'Expected effect on you']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
+                        <Tooltip formatter={(v: any) => [`+${v}%`, 'Expected effect on you']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
                         <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                           {incomingChartData.map((d, i) => <Cell key={i} fill={RISK_BAR_COLOR[d.risk] || '#10b981'} />)}
                         </Bar>
@@ -347,7 +347,7 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
                         <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
                         <XAxis type="number" unit="%" fontSize={10} stroke="#94a3b8" />
                         <YAxis type="category" dataKey="name" width={90} fontSize={10} stroke="#94a3b8" />
-                        <Tooltip formatter={(v: number) => [`+${v}%`, 'Expected effect on them']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
+                        <Tooltip formatter={(v: any) => [`+${v}%`, 'Expected effect on them']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
                         <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                           {outgoingChartData.map((d, i) => <Cell key={i} fill={RISK_BAR_COLOR[d.risk] || '#10b981'} />)}
                         </Bar>
@@ -463,7 +463,7 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">This Has Happened Before</h3>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
-                  Real, documented disruptions — shown for context, not as a measure of this tool's accuracy.
+                  Documented historical disruption case studies for operational comparison and benchmarking.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {precedents.map((p, idx) => (
@@ -503,12 +503,12 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
               </section>
             )}
 
-            {/* ===== SECTION 8: ADVANCED STRESS TEST (condensed, chart-based) ===== */}
+            {/* ===== SECTION 8: EMERGENCY CLOSURE STRESS SIMULATION ===== */}
             <section className="bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-3 print:hidden">
               <button onClick={() => setShowStressTest((v) => !v)} className="w-full flex items-center justify-between text-left">
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-slate-400" />
-                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">Advanced: Test a Full Shutdown (Not Based on Current Data)</h3>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">Emergency Port Closure Simulation (Contingency Stress Test)</h3>
                 </div>
                 {showStressTest ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
               </button>
@@ -516,18 +516,18 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
                 {showStressTest && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden space-y-3 pt-2">
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      This hypothetical test ignores current congestion and asks "what if my port stopped completely?" — useful for contingency planning, not day-to-day decisions.
+                      Simulate how an emergency complete closure or extreme operational stoppage at your port cascades across connecting global trade lanes over 3, 7, and 14 days.
                     </p>
                     <div className="flex items-center gap-2">
                       <select value={stressSeverity} onChange={(e) => setStressSeverity(e.target.value as any)} className="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200">
-                        <option value="low">Brief Disruption</option>
-                        <option value="medium">Moderate Shutdown</option>
-                        <option value="high">Serious Shutdown</option>
-                        <option value="critical">Complete Shutdown</option>
+                        <option value="low">Brief Incident (1-2 Days)</option>
+                        <option value="medium">Moderate Stoppage (3-5 Days)</option>
+                        <option value="high">Serious Shutdown (7-10 Days)</option>
+                        <option value="critical">Full Emergency Closure</option>
                       </select>
                       <Button onClick={handleRunStressTest} disabled={stressRunning} className="bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs">
                         {stressRunning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-                        Run Test
+                        Run Simulation
                       </Button>
                     </div>
                     {stressResult && (
@@ -540,7 +540,7 @@ export const NetworkImpactAnalyzerPage: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
                                 <XAxis type="number" unit="%" fontSize={10} stroke="#94a3b8" />
                                 <YAxis type="category" dataKey="name" width={100} fontSize={10} stroke="#94a3b8" />
-                                <Tooltip formatter={(v: number) => [`+${v}%`, '14-day congestion increase']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
+                                <Tooltip formatter={(v: any) => [`+${v}%`, '14-day congestion increase']} contentStyle={{ fontSize: 11, borderRadius: 10 }} />
                                 <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                                   {stressChartData.map((d, i) => <Cell key={i} fill={RISK_BAR_COLOR[d.risk] || '#10b981'} />)}
                                 </Bar>

@@ -6,7 +6,7 @@
 // GET /api/v1/reroute/dijkstra-compare
 // POST /api/v1/reports/pdf (Backend PDF Report Export Endpoint)
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {

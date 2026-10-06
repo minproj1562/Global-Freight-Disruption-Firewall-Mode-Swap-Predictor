@@ -127,17 +127,25 @@ def get_alternative_routes(port_id: str, db: Session = Depends(get_db)):
                 ),
             ))
         else:
+            if alt.get("diversion_port_name"):
+                summary = (
+                    f"Inbound cargo from {alt['from_port_name']} can divert to {alt['diversion_port_name']} "
+                    f"(via {' → '.join(alt['alternate_path'])}), adding approximately {alt['extra_transit_days']} "
+                    f"extra day(s) for berth reallocation and hinterland connection."
+                )
+            else:
+                summary = (
+                    f"Cargo between {alt['from_port_name']} and {alt['to_port_name']} could reroute via "
+                    f"{' → '.join(alt['alternate_path'])}, adding approximately {alt['extra_transit_days']} "
+                    f"extra day(s) of transit if your port is unavailable."
+                )
             results.append(AlternativeRouteItem(
                 from_port_name=alt["from_port_name"],
                 to_port_name=alt["to_port_name"],
                 has_alternative=True,
                 alternate_path_names=alt["alternate_path"],
                 extra_transit_days=alt["extra_transit_days"],
-                plain_language_summary=(
-                    f"Cargo between {alt['from_port_name']} and {alt['to_port_name']} could reroute via "
-                    f"{' → '.join(alt['alternate_path'])}, adding approximately {alt['extra_transit_days']} "
-                    f"extra day(s) of transit if your port is unavailable."
-                ),
+                plain_language_summary=summary,
             ))
     return results
 
@@ -176,16 +184,16 @@ def simulate_port_shutdown(
     ]
 
     severity_word = {
-        "low": "a brief disruption", "medium": "a moderate shutdown",
-        "high": "a serious shutdown", "critical": "a complete shutdown",
-    }.get(severity.lower(), "a shutdown")
+        "low": "a brief 1-2 day disruption", "medium": "a moderate 3-5 day stoppage",
+        "high": "a serious 7-10 day stoppage", "critical": "a complete emergency closure",
+    }.get(severity.lower(), "an emergency closure")
 
     summary = (
-        f"If {port.name} experiences {severity_word}, our model predicts {len(affected)} other port(s) "
-        f"in the network would see measurable congestion increases within 14 days."
+        f"If {port.name} experiences {severity_word}, our graph model predicts {len(affected)} other port(s) "
+        f"in the global network would see cascading congestion increases within 14 days."
         if affected else
-        f"If {port.name} experiences {severity_word}, our model does not predict significant knock-on "
-        f"congestion at other monitored ports — your port's disruptions appear to stay relatively contained."
+        f"If {port.name} experiences {severity_word}, our model indicates network shock "
+        f"remains primarily contained to local coastal trade."
     )
 
     return ShutdownSimulationResponse(

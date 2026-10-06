@@ -75,7 +75,7 @@ export const CongestionForecastPage: React.FC = () => {
   const [mapRoutes, setMapRoutes] = useState<any[]>([]);
   const [mapInfra, setMapInfra] = useState<any[]>([]);
 
-  const [layers, setLayers] = useState<LayerVisibilityState>({
+  const [layers] = useState<LayerVisibilityState>({
     vessels: false,
     ports: true,
     disruptions: true,

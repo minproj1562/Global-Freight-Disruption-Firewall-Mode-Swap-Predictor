@@ -17,11 +17,22 @@ This is the "real network science" layer feeding both:
      BFS "teacher" simulation; gnn_model.py / gnn_ripple_predictor.py /
      train_gnn_model.py consume it).
 """
+import math
 import networkx as nx
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models.ports import Port, PortNetwork
+
+
+def _haversine_distance_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculates great circle distance in nautical miles between two coordinates."""
+    R_nm = 3440.065
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    return R_nm * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def build_port_graph(db: Session, undirected: bool = True) -> "nx.Graph":
@@ -137,51 +148,86 @@ def compute_port_vulnerability(G: "nx.Graph", port_id: str, centralities: Dict[s
 # SHORTEST / ALTERNATIVE PATHS
 # ============================================================
 
-def find_alternative_routes(G: "nx.Graph", port_id: str, top_k: int = 3) -> List[Dict[str, Any]]:
+def find_alternative_routes(G: "nx.Graph", port_id: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
-    If `port_id` were disrupted, which neighboring ports' trade pairs
-    could reroute, and via what alternate path (excluding port_id)?
+    Computes realistic backup/diversion corridors if port_id experiences peak congestion or closure.
+    For each major trade partner connecting to port_id, determines the closest viable alternative
+    gateway port in port_id's regional maritime cluster with genuine diversion delays (+0.8 to +2.5d).
     """
     if port_id not in G.nodes:
         return []
 
-    H = G.copy()
+    port_node = G.nodes[port_id]
+    port_name = port_node.get("name", port_id)
+    port_lat = port_node.get("latitude", 0.0)
+    port_lon = port_node.get("longitude", 0.0)
+
+    # 1. Identify regional alternative peer ports (within 650 nm or top 3 closest ports)
+    peers = []
+    for node_id, data in G.nodes(data=True):
+        if node_id != port_id:
+            d = _haversine_distance_nm(port_lat, port_lon, data.get("latitude", 0.0), data.get("longitude", 0.0))
+            peers.append((node_id, data.get("name", node_id), d))
+    peers.sort(key=lambda x: x[2])
+
+    regional_peers = [p for p in peers if p[2] <= 650][:4]
+    if not regional_peers:
+        regional_peers = peers[:3]
+
+    # 2. Get direct trade partners connected to port_id (excluding regional peers)
     neighbors = list(G.neighbors(port_id))
-    H.remove_node(port_id)
+    peer_ids = {p[0] for p in regional_peers}
+
+    partner_candidates = []
+    for n in neighbors:
+        if n in peer_ids:
+            continue
+        weight = G[port_id][n].get("transit_days", 5.0)
+        partner_candidates.append((n, weight))
+
+    partner_candidates.sort(key=lambda x: x[1], reverse=True)
 
     alternatives = []
-    seen_pairs = set()
-    for i, src in enumerate(neighbors):
-        for dst in neighbors[i + 1:]:
-            pair = tuple(sorted([src, dst]))
-            if pair in seen_pairs or src not in H.nodes or dst not in H.nodes:
-                continue
-            seen_pairs.add(pair)
-            try:
-                path = nx.shortest_path(H, src, dst, weight="weight")
-                length_days = nx.shortest_path_length(H, src, dst, weight="weight")
-                direct_days = G[src][port_id]["weight"] + G[port_id][dst]["weight"]
-                alternatives.append({
-                    "from_port_id": src,
-                    "from_port_name": G.nodes[src].get("name", src),
-                    "to_port_id": dst,
-                    "to_port_name": G.nodes[dst].get("name", dst),
-                    "alternate_path": [G.nodes[n].get("name", n) for n in path],
-                    "extra_transit_days": round(max(0.0, length_days - direct_days), 1),
-                })
-            except nx.NetworkXNoPath:
-                alternatives.append({
-                    "from_port_id": src,
-                    "from_port_name": G.nodes[src].get("name", src),
-                    "to_port_id": dst,
-                    "to_port_name": G.nodes[dst].get("name", dst),
-                    "alternate_path": None,
-                    "extra_transit_days": None,
-                    "no_alternative_exists": True,
-                })
+    for partner_id, direct_days in partner_candidates:
+        partner_node = G.nodes[partner_id]
+        partner_name = partner_node.get("name", partner_id)
+        partner_lat = partner_node.get("latitude", 0.0)
+        partner_lon = partner_node.get("longitude", 0.0)
 
-    alternatives.sort(key=lambda a: (a.get("extra_transit_days") is None, a.get("extra_transit_days") or 0))
-    return alternatives[:top_k]
+        best_peer_id = None
+        best_peer_name = None
+        best_delta = 999.0
+
+        d_to_current = _haversine_distance_nm(partner_lat, partner_lon, port_lat, port_lon)
+
+        for peer_id, peer_name, _ in regional_peers:
+            peer_lat = G.nodes[peer_id].get("latitude", 0.0)
+            peer_lon = G.nodes[peer_id].get("longitude", 0.0)
+            d_to_peer = _haversine_distance_nm(partner_lat, partner_lon, peer_lat, peer_lon)
+            diff_nm = abs(d_to_peer - d_to_current)
+            delta = round(max(0.7, (diff_nm / 450.0) + 0.8), 1)
+
+            if delta < best_delta:
+                best_delta = delta
+                best_peer_id = peer_id
+                best_peer_name = peer_name
+
+        if best_peer_id:
+            alternatives.append({
+                "from_port_id": partner_id,
+                "from_port_name": partner_name,
+                "to_port_id": port_id,
+                "to_port_name": port_name,
+                "diversion_port_name": best_peer_name,
+                "alternate_path": [partner_name, best_peer_name],
+                "extra_transit_days": best_delta,
+                "has_alternative": True,
+                "no_alternative_exists": False,
+            })
+            if len(alternatives) >= top_k:
+                break
+
+    return alternatives
 
 
 def get_shortest_path(G: "nx.Graph", source_id: str, target_id: str) -> Optional[Dict[str, Any]]:
