@@ -26,6 +26,7 @@ from app.schemas.port import (
     VesselSyncSuggestion,
 )
 from app.models.ports import Port, PortDisruption, BerthSlot, VesselArrival, PortCongestionHistory
+from app.models.disruptions import GlobalDisruption
 from app.models.users import User
 from app.models.vessels import Vessel
 from app.core.security import get_current_user, get_current_port_manager
@@ -972,6 +973,23 @@ async def flag_port_disruption(
 
     db.add(new_disruption)
 
+    # Synchronize incident with GlobalDisruption registry for unified Logistics & Admin visibility
+    global_disruption = GlobalDisruption(
+        id=f"port-{new_disruption.id}",
+        disruption_type=disruption_data.disruption_type,
+        location_name=f"{port.name} ({port.code})",
+        latitude=port.latitude,
+        longitude=port.longitude,
+        start_date=datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+        end_date=(datetime.utcnow() + timedelta(days=5)).strftime("%Y-%m-%d %H:%M"),
+        severity=disruption_data.severity.lower(),
+        radius_nm=60.0,
+        description=f"[{port.name}] {disruption_data.title}: {disruption_data.description or 'Operational disruption advisory reported by Port Operations.'}",
+        affected_vessels_count=port.waiting_vessels or 0,
+        resolved=False
+    )
+    db.add(global_disruption)
+
     if disruption_data.severity in ["high", "critical"]:
         port.congestion_level = disruption_data.severity
         port.status_label = f"Disrupted: {disruption_data.disruption_type}"
@@ -1008,6 +1026,20 @@ async def resolve_port_disruption(
 
     disruption.is_active = False
     disruption.resolved_at = datetime.utcnow()
+
+    port = db.query(Port).filter(Port.id == port_id).first()
+
+    # Synchronize resolution with GlobalDisruption registry
+    matching_global = db.query(GlobalDisruption).filter(
+        (GlobalDisruption.id == f"port-{disruption_id}") |
+        (GlobalDisruption.location_name.contains(port.code if port else "XYZ_NONE"))
+    ).first()
+    if matching_global:
+        matching_global.resolved = True
+
+    if port:
+        port.status_label = "Operational"
+        port.congestion_level = "low" if (port.congestion_percent or 0) < 25 else "medium" if (port.congestion_percent or 0) < 50 else "high"
 
     db.commit()
     db.refresh(disruption)

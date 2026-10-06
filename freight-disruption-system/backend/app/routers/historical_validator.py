@@ -4,7 +4,7 @@ Historical Validator Router
 Validates Monte Carlo system against 10 real-world scenarios
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime

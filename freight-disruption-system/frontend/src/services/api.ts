@@ -1,7 +1,6 @@
 // frontend/src/services/api.ts
 import axios from 'axios';
 import { AdminUser, DatabaseStats, UploadHistoryItem, CleanupOperationLog } from '@/types/adminUserTypes';
-import { INITIAL_DATABASE_STATS, INITIAL_UPLOAD_HISTORY, INITIAL_CLEANUP_LOGS } from '@/shared/mock/adminMockData';
 
 
 // Use import.meta.env for Vite environment variables (not bare global names)
@@ -648,118 +647,76 @@ export const deleteAdminUser = async (userId: string): Promise<boolean> => {
 // ============= PAGE 4.5: DATA MANAGEMENT =============
 
 export const getDatabaseStats = async (): Promise<DatabaseStats> => {
-  try {
-    const token = localStorage.getItem('token') || 'demo-token';
-    const response = await fetch(`${API_BASE_URL}/api/admin/data/stats`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      return INITIAL_DATABASE_STATS;
-    }
-    return await response.json();
-  } catch (err) {
-    console.warn('Backend API connection fallback for database stats:', err);
-    return INITIAL_DATABASE_STATS;
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/data/stats`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch database telemetry (${response.status})`);
   }
+  return await response.json();
 };
 
 export const getUploadHistory = async (): Promise<UploadHistoryItem[]> => {
-  try {
-    const token = localStorage.getItem('token') || 'demo-token';
-    const response = await fetch(`${API_BASE_URL}/api/admin/data/uploads`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      return INITIAL_UPLOAD_HISTORY;
-    }
-    return await response.json();
-  } catch (err) {
-    console.warn('Backend API connection fallback for upload history:', err);
-    return INITIAL_UPLOAD_HISTORY;
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/data/uploads`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch dataset audit trail (${response.status})`);
   }
+  return await response.json();
 };
 
 export const getCleanupLogs = async (): Promise<CleanupOperationLog[]> => {
-  try {
-    const token = localStorage.getItem('token') || 'demo-token';
-    const response = await fetch(`${API_BASE_URL}/api/admin/data/cleanups`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      return INITIAL_CLEANUP_LOGS;
-    }
-    return await response.json();
-  } catch (err) {
-    console.warn('Backend API connection fallback for cleanup logs:', err);
-    return INITIAL_CLEANUP_LOGS;
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/data/cleanups`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch maintenance operation logs (${response.status})`);
   }
+  return await response.json();
 };
 
 export const uploadDatasetFile = async (
   datasetType: string,
   file: File
 ): Promise<UploadHistoryItem> => {
-  try {
-    const token = localStorage.getItem('token') || 'demo-token';
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('datasetType', datasetType);
+  const token = localStorage.getItem('token') || 'demo-token';
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('datasetType', datasetType);
 
-    const response = await fetch(`${API_BASE_URL}/api/admin/data/upload`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (err) {
-    console.warn('Backend API connection fallback for dataset upload:', err);
+  const response = await fetch(`${API_BASE_URL}/api/admin/data/upload`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({ detail: 'Upload failed' }));
+    throw new Error(errData.detail || `Dataset upload failed with status ${response.status}`);
   }
-
-  // Fallback return item
-  return {
-    id: `upload-${Date.now()}`,
-    fileName: file.name,
-    datasetType: datasetType as any,
-    uploadedBy: 'Admin User (System)',
-    uploadedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    recordsIngested: Math.floor(1000 + Math.random() * 9000),
-    fileSizeBytes: file.size || 1240000,
-    status: 'Success',
-  };
+  return await response.json();
 };
 
 export const executeDataCleanup = async (
   operationType: 'Delete Old AIS' | 'Delete Old Simulations' | 'Reset Disruptions'
 ): Promise<CleanupOperationLog> => {
-  try {
-    const token = localStorage.getItem('token') || 'demo-token';
-    const response = await fetch(`${API_BASE_URL}/api/admin/data/cleanup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ operationType })
-    });
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (err) {
-    console.warn('Backend API connection fallback for data cleanup:', err);
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/admin/data/cleanup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ operationType })
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({ detail: 'Cleanup failed' }));
+    throw new Error(errData.detail || `Maintenance cleanup failed with status ${response.status}`);
   }
-
-  // Fallback return item
-  return {
-    id: `cleanup-${Date.now()}`,
-    operationType,
-    executedBy: 'Admin User (System)',
-    executedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    recordsAffected: operationType === 'Delete Old AIS' ? 450000 : operationType === 'Delete Old Simulations' ? 120000 : 16,
-    sizeFreedMb: operationType === 'Delete Old AIS' ? 128.4 : operationType === 'Delete Old Simulations' ? 45.2 : 0.2,
-    details: 'Manual storage maintenance operation executed.',
-  };
+  return await response.json();
 };
 
 // ============= DASHBOARD 2: ANALYTICS & SIMULATION LAB =============
@@ -952,8 +909,11 @@ export const getSecondaryInfrastructure = async () => {
 
 // ============= PAGE 1.2: DISRUPTION ALERT CENTER =============
 
-export const getDisruptionAlerts = async () => {
-  const response = await fetch(`${API_BASE_URL}/api/disruptions/alert-center`);
+export const getDisruptionAlerts = async (inboundOnly: boolean = false) => {
+  const params = new URLSearchParams();
+  if (inboundOnly) params.append('inbound_only', 'true');
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/disruptions/alert-center${qs ? '?' + qs : ''}`);
   if (!response.ok) throw new Error('Failed to fetch disruption alerts');
   return response.json();
 };
@@ -1076,6 +1036,100 @@ export const fetchPortCongestionHistory = async (portId: string, days: number = 
 export const getRiskRegisterSummary = async () => {
   const response = await fetch(`${API_BASE_URL}/api/risk-register/summary`);
   if (!response.ok) throw new Error('Failed to fetch risk register summary');
+  return response.json();
+};
+
+// ============= PAGE 2.4: SENSITIVITY ANALYZER =============
+
+export const fetchSensitivityTornado = async (config: {
+  origin: string;
+  destination: string;
+  vessel: string;
+  disruption_template?: string;
+}) => {
+  const response = await fetch(`${API_BASE_URL}/api/simulation/parameter-sweep`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...config,
+      fuel_price_range: { min: 400, max: 900, step: 100 },
+      congestion_range: { min: 20, max: 90, step: 10 },
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to run sensitivity analysis');
+  return response.json();
+};
+
+// ============= PAGE 2.5: HISTORICAL VALIDATOR =============
+
+export const fetchHistoricalScenarios = async () => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulator/historical/scenarios`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch historical scenarios');
+  return response.json();
+};
+
+export const compareHistoricalScenario = async (scenarioId: string) => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulator/historical/${scenarioId}/compare`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to compare scenario');
+  return response.json();
+};
+
+export const fetchHistoricalSummary = async () => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulator/historical/summary`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch validation summary');
+  return response.json();
+};
+
+export const validateAllHistoricalScenarios = async () => {
+  const token = localStorage.getItem('token') || 'demo-token';
+  const response = await fetch(`${API_BASE_URL}/api/simulator/historical/validate-all`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to validate all scenarios');
+  return response.json();
+};
+
+// ============= PAGE 3.5: NETWORK IMPACT ANALYZER =============
+
+export const fetchNetworkRippleDashboard = async (portId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/network-analyzer/${portId}/ripple-dashboard`);
+  if (!response.ok) throw new Error('Failed to fetch network ripple dashboard');
+  return response.json();
+};
+
+export const fetchNetworkOverview = async (portId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/network-analyzer/${portId}/overview`);
+  if (!response.ok) throw new Error('Failed to fetch network overview');
+  return response.json();
+};
+
+export const fetchAlternativeRoutes = async (portId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/network-analyzer/${portId}/alternative-routes`);
+  if (!response.ok) throw new Error('Failed to fetch alternative routes');
+  return response.json();
+};
+
+export const simulatePortShutdown = async (portId: string, severity: string = 'high') => {
+  const response = await fetch(
+    `${API_BASE_URL}/api/network-analyzer/${portId}/simulate-shutdown?severity=${severity}`
+  );
+  if (!response.ok) throw new Error('Failed to simulate port shutdown');
+  return response.json();
+};
+
+export const fetchNetworkTechnicalDetails = async (portId: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/network-analyzer/${portId}/technical-details`);
+  if (!response.ok) throw new Error('Failed to fetch technical details');
   return response.json();
 };
 

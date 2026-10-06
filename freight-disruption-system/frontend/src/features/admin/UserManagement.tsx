@@ -1,6 +1,6 @@
 // frontend/src/features/admin/UserManagement.tsx
 // Page 4.4 — User Management
-// Purpose: Manage system administrators, port managers, logistics officers & analysts.
+// Manage system administrators, port managers, logistics officers & analysts.
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,13 +42,11 @@ export const UserManagement: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
 
-  // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState<{
     name: string;
     email: string;
@@ -69,7 +67,6 @@ export const UserManagement: React.FC = () => {
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Fetch users on mount
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -82,13 +79,12 @@ export const UserManagement: React.FC = () => {
       setUsers(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Error fetching users:', err);
-      setError(err?.message || 'Failed to connect to backend user management API.');
+      setError(err?.message || 'Could not connect to the user directory.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter Users defensively
   const filteredUsers = (users || []).filter((u) => {
     if (!u) return false;
     const nameStr = u.name || '';
@@ -108,57 +104,53 @@ export const UserManagement: React.FC = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  // KPI Calculations
   const totalCount = (users || []).length;
   const activeCount = (users || []).filter((u) => u?.status === 'Active').length;
   const inactiveCount = (users || []).filter((u) => u?.status === 'Inactive' || u?.status === 'Suspended').length;
   const adminCount = (users || []).filter((u) => u?.role === 'Admin').length;
   const portManagerCount = (users || []).filter((u) => u?.role === 'Port Manager').length;
 
-  // Role Badge Styling
+  // Role badges use distinct colors on purpose — helps tell roles apart at a glance in the table
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case 'Admin':
-        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30';
+        return 'bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-500/30';
       case 'Port Manager':
-        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+        return 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-500/30';
       case 'Logistics Manager':
-        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+        return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30';
       case 'Analyst':
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+        return 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30';
       default:
-        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
     }
   };
 
-  // Status Badge Styling
   const getStatusBadge = (status: UserStatus) => {
     switch (status) {
       case 'Active':
-        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+        return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30';
       case 'Inactive':
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+        return 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30';
       case 'Suspended':
-        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30';
+        return 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30';
       default:
-        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
     }
   };
 
-  // Form Validation
   const validateForm = () => {
     const errors: Record<string, string> = {};
     if (!formData.name.trim()) errors.name = 'Full name is required';
     if (!formData.email.trim()) {
       errors.email = 'Email address is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Invalid email format';
+      errors.email = 'Please enter a valid email';
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Open Add Modal
   const handleOpenAdd = () => {
     setFormData({
       name: '',
@@ -173,7 +165,6 @@ export const UserManagement: React.FC = () => {
     setIsAddModalOpen(true);
   };
 
-  // Submit Add User
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -183,19 +174,18 @@ export const UserManagement: React.FC = () => {
       setUsers([newUser, ...users]);
       setIsAddModalOpen(false);
       toast({
-        title: 'User Registered Successfully',
-        description: `${newUser.name} (${newUser.role}) has been added to the system.`,
+        title: 'User Added',
+        description: `${newUser.name} (${newUser.role}) now has access to the system.`,
       });
     } catch (err) {
       toast({
-        title: 'Registration Failed',
-        description: 'Unable to add user. Please check system logs.',
+        title: 'Could Not Add User',
+        description: 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
     }
   };
 
-  // Open Edit Modal
   const handleOpenEdit = (user: AdminUser) => {
     setUserToEdit(user);
     setFormData({
@@ -211,94 +201,72 @@ export const UserManagement: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  // Submit Edit User
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userToEdit || !validateForm()) return;
 
     try {
       const updated = await updateAdminUser(userToEdit.id, formData);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userToEdit.id ? { ...u, ...updated, ...formData } : u))
-      );
+      setUsers((prev) => prev.map((u) => (u.id === userToEdit.id ? { ...u, ...updated, ...formData } : u)));
       setIsEditModalOpen(false);
       setUserToEdit(null);
-      toast({
-        title: 'User Profile Updated',
-        description: `Changes to ${formData.name} have been saved successfully.`,
-      });
+      toast({ title: 'Profile Updated', description: `Changes to ${formData.name} were saved.` });
     } catch (err) {
-      toast({
-        title: 'Update Failed',
-        description: 'Could not update user details.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Update Failed', description: 'Could not save changes.', variant: 'destructive' });
     }
   };
 
-  // Toggle User Status (Activate / Deactivate)
   const handleToggleStatus = async (user: AdminUser) => {
     const nextStatus = user.status === 'Active' ? 'Inactive' : 'Active';
     try {
       await toggleUserStatus(user.id, user.status);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u))
-      );
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u)));
       toast({
-        title: `User ${nextStatus === 'Active' ? 'Activated' : 'Deactivated'}`,
-        description: `${user.name} is now set to ${nextStatus}.`,
+        title: nextStatus === 'Active' ? 'User Activated' : 'User Deactivated',
+        description: `${user.name} is now ${nextStatus}.`,
       });
     } catch (err) {
-      toast({
-        title: 'Status Update Failed',
-        description: 'Could not toggle user status.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could Not Update Status', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
-  // Delete User
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return;
 
     try {
       await deleteAdminUser(userToDelete.id);
       setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
-      toast({
-        title: 'User Account Deleted',
-        description: `${userToDelete.name} has been removed from system access lists.`,
-      });
+      toast({ title: 'User Removed', description: `${userToDelete.name} no longer has access.` });
     } catch (err) {
-      toast({
-        title: 'Deletion Failed',
-        description: 'Could not delete user account.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could Not Delete User', description: 'Please try again.', variant: 'destructive' });
     } finally {
       setUserToDelete(null);
     }
   };
 
+  const inputClass =
+    'w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-violet-500/40 focus:outline-none transition-shadow';
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-500 font-mono text-sm space-y-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-purple-500" />
-        <span>Loading registered user directory from database...</span>
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm space-y-3">
+        <RefreshCw className="w-8 h-8 animate-spin text-violet-500" />
+        <span>Loading users...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-rose-500/10 border border-rose-500/30 p-8 rounded-2xl text-center space-y-3">
+      <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-8 rounded-2xl text-center space-y-3">
         <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-        <h3 className="text-base font-bold text-rose-600 dark:text-rose-400">Failed to Load User Directory</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">{error}</p>
+        <h3 className="text-base font-semibold text-rose-600 dark:text-rose-400">Could Not Load Users</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">{error}</p>
         <button
           onClick={fetchUsers}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition"
+          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm rounded-lg transition-colors"
         >
-          Retry Connection
+          Try Again
         </button>
       </div>
     );
@@ -306,78 +274,75 @@ export const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* SECTION HEADER & QUICK STATS */}
+      {/* QUICK STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Registered Users</p>
-            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{totalCount}</h3>
-            <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1 font-mono">{adminCount} System Admins</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{totalCount}</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{adminCount} system admins</p>
           </div>
-          <div className="p-3 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20">
+          <div className="p-3 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-xl">
             <Users className="w-6 h-6" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Active Accounts</p>
-            <h3 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{activeCount}</h3>
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              {Math.round((activeCount / (totalCount || 1)) * 100)}% active rate
+            <p className="text-sm text-slate-500 dark:text-slate-400">Active Accounts</p>
+            <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{activeCount}</h3>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+              {Math.round((activeCount / (totalCount || 1)) * 100)}% of all users
             </p>
           </div>
-          <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
             <UserCheck className="w-6 h-6" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Inactive / Suspended</p>
-            <h3 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{inactiveCount}</h3>
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-mono">Access Restricted</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Inactive / Suspended</p>
+            <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{inactiveCount}</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Access currently restricted</p>
           </div>
-          <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
+          <div className="p-3 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
             <UserX className="w-6 h-6" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Port & Logistics Leads</p>
-            <h3 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">{portManagerCount}</h3>
-            <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1 font-mono">Terminal Operators</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Port & Logistics Leads</p>
+            <h3 className="text-2xl font-bold text-sky-600 dark:text-sky-400 mt-1">{portManagerCount}</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Terminal operators</p>
           </div>
-          <div className="p-3 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-500/20">
+          <div className="p-3 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-xl">
             <Building2 className="w-6 h-6" />
           </div>
         </div>
       </div>
 
-      {/* FILTER, SEARCH & ADD TOOLBAR */}
+      {/* SEARCH, FILTER, ADD TOOLBAR */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Search Bar */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by user name, email, department or port..."
+            placeholder="Search by name, email, department, or port..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
           />
         </div>
 
-        {/* Role & Status Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Role:</span>
+            <Filter className="w-4 h-4 text-slate-400" />
             <select
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-medium"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40"
             >
               <option value="All">All Roles</option>
               <option value="Admin">Admin</option>
@@ -388,76 +353,66 @@ export const UserManagement: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-500 dark:text-slate-400">Status:</span>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 font-medium"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-              <option value="Suspended">Suspended</option>
-            </select>
-          </div>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Suspended">Suspended</option>
+          </select>
 
-          {/* Add User Button */}
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-md shadow-purple-600/20 active:scale-95"
+            className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
           >
             <UserPlus className="w-4 h-4" />
-            <span>ADD NEW USER</span>
+            <span>Add User</span>
           </button>
         </div>
       </div>
 
-      {/* USER DATA TABLE */}
+      {/* USER TABLE */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
-              Registered System Users & RBAC Directory
-            </h2>
+            <ShieldCheck className="w-4 h-4 text-violet-500" />
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">User Directory</h2>
           </div>
-          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            Showing {filteredUsers.length} of {totalCount} users
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Showing {filteredUsers.length} of {totalCount}
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">User Details</th>
-                <th className="py-3 px-4">Role</th>
-                <th className="py-3 px-4">Assigned Location / Dept</th>
-                <th className="py-3 px-4">Last Login</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                <th className="py-3 px-4 font-medium">User</th>
+                <th className="py-3 px-4 font-medium">Role</th>
+                <th className="py-3 px-4 font-medium">Location / Department</th>
+                <th className="py-3 px-4 font-medium">Last Login</th>
+                <th className="py-3 px-4 font-medium">Status</th>
+                <th className="py-3 px-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                    <Users className="w-8 h-8 mx-auto mb-2 opacity-40 text-purple-500" />
-                    <p className="font-semibold">No users matching search or filter parameters.</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Try resetting role/status filters.</p>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="font-medium">No users match your search or filters.</p>
+                    <p className="text-xs mt-1">Try clearing the role or status filter.</p>
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    {/* Name & Email */}
+                  <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shadow-sm shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-violet-600 text-white font-semibold text-xs flex items-center justify-center shrink-0">
                           {(user.name || 'User')
                             .split(' ')
                             .filter(Boolean)
@@ -466,96 +421,72 @@ export const UserManagement: React.FC = () => {
                             .toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <span>{user.name || 'Unnamed User'}</span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                            <Mail className="w-3 h-3 text-slate-400" />
+                          <div className="font-medium text-slate-900 dark:text-white">{user.name || 'Unnamed User'}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3" />
                             <span>{user.email}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Role */}
                     <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono border ${getRoleBadge(
-                          user.role
-                        )}`}
-                      >
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold border ${getRoleBadge(user.role)}`}>
                         {user.role}
                       </span>
                     </td>
 
-                    {/* Assigned Port / Department */}
                     <td className="py-3.5 px-4">
-                      <div className="text-slate-900 dark:text-slate-200 font-medium">
+                      <div className="text-slate-800 dark:text-slate-200 font-medium text-sm">
                         {user.assignedPort || 'Global Control HQ'}
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                        {user.department || 'Operations'}
-                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{user.department || 'Operations'}</div>
                     </td>
 
-                    {/* Last Login */}
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
                         <span>{user.lastLogin}</span>
                       </div>
                     </td>
 
-                    {/* Status */}
                     <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold font-mono border ${getStatusBadge(
-                          user.status
-                        )}`}
-                      >
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(user.status)}`}>
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
-                            user.status === 'Active'
-                              ? 'bg-emerald-500'
-                              : user.status === 'Inactive'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
+                            user.status === 'Active' ? 'bg-emerald-500' : user.status === 'Inactive' ? 'bg-amber-500' : 'bg-rose-500'
                           }`}
                         />
                         {user.status}
                       </span>
                     </td>
 
-                    {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {/* Edit Button */}
                         <button
                           onClick={() => handleOpenEdit(user)}
-                          title="Edit User Profile"
-                          className="p-1.5 text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
+                          title="Edit profile"
+                          className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded-lg transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
 
-                        {/* Toggle Activate/Deactivate */}
                         <button
                           onClick={() => handleToggleStatus(user)}
-                          title={user.status === 'Active' ? 'Deactivate User' : 'Activate User'}
+                          title={user.status === 'Active' ? 'Deactivate' : 'Activate'}
                           className={`p-1.5 rounded-lg transition-colors ${
                             user.status === 'Active'
-                              ? 'text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-500/10'
-                              : 'text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10'
+                              ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10'
+                              : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
                           }`}
                         >
                           <Power className="w-4 h-4" />
                         </button>
 
-                        {/* Delete Button */}
                         <button
                           onClick={() => setUserToDelete(user)}
-                          title="Delete User Account"
-                          className="p-1.5 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="Delete user"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -574,76 +505,60 @@ export const UserManagement: React.FC = () => {
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl max-w-lg w-full overflow-hidden"
             >
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/40">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
+                  <div className="p-2 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-lg">
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Register New System User</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Assign role and system access scope</p>
+                    <h3 className="font-semibold text-base text-slate-900 dark:text-white">Add New User</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Set their role and access level</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
+                <button onClick={() => setIsAddModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
-                {/* Full Name */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Full Name *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Captain Marcus Vance"
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    placeholder="e.g. Marcus Vance"
+                    className={inputClass}
                   />
-                  {formErrors.name && (
-                    <p className="text-[11px] text-rose-500 font-mono mt-1">{formErrors.name}</p>
-                  )}
+                  {formErrors.name && <p className="text-xs text-rose-500 mt-1">{formErrors.name}</p>}
                 </div>
 
-                {/* Email Address */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Email Address *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address *</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="m.vance@maritimefirewall.com"
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    placeholder="name@company.com"
+                    className={inputClass}
                   />
-                  {formErrors.email && (
-                    <p className="text-[11px] text-rose-500 font-mono mt-1">{formErrors.email}</p>
-                  )}
+                  {formErrors.email && <p className="text-xs text-rose-500 mt-1">{formErrors.email}</p>}
                 </div>
 
-                {/* Role & Status */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      RBAC Role
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role</label>
                     <select
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none font-medium"
+                      className={inputClass}
                     >
-                      <option value="Admin">Admin (Full Control)</option>
+                      <option value="Admin">Admin (Full Access)</option>
                       <option value="Port Manager">Port Manager</option>
                       <option value="Logistics Manager">Logistics Manager</option>
                       <option value="Analyst">Analyst</option>
@@ -652,13 +567,11 @@ export const UserManagement: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Initial Account Status
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Account Status</label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as UserStatus })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none font-medium"
+                      className={inputClass}
                     >
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
@@ -667,63 +580,54 @@ export const UserManagement: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Port & Dept */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Assigned Port / Hub
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assigned Port</label>
                     <input
                       type="text"
                       value={formData.assignedPort}
                       onChange={(e) => setFormData({ ...formData, assignedPort: e.target.value })}
                       placeholder="e.g. Port of Rotterdam"
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Department
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
                     <input
                       type="text"
                       value={formData.department}
                       onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      placeholder="e.g. Maritime Operations"
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                      placeholder="e.g. Operations"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Phone */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Contact Phone Number
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
                   <input
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+1 (555) 234-5678"
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Modal Footer Buttons */}
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold font-mono transition-all shadow-md shadow-purple-600/20"
+                    className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
                   >
-                    REGISTER USER
+                    Add User
                   </button>
                 </div>
               </form>
@@ -737,72 +641,56 @@ export const UserManagement: React.FC = () => {
         {isEditModalOpen && userToEdit && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl max-w-lg w-full overflow-hidden"
             >
-              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/40">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
+                  <div className="p-2 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-lg">
                     <Edit2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Edit User Profile</h3>
+                    <h3 className="font-semibold text-base text-slate-900 dark:text-white">Edit User</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">ID: {userToEdit.id}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                >
+                <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-                {/* Full Name */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Full Name *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    className={inputClass}
                   />
-                  {formErrors.name && (
-                    <p className="text-[11px] text-rose-500 font-mono mt-1">{formErrors.name}</p>
-                  )}
+                  {formErrors.name && <p className="text-xs text-rose-500 mt-1">{formErrors.name}</p>}
                 </div>
 
-                {/* Email Address */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Email Address *
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address *</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    className={inputClass}
                   />
-                  {formErrors.email && (
-                    <p className="text-[11px] text-rose-500 font-mono mt-1">{formErrors.email}</p>
-                  )}
+                  {formErrors.email && <p className="text-xs text-rose-500 mt-1">{formErrors.email}</p>}
                 </div>
 
-                {/* Role & Status */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      RBAC Role
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Role</label>
                     <select
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none font-medium"
+                      className={inputClass}
                     >
                       <option value="Admin">Admin</option>
                       <option value="Port Manager">Port Manager</option>
@@ -813,13 +701,11 @@ export const UserManagement: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Account Status
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as UserStatus })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none font-medium"
+                      className={inputClass}
                     >
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
@@ -828,60 +714,51 @@ export const UserManagement: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Port & Dept */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Assigned Port / Hub
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assigned Port</label>
                     <input
                       type="text"
                       value={formData.assignedPort}
                       onChange={(e) => setFormData({ ...formData, assignedPort: e.target.value })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Department
-                    </label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
                     <input
                       type="text"
                       value={formData.department}
                       onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Phone */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Contact Phone
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
                   <input
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500/40 focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Modal Footer Buttons */}
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold font-mono transition-all shadow-md shadow-purple-600/20"
+                    className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold transition-colors"
                   >
-                    SAVE CHANGES
+                    Save Changes
                   </button>
                 </div>
               </form>
@@ -895,33 +772,33 @@ export const UserManagement: React.FC = () => {
         {userToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6 text-center"
             >
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center border border-rose-500/20 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center mb-4">
                 <AlertCircle className="w-6 h-6" />
               </div>
 
-              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Delete User Account</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Are you sure you want to permanently revoke access for{' '}
-                <span className="font-bold text-slate-900 dark:text-white">{userToDelete.name}</span> ({userToDelete.email})?
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Remove This User?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                This will revoke access for{' '}
+                <span className="font-semibold text-slate-900 dark:text-white">{userToDelete.name}</span> ({userToDelete.email}).
               </p>
 
               <div className="mt-6 flex items-center justify-center gap-3">
                 <button
                   onClick={() => setUserToDelete(null)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold font-mono transition-all shadow-md shadow-rose-600/20"
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold transition-colors"
                 >
-                  CONFIRM DELETE
+                  Yes, Remove
                 </button>
               </div>
             </motion.div>

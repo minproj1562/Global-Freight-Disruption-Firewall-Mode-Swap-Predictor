@@ -1,19 +1,18 @@
 // frontend/src/pages/AdminDashboardPage.tsx
 // DASHBOARD 3: ADMIN DASHBOARD
 // For: System Administrator | Purpose: Manage data, users, system health
-// Sub-pages: Page 4.1 System Health | Page 4.2 Disruptions | Page 4.3 Vessel Fleet | Page 4.4 User Management | Page 4.5 Data Management
+// Sub-pages: 4.1 System Health | 4.2 Disruptions | 4.3 Vessel Fleet | 4.4 User Management | 4.5 Data Management
 
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings,
   Activity,
   AlertTriangle,
   Ship,
-  ShieldCheck,
   Users,
   Database,
+  ShieldCheck,
 } from 'lucide-react';
 import { SystemHealthMonitor } from '@/features/admin/SystemHealthMonitor';
 import { DisruptionManagement } from '@/features/admin/DisruptionManagement';
@@ -23,182 +22,97 @@ import { DataManagement } from '@/features/admin/DataManagement';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
+type AdminTab = '4.1' | '4.2' | '4.3' | '4.4' | '4.5';
+
+const TABS: Array<{ id: AdminTab; label: string; icon: React.ElementType }> = [
+  { id: '4.1', label: 'System Health', icon: Activity },
+  { id: '4.2', label: 'Disruptions', icon: AlertTriangle },
+  { id: '4.3', label: 'Vessel Fleet', icon: Ship },
+  { id: '4.4', label: 'User Management', icon: Users },
+  { id: '4.5', label: 'Data Management', icon: Database },
+];
+
 export const AdminDashboardPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const initialTabParam = searchParams.get('tab') as '4.1' | '4.2' | '4.3' | '4.4' | '4.5' | null;
-
-  // Sub-page state: '4.1' | '4.2' | '4.3' | '4.4' | '4.5'
-  const [activeTab, setActiveTab] = useState<'4.1' | '4.2' | '4.3' | '4.4' | '4.5'>(
-    initialTabParam || '4.1'
-  );
+  const initialTabParam = searchParams.get('tab') as AdminTab | null;
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTabParam || '4.1');
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans flex flex-col transition-colors duration-300">
       <AdminSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      {/* ======== TOP NAVIGATION BAR ======== */}
-      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md px-4 lg:px-8 py-3 flex items-center justify-between ml-16">
+      {/* TOP BAR */}
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800 backdrop-blur-md px-6 lg:px-10 py-4 flex items-center justify-between ml-16">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-            <Settings className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-lg bg-violet-600 text-white flex items-center justify-center shadow-sm shadow-violet-600/30">
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <span className="font-bold text-sm text-slate-900 dark:text-white tracking-wide block">FREIGHT FIREWALL</span>
-            <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono">SYSTEM ADMINISTRATOR CONTROL CENTER</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* ======== MAIN CONTENT AREA ======== */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8 space-y-6 ml-16">
-
-        {/* DASHBOARD HEADER & SUB-PAGE SWITCHER */}
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-purple-600 dark:text-purple-400 mb-1">
-              <ShieldCheck className="w-4 h-4" />
-              <span>DASHBOARD 3: ADMIN DASHBOARD • SYSTEM ADMINISTRATOR</span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              System Administration & Data Management
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              Manage system users & RBAC roles, ingest manual dataset CSVs, monitor database stats, run data cleanups, and track vessel fleet telemetry.
+            <p className="font-semibold text-sm text-slate-900 dark:text-white leading-tight">
+              Admin Control Center
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">
+              Freight Disruption System
             </p>
           </div>
+        </div>
 
-          {/* SUB-NAVIGATION TABS (4.1, 4.2, 4.3, 4.4, 4.5) */}
-          <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shrink-0">
-            <button
-              onClick={() => setActiveTab('4.1')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
-                activeTab === '4.1'
-                  ? 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/40 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Activity className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>4.1 Health</span>
-            </button>
+        <ThemeToggle />
+      </header>
 
-            <button
-              onClick={() => setActiveTab('4.2')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
-                activeTab === '4.2'
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/40 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>4.2 Disruptions</span>
-            </button>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 lg:px-10 py-8 space-y-6 ml-16">
 
-            <button
-              onClick={() => setActiveTab('4.3')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
-                activeTab === '4.3'
-                  ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Ship className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-              <span>4.3 Vessels</span>
-            </button>
+        {/* PAGE HEADER */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            System Administration
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+            Manage user accounts and permissions, upload or clean up datasets, monitor
+            database health, and keep track of the vessel fleet and active disruptions.
+          </p>
 
-            <button
-              onClick={() => setActiveTab('4.4')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
-                activeTab === '4.4'
-                  ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/40 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>4.4 Users</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('4.5')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
-                activeTab === '4.5'
-                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>4.5 Data Mgmt</span>
-            </button>
+          {/* SEGMENTED TAB SWITCHER */}
+          <div className="mt-5 flex flex-wrap gap-1.5 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 w-fit">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* ACTIVE SUB-PAGE RENDER */}
+        {/* ACTIVE SECTION */}
         <AnimatePresence mode="wait">
-          {activeTab === '4.1' && (
-            <motion.div
-              key="4.1"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <SystemHealthMonitor />
-            </motion.div>
-          )}
-
-          {activeTab === '4.2' && (
-            <motion.div
-              key="4.2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <DisruptionManagement />
-            </motion.div>
-          )}
-
-          {activeTab === '4.3' && (
-            <motion.div
-              key="4.3"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <VesselManagement />
-            </motion.div>
-          )}
-
-          {activeTab === '4.4' && (
-            <motion.div
-              key="4.4"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <UserManagement />
-            </motion.div>
-          )}
-
-          {activeTab === '4.5' && (
-            <motion.div
-              key="4.5"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <DataManagement />
-            </motion.div>
-          )}
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeTab === '4.1' && <SystemHealthMonitor />}
+            {activeTab === '4.2' && <DisruptionManagement />}
+            {activeTab === '4.3' && <VesselManagement />}
+            {activeTab === '4.4' && <UserManagement />}
+            {activeTab === '4.5' && <DataManagement />}
+          </motion.div>
         </AnimatePresence>
       </main>
     </div>
   );
 };
-

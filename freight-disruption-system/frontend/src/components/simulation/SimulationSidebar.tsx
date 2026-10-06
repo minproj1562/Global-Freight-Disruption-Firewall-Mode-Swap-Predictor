@@ -37,6 +37,8 @@ export const SimulationSidebar: React.FC<SimulationSidebarProps> = ({ activeTab,
     { id: 'scenario-studio' as SimulationTab, name: 'Scenario Studio', subtitle: 'Corridor & Disruption Sandbox', icon: Sliders, color: 'amber' },
     { id: 'monte-carlo' as SimulationTab, name: 'Monte Carlo Explorer', subtitle: 'Risk & Budget Contingency', icon: Activity, color: 'emerald' },
     { id: 'nsga-optimizer' as SimulationTab, name: 'Route Optimizer', subtitle: 'Cost vs Speed vs ESG', icon: TrendingUp, color: 'sky' },
+    { id: 'sensitivity' as SimulationTab, name: 'Sensitivity Analyzer', subtitle: 'Variable Impact Analysis', icon: Anchor, color: 'amber' },
+    { id: 'historical-validator' as SimulationTab, name: 'Historical Validator', subtitle: 'Real-World Benchmarks', icon: Navigation, color: 'emerald' },
   ];
 
   const sidebarVariants = {

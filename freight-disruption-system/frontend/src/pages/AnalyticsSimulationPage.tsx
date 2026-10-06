@@ -14,8 +14,10 @@ import { SimulationProvider } from '@/context/SimulationContext';
 import { ScenarioStudioPanel } from './simulation/ScenarioStudioPanel';
 import { MonteCarloExplorerPanel } from './simulation/MonteCarloExplorerPanel';
 import { NSGA2OptimizerPanel } from './simulation/NSGA2OptimizerPanel';
+import { SensitivityAnalyzerPanel } from './simulation/SensitivityAnalyzerPanel';
+import { HistoricalValidatorPanel } from './simulation/HistoricalValidatorPanel';
 
-export type SimulationTab = 'scenario-studio' | 'monte-carlo' | 'nsga-optimizer';
+export type SimulationTab = 'scenario-studio' | 'monte-carlo' | 'nsga-optimizer' | 'sensitivity' | 'historical-validator';
 
 export const AnalyticsSimulationPage: React.FC = () => {
   const location = useLocation();
@@ -149,6 +151,30 @@ export const AnalyticsSimulationPage: React.FC = () => {
                 transition={{ duration: 0.2 }}
               >
                 <NSGA2OptimizerPanel />
+              </motion.div>
+            )}
+
+            {activeTab === 'sensitivity' && (
+              <motion.div
+                key="sensitivity"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <SensitivityAnalyzerPanel />
+              </motion.div>
+            )}
+
+            {activeTab === 'historical-validator' && (
+              <motion.div
+                key="historical-validator"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <HistoricalValidatorPanel />
               </motion.div>
             )}
           </AnimatePresence>

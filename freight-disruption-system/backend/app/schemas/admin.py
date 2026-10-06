@@ -35,17 +35,25 @@ class GlobalDisruptionUpdate(BaseModel):
 
 class GlobalDisruptionResponse(BaseModel):
     id: str
-    type: str = Field(alias="disruption_type")
-    locationName: str = Field(alias="location_name")
+    type: str
+    locationName: str
     latitude: float
     longitude: float
-    startDate: str = Field(alias="start_date")
-    endDate: str = Field(alias="end_date")
+    startDate: str
+    endDate: str
     severity: str
-    radiusNm: float = Field(alias="radius_nm")
+    radiusNm: float
     description: str
-    affectedVesselsCount: int = Field(alias="affected_vessels_count")
+    affectedVesselsCount: int
     resolved: bool
+
+    # Backwards-compatibility aliases
+    disruption_type: Optional[str] = None
+    location_name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    radius_nm: Optional[float] = None
+    affected_vessels_count: Optional[int] = None
 
     class Config:
         populate_by_name = True
@@ -121,15 +129,22 @@ class AdminUserUpdate(BaseModel):
 
 class AdminUserResponse(BaseModel):
     id: str
-    name: str = Field(alias="full_name")
+    name: str
     email: str
     role: str
-    lastLogin: str = Field(alias="last_login")
-    status: str = Field(alias="status_label")
-    createdAt: Any = Field(alias="created_at")
-    assignedPort: Optional[str] = Field(alias="assigned_port")
-    department: Optional[str] = Field(alias="department")
-    phone: Optional[str] = Field(alias="phone")
+    lastLogin: str
+    status: str
+    createdAt: Any
+    assignedPort: Optional[str] = "Global Control HQ"
+    department: Optional[str] = "Operations Command"
+    phone: Optional[str] = "+1 (555) 019-2834"
+
+    # Backwards-compatibility aliases
+    full_name: Optional[str] = None
+    last_login: Optional[str] = None
+    status_label: Optional[str] = None
+    created_at: Optional[Any] = None
+    assigned_port: Optional[str] = None
 
     class Config:
         populate_by_name = True

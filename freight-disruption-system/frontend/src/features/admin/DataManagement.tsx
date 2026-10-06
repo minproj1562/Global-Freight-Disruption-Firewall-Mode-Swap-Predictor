@@ -1,6 +1,6 @@
 // frontend/src/features/admin/DataManagement.tsx
 // Page 4.5 — Data Management
-// Purpose: Manual CSV uploads (AIS, ports, vessels, congestion), Database Stats, and Data Cleanup operations.
+// Manual CSV uploads, database overview, and cleanup tools.
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,8 +20,6 @@ import {
   Layers,
   ArrowDownToLine,
   Radio,
-  BarChart2,
-  ShieldAlert,
 } from 'lucide-react';
 import {
   DatabaseStats,
@@ -29,11 +27,6 @@ import {
   CleanupOperationLog,
   DatasetUploadType,
 } from '@/types/adminUserTypes';
-import {
-  INITIAL_DATABASE_STATS,
-  INITIAL_UPLOAD_HISTORY,
-  INITIAL_CLEANUP_LOGS,
-} from '@/shared/mock/adminMockData';
 import {
   getDatabaseStats,
   getUploadHistory,
@@ -54,14 +47,12 @@ export const DataManagement: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Upload State
   const [selectedDatasetType, setSelectedDatasetType] = useState<DatasetUploadType>('AIS Telemetry');
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadStep, setUploadStep] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
-  // Cleanup Modal Confirmation State
   const [cleanupTarget, setCleanupTarget] = useState<
     'Delete Old AIS' | 'Delete Old Simulations' | 'Reset Disruptions' | null
   >(null);
@@ -76,38 +67,32 @@ export const DataManagement: React.FC = () => {
     setError(null);
     try {
       const [stats, history, cleanups] = await Promise.all([
-        getDatabaseStats().catch(() => INITIAL_DATABASE_STATS),
-        getUploadHistory().catch(() => INITIAL_UPLOAD_HISTORY),
-        getCleanupLogs().catch(() => INITIAL_CLEANUP_LOGS),
+        getDatabaseStats(),
+        getUploadHistory(),
+        getCleanupLogs(),
       ]);
-      setDbStats(stats || INITIAL_DATABASE_STATS);
-      setUploadHistory(Array.isArray(history) && history.length > 0 ? history : INITIAL_UPLOAD_HISTORY);
-      setCleanupLogs(Array.isArray(cleanups) && cleanups.length > 0 ? cleanups : INITIAL_CLEANUP_LOGS);
+      setDbStats(stats);
+      setUploadHistory(Array.isArray(history) ? history : []);
+      setCleanupLogs(Array.isArray(cleanups) ? cleanups : []);
     } catch (err: any) {
-      console.warn('Backend connection fallback for data management:', err);
-      setDbStats(INITIAL_DATABASE_STATS);
-      setUploadHistory(INITIAL_UPLOAD_HISTORY);
-      setCleanupLogs(INITIAL_CLEANUP_LOGS);
+      console.error('Data telemetry fetch error:', err);
+      setError(err?.message || 'Could not connect to the data management service.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle File Selection
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const file = files[0];
-    processFileUpload(file);
+    processFileUpload(files[0]);
   };
 
-  // Process & Simulate Upload Progress
   const processFileUpload = async (file: File) => {
-    // Validate file extension
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (ext !== 'csv' && ext !== 'json') {
       toast({
-        title: 'Unsupported File Format',
-        description: 'Please upload a valid .csv or .json file.',
+        title: 'File type not supported',
+        description: 'Please upload a .csv or .json file.',
         variant: 'destructive',
       });
       return;
@@ -115,28 +100,26 @@ export const DataManagement: React.FC = () => {
 
     setUploading(true);
     setUploadProgress(10);
-    setUploadStep('Reading file headers...');
+    setUploadStep('Reading file...');
 
-    // Progress animation steps
     const timer1 = setTimeout(() => {
       setUploadProgress(40);
-      setUploadStep('Validating schema & parsing rows...');
+      setUploadStep('Checking data format...');
     }, 600);
 
     const timer2 = setTimeout(() => {
       setUploadProgress(75);
-      setUploadStep('Ingesting into PostgreSQL / TimescaleDB...');
+      setUploadStep('Saving to database...');
     }, 1400);
 
     const timer3 = setTimeout(async () => {
       setUploadProgress(100);
-      setUploadStep('Indexing completed!');
+      setUploadStep('Done!');
 
       try {
         const newItem = await uploadDatasetFile(selectedDatasetType, file);
         setUploadHistory([newItem, ...uploadHistory]);
 
-        // Update database stats dynamically
         setDbStats((prev) => {
           if (!prev) return null;
           const addedRecords = newItem.recordsIngested;
@@ -166,13 +149,13 @@ export const DataManagement: React.FC = () => {
         });
 
         toast({
-          title: 'Data Ingestion Successful',
-          description: `Uploaded ${file.name}. Ingested ${(newItem.recordsIngested ?? (newItem as any).recordsProcessed ?? 0).toLocaleString()} records.`,
+          title: 'Upload Successful',
+          description: `${file.name} added ${(newItem.recordsIngested ?? (newItem as any).recordsProcessed ?? 0).toLocaleString()} records.`,
         });
       } catch (err) {
         toast({
           title: 'Upload Failed',
-          description: 'An error occurred during dataset ingestion.',
+          description: 'Something went wrong while saving this file.',
           variant: 'destructive',
         });
       } finally {
@@ -190,7 +173,6 @@ export const DataManagement: React.FC = () => {
     };
   };
 
-  // Sample CSV Template Downloader
   const downloadSampleTemplate = (type: DatasetUploadType) => {
     let csvContent = '';
     let filename = '';
@@ -218,13 +200,9 @@ export const DataManagement: React.FC = () => {
     link.click();
     document.body.removeChild(link);
 
-    toast({
-      title: 'Template Downloaded',
-      description: `Downloaded ${filename} sample format file.`,
-    });
+    toast({ title: 'Template Downloaded', description: `Saved ${filename} to your downloads.` });
   };
 
-  // Handle Data Cleanup Operation
   const handleConfirmCleanup = async () => {
     if (!cleanupTarget) return;
 
@@ -233,7 +211,6 @@ export const DataManagement: React.FC = () => {
       const log = await executeDataCleanup(cleanupTarget);
       setCleanupLogs([log, ...cleanupLogs]);
 
-      // Update dbStats dynamically
       setDbStats((prev) => {
         if (!prev) return null;
         const freedGb = log.sizeFreedMb / 1024;
@@ -242,35 +219,18 @@ export const DataManagement: React.FC = () => {
         if (cleanupTarget === 'Delete Old AIS') {
           updatedTables = prev.tables.map((t) =>
             t.tableName === 'ais_telemetry_logs'
-              ? {
-                  ...t,
-                  recordCount: Math.max(0, t.recordCount - log.recordsAffected),
-                  sizeMb: Math.max(10, Number((t.sizeMb - log.sizeFreedMb).toFixed(1))),
-                  lastUpdated: 'Pruned just now',
-                }
+              ? { ...t, recordCount: Math.max(0, t.recordCount - log.recordsAffected), sizeMb: Math.max(10, Number((t.sizeMb - log.sizeFreedMb).toFixed(1))), lastUpdated: 'Just cleaned' }
               : t
           );
         } else if (cleanupTarget === 'Delete Old Simulations') {
           updatedTables = prev.tables.map((t) =>
             t.tableName === 'simulated_routes'
-              ? {
-                  ...t,
-                  recordCount: Math.max(0, t.recordCount - log.recordsAffected),
-                  sizeMb: Math.max(5, Number((t.sizeMb - log.sizeFreedMb).toFixed(1))),
-                  lastUpdated: 'Purged just now',
-                }
+              ? { ...t, recordCount: Math.max(0, t.recordCount - log.recordsAffected), sizeMb: Math.max(5, Number((t.sizeMb - log.sizeFreedMb).toFixed(1))), lastUpdated: 'Just cleaned' }
               : t
           );
         } else if (cleanupTarget === 'Reset Disruptions') {
           updatedTables = prev.tables.map((t) =>
-            t.tableName === 'active_disruptions'
-              ? {
-                  ...t,
-                  recordCount: 4,
-                  sizeMb: 0.1,
-                  lastUpdated: 'Reset to default',
-                }
-              : t
+            t.tableName === 'active_disruptions' ? { ...t, recordCount: 4, sizeMb: 0.1, lastUpdated: 'Reset to default' } : t
           );
         }
 
@@ -282,16 +242,9 @@ export const DataManagement: React.FC = () => {
         };
       });
 
-      toast({
-        title: 'Cleanup Action Executed',
-        description: `${log.details} Freed ${log.sizeFreedMb} MB.`,
-      });
+      toast({ title: 'Cleanup Complete', description: `${log.details} Freed ${log.sizeFreedMb} MB.` });
     } catch (err) {
-      toast({
-        title: 'Cleanup Failed',
-        description: 'Unable to complete maintenance operation.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Cleanup Failed', description: 'Could not complete this operation.', variant: 'destructive' });
     } finally {
       setCleaning(false);
       setCleanupTarget(null);
@@ -300,141 +253,117 @@ export const DataManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-500 font-mono text-sm space-y-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-purple-500" />
-        <span>Loading database health telemetry & management logs...</span>
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm space-y-3">
+        <RefreshCw className="w-8 h-8 animate-spin text-violet-500" />
+        <span>Loading data management tools...</span>
       </div>
     );
   }
 
   if (!dbStats) {
     return (
-      <div className="bg-rose-500/10 border border-rose-500/30 p-8 rounded-2xl text-center space-y-3">
+      <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-8 rounded-2xl text-center space-y-3">
         <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
-        <h3 className="text-base font-bold text-rose-600 dark:text-rose-400">Failed to Load Database Telemetry</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-          {error || 'Unable to fetch database metrics from http://localhost:8000.'}
+        <h3 className="text-base font-semibold text-rose-600 dark:text-rose-400">Could Not Load Database Info</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+          {error || 'Unable to reach the server.'}
         </p>
         <button
           onClick={fetchInitialData}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition"
+          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm rounded-lg transition-colors"
         >
-          Retry Connection
+          Try Again
         </button>
       </div>
     );
   }
 
+  const usagePct = dbStats.maxConnections ? Math.round((dbStats.activeConnections / dbStats.maxConnections) * 100) : 0;
+  const usageColor = usagePct > 80 ? 'text-rose-600 dark:text-rose-400' : usagePct > 50 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400';
+
   return (
-    <div className="space-y-8">
-      {/* SECTION 1: DATABASE METRICS & CLUSTER STATUS */}
+    <div className="space-y-6">
+      {/* SECTION 1: DATABASE OVERVIEW */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20">
+            <div className="p-3 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-xl">
               <Server className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Database & Storage Health Telemetry
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {dbStats?.status || 'Healthy'}
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Database & Storage Overview</h2>
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {dbStats.status || 'Healthy'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                {dbStats?.engine || 'PostgreSQL'}
-              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{dbStats.engine || 'PostgreSQL'}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
-            <Clock className="w-3.5 h-3.5 text-purple-500" />
-            <span>Last Snapshot: {dbStats?.lastBackup || 'Automated Snapshot'}</span>
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg">
+            <Clock className="w-3.5 h-3.5 text-violet-500" />
+            <span>Last Backup: {dbStats.lastBackup || 'Automatic'}</span>
           </div>
         </div>
 
-        {/* 4 Summary Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
-              <span>Total DB Records</span>
-              <Layers className="w-4 h-4 text-purple-500" />
+        {/* SUMMARY STATS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm">
+              <span>Total Records</span>
+              <Layers className="w-4 h-4 text-violet-500" />
             </div>
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-              {(dbStats?.totalRecords || 0).toLocaleString()}
-            </div>
-            <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1 font-mono">Across 7 schemas</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{(dbStats.totalRecords || 0).toLocaleString()}</div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Across all tables</p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
-              <span>Storage Allocated</span>
-              <HardDrive className="w-4 h-4 text-indigo-500" />
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm">
+              <span>Storage Used</span>
+              <HardDrive className="w-4 h-4 text-violet-500" />
             </div>
-            <div className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-2">
-              {dbStats?.totalSizeGb || 0} GB
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-mono">Compressed SSD block storage</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{dbStats.totalSizeGb || 0} GB</div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Disk space used by stored records</p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
-              <span>Connection Pool</span>
-              <Activity className="w-4 h-4 text-emerald-500" />
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm">
+              <span>Active Connections</span>
+              <Activity className="w-4 h-4 text-violet-500" />
             </div>
-            <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
-              {dbStats?.activeConnections || 0} / {dbStats?.maxConnections || 100}
-            </div>
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-              18% Pool Utilization
-            </p>
+            <div className={`text-2xl font-bold mt-2 ${usageColor}`}>{dbStats.activeConnections || 0} / {dbStats.maxConnections || 100}</div>
+            <p className={`text-xs mt-1 ${usageColor}`}>{usagePct}% of capacity in use</p>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-medium">
-              <span>High-Velocity Feed</span>
-              <Radio className="w-4 h-4 text-cyan-500" />
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm">
+              <span>Live Data Feed</span>
+              <Radio className="w-4 h-4 text-violet-500" />
             </div>
-            <div className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400 mt-2">
-              AIS Satellite
-            </div>
-            <p className="text-[11px] text-cyan-600 dark:text-cyan-400 mt-1 font-mono">~1,450 records / sec</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white mt-2">Vessel Tracking</div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">~1,450 updates / second</p>
           </div>
         </div>
 
-        {/* Database Table Breakdown Cards */}
+        {/* TABLE BREAKDOWN */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-            Database Schema & Table Breakdown
-          </h3>
-
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Data by Table</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(dbStats?.tables || []).map((table) => (
+            {(dbStats.tables || []).map((table) => (
               <div
                 key={table.tableName}
-                className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 transition-colors"
+                className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-transparent hover:border-violet-200 dark:hover:border-violet-500/30 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-xs text-purple-600 dark:text-purple-400">
-                    {table.tableName}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    {table.category}
-                  </span>
+                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{table.tableName}</span>
+                  <span className="px-2 py-0.5 rounded text-[11px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{table.category}</span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                  {table.description}
-                </p>
-                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-slate-900 dark:text-white font-bold">
-                    {(table.recordCount ?? 0).toLocaleString()} rows
-                  </span>
-                  <span className="text-slate-500 dark:text-slate-400">
-                    {table.sizeMb} MB • {table.lastUpdated}
-                  </span>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{table.description}</p>
+                <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
+                  <span className="text-slate-900 dark:text-white font-semibold">{(table.recordCount ?? 0).toLocaleString()} rows</span>
+                  <span className="text-slate-400 dark:text-slate-500">{table.sizeMb} MB • {table.lastUpdated}</span>
                 </div>
               </div>
             ))}
@@ -442,52 +371,40 @@ export const DataManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 2: MANUAL DATA UPLOADS */}
+      {/* SECTION 2: UPLOAD DATA */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+            <div className="p-3 bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-xl">
               <UploadCloud className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                Manual Data Uploads & CSV Ingestion
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Ingest AIS telemetry, port berth specs, vessel directories, and congestion metrics.
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Upload Data Files</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Add vessel positions, port details, vessel records, or congestion updates.
               </p>
             </div>
           </div>
 
-          {/* Download Sample Templates */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => downloadSampleTemplate(selectedDatasetType)}
-              className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-mono font-medium transition-colors flex items-center gap-2"
-            >
-              <Download className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Download {selectedDatasetType} CSV Template</span>
-            </button>
-          </div>
+          <button
+            onClick={() => downloadSampleTemplate(selectedDatasetType)}
+            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shrink-0"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Sample File</span>
+          </button>
         </div>
 
-        {/* Dataset Type Selector Tabs */}
-        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
-          {(
-            [
-              'AIS Telemetry',
-              'Ports Database',
-              'Vessel Directory',
-              'Congestion CSV',
-            ] as DatasetUploadType[]
-          ).map((type) => (
+        {/* DATASET TYPE SELECTOR */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/60 rounded-xl w-fit">
+          {(['AIS Telemetry', 'Ports Database', 'Vessel Directory', 'Congestion CSV'] as DatasetUploadType[]).map((type) => (
             <button
               key={type}
               onClick={() => setSelectedDatasetType(type)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                 selectedDatasetType === type
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -497,118 +414,82 @@ export const DataManagement: React.FC = () => {
         </div>
 
         {/* DRAG AND DROP ZONE */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={(e) => handleFileSelect(e.target.files)}
-          accept=".csv,.json"
-          className="hidden"
-        />
+        <input type="file" ref={fileInputRef} onChange={(e) => handleFileSelect(e.target.files)} accept=".csv,.json" className="hidden" />
 
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
           onDragLeave={() => setIsDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            handleFileSelect(e.dataTransfer.files);
-          }}
+          onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFileSelect(e.dataTransfer.files); }}
           onClick={() => !uploading && fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 ${
             isDragOver
-              ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 scale-[1.01]'
-              : 'border-slate-300 dark:border-slate-700 hover:border-indigo-400 bg-slate-50/50 dark:bg-slate-950/50'
+              ? 'border-violet-400 bg-violet-50 dark:bg-violet-500/10'
+              : 'border-slate-300 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-500/40 bg-slate-50 dark:bg-slate-800/30'
           }`}
         >
           {uploading ? (
             <div className="space-y-4 max-w-md mx-auto py-2">
-              <div className="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center animate-spin">
+              <div className="w-12 h-12 rounded-full bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto flex items-center justify-center animate-spin">
                 <RefreshCw className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white font-mono">
-                  Ingesting {selectedDatasetType}...
-                </h4>
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-mono mt-1">
-                  {uploadStep}
-                </p>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Uploading {selectedDatasetType}...</h4>
+                <p className="text-sm text-violet-600 dark:text-violet-400 mt-1">{uploadStep}</p>
               </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-full transition-all duration-300 ease-out"
-                  style={{ width: `${uploadProgress}%` }}
-                />
+              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                <div className="bg-violet-600 h-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center border border-indigo-500/20">
+              <div className="w-12 h-12 rounded-full bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 mx-auto flex items-center justify-center">
                 <ArrowDownToLine className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Click to browse or drag and drop dataset file
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Target Destination:{' '}
-                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                    {selectedDatasetType}
-                  </span>{' '}
-                  • Supports .CSV and .JSON formats (up to 250 MB)
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Click here or drag a file to upload</h4>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Uploading to: <span className="font-semibold text-violet-600 dark:text-violet-400">{selectedDatasetType}</span>
+                  {' '}• .CSV or .JSON, up to 250 MB
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* UPLOAD HISTORY LOG TABLE */}
+        {/* UPLOAD HISTORY */}
         <div className="space-y-3 pt-2">
-          <h3 className="text-xs font-bold font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-            Recent Data Ingestion Audit Trail
-          </h3>
-
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Recent Uploads</h3>
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  <th className="py-2.5 px-4">File Name</th>
-                  <th className="py-2.5 px-4">Dataset Target</th>
-                  <th className="py-2.5 px-4">Uploaded By</th>
-                  <th className="py-2.5 px-4">Timestamp</th>
-                  <th className="py-2.5 px-4">Ingested Records</th>
-                  <th className="py-2.5 px-4">File Size</th>
-                  <th className="py-2.5 px-4 text-right">Status</th>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <th className="py-2.5 px-4 font-medium">File Name</th>
+                  <th className="py-2.5 px-4 font-medium">Dataset</th>
+                  <th className="py-2.5 px-4 font-medium">Uploaded By</th>
+                  <th className="py-2.5 px-4 font-medium">When</th>
+                  <th className="py-2.5 px-4 font-medium">Records Added</th>
+                  <th className="py-2.5 px-4 font-medium">File Size</th>
+                  <th className="py-2.5 px-4 font-medium text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
                 {uploadHistory.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-indigo-500" />
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-violet-500" />
                       <span>{item.fileName}</span>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                      {item.datasetType}
-                    </td>
-                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">
-                      {item.uploadedBy || 'Admin User'}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                      {item.uploadedAt || (item as any).timestamp || 'Just now'}
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-400 text-xs">{item.datasetType}</td>
+                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{item.uploadedBy || 'Admin User'}</td>
+                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">{item.uploadedAt || (item as any).timestamp || 'Just now'}</td>
+                    <td className="py-3 px-4 font-semibold text-emerald-600 dark:text-emerald-400">
                       +{(item.recordsIngested ?? (item as any).recordsProcessed ?? 0).toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">
                       {(((item.fileSizeBytes ?? ((item as any).fileSizeMb ? (item as any).fileSizeMb * 1024 * 1024 : 0)) || 1240000) / (1024 * 1024)).toFixed(2)} MB
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                         <CheckCircle2 className="w-3 h-3" />
                         {item.status}
                       </span>
@@ -621,148 +502,106 @@ export const DataManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 3: DATA CLEANUP & MAINTENANCE BUTTONS */}
+      {/* SECTION 3: CLEANUP & MAINTENANCE */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/20">
+          <div className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl">
             <Trash2 className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-              Data Cleanup & Maintenance Controls
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Purge stale telemetry, clear route simulation caches, and reset disruption events.
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Cleanup & Maintenance</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Remove old data to free up space. These actions cannot be undone.
             </p>
           </div>
         </div>
 
-        {/* 3 CLEANUP CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Action 1: Delete Old AIS */}
-          <div className="p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 hover:border-amber-500/40 transition-colors">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* AIS Cleanup */}
+          <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex flex-col justify-between space-y-4">
             <div>
-              <div className="flex items-center justify-between">
-                <div className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
-                  <Radio className="w-5 h-5" />
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  Prune Telemetry
-                </span>
+              <div className="p-2.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl w-fit">
+                <Radio className="w-5 h-5" />
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white mt-3">
-                Delete Old AIS Data
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Deletes raw AIS vessel telemetry points older than 30 days to free SSD database storage.
+              <h3 className="font-semibold text-base text-slate-900 dark:text-white mt-3">Remove Old Vessel Positions</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Deletes vessel position records older than 30 days to free up space.
               </p>
             </div>
-
             <button
               onClick={() => setCleanupTarget('Delete Old AIS')}
-              className="w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-2.5 px-4 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
-              <span>DELETE OLD AIS</span>
+              <span>Run Cleanup</span>
             </button>
           </div>
 
-          {/* Action 2: Delete Old Simulations */}
-          <div className="p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 hover:border-cyan-500/40 transition-colors">
+          {/* Simulations Cleanup */}
+          <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex flex-col justify-between space-y-4">
             <div>
-              <div className="flex items-center justify-between">
-                <div className="p-2.5 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-xl border border-cyan-500/20">
-                  <BarChart2 className="w-5 h-5" />
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  Cache Purge
-                </span>
+              <div className="p-2.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl w-fit">
+                <Layers className="w-5 h-5" />
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white mt-3">
-                Delete Old Simulations
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Clears cached Monte Carlo stochastic iterations & Dijkstra reroute calculation trees.
+              <h3 className="font-semibold text-base text-slate-900 dark:text-white mt-3">Clear Old Simulations</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Clears saved route simulations and recommendation calculations.
               </p>
             </div>
-
             <button
               onClick={() => setCleanupTarget('Delete Old Simulations')}
-              className="w-full py-2.5 px-4 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-2.5 px-4 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
-              <span>DELETE SIMULATIONS</span>
+              <span>Run Cleanup</span>
             </button>
           </div>
 
-          {/* Action 3: Reset Disruptions */}
-          <div className="p-5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 hover:border-rose-500/40 transition-colors">
+          {/* Reset Disruptions */}
+          <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl flex flex-col justify-between space-y-4">
             <div>
-              <div className="flex items-center justify-between">
-                <div className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/20">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                  Baseline Reset
-                </span>
+              <div className="p-2.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl w-fit">
+                <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white mt-3">
-                Reset Disruptions
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Resets active disruption alert center back to seed default baseline hazard events.
+              <h3 className="font-semibold text-base text-slate-900 dark:text-white mt-3">Reset Disruptions</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                Clears all active disruption alerts and restores default settings.
               </p>
             </div>
-
             <button
               onClick={() => setCleanupTarget('Reset Disruptions')}
-              className="w-full py-2.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-2.5 px-4 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
-              <span>RESET DISRUPTIONS</span>
+              <span>Run Reset</span>
             </button>
           </div>
         </div>
 
-        {/* MAINTENANCE OPERATIONS LOG TABLE */}
+        {/* MAINTENANCE LOG */}
         <div className="space-y-3 pt-2">
-          <h3 className="text-xs font-bold font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-            Executed Maintenance Log
-          </h3>
-
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Maintenance History</h3>
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  <th className="py-2.5 px-4">Operation</th>
-                  <th className="py-2.5 px-4">Executed By</th>
-                  <th className="py-2.5 px-4">Timestamp</th>
-                  <th className="py-2.5 px-4">Records Affected</th>
-                  <th className="py-2.5 px-4">Storage Freed</th>
-                  <th className="py-2.5 px-4">Execution Details</th>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  <th className="py-2.5 px-4 font-medium">Action</th>
+                  <th className="py-2.5 px-4 font-medium">Performed By</th>
+                  <th className="py-2.5 px-4 font-medium">When</th>
+                  <th className="py-2.5 px-4 font-medium">Records Removed</th>
+                  <th className="py-2.5 px-4 font-medium">Space Freed</th>
+                  <th className="py-2.5 px-4 font-medium">Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
                 {cleanupLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-white">
-                      {log.operationType}
-                    </td>
-                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">
-                      {log.executedBy || 'Admin User'}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-                      {log.executedAt || (log as any).timestamp || 'Just now'}
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-amber-600 dark:text-amber-400">
-                      -{(log.recordsAffected ?? 0).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                      {log.sizeFreedMb ?? (log as any).storageFreedMb ?? 0} MB
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-[11px]">
-                      {log.details || 'Storage maintenance operation executed.'}
-                    </td>
+                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-white">{log.operationType}</td>
+                    <td className="py-3 px-4 text-slate-700 dark:text-slate-300">{log.executedBy || 'Admin User'}</td>
+                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">{log.executedAt || (log as any).timestamp || 'Just now'}</td>
+                    <td className="py-3 px-4 font-semibold text-rose-600 dark:text-rose-400">-{(log.recordsAffected ?? 0).toLocaleString()}</td>
+                    <td className="py-3 px-4 font-semibold text-emerald-600 dark:text-emerald-400">{log.sizeFreedMb ?? (log as any).storageFreedMb ?? 0} MB</td>
+                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">{log.details || 'Maintenance operation completed.'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -771,49 +610,46 @@ export const DataManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* CONFIRM CLEANUP ACTION MODAL */}
+      {/* CONFIRM CLEANUP MODAL */}
       <AnimatePresence>
         {cleanupTarget && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl max-w-md w-full p-6 text-center"
             >
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center border border-amber-500/20 mb-4">
+              <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center mb-4">
                 <AlertTriangle className="w-6 h-6" />
               </div>
 
-              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                Confirm Maintenance Operation
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Are you sure you want to execute{' '}
-                <span className="font-bold text-slate-900 dark:text-white">{cleanupTarget}</span>? This
-                will modify database tables and free allocated memory.
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Are you sure?</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                This will run <span className="font-semibold text-slate-900 dark:text-white">{cleanupTarget}</span> and
+                cannot be undone.
               </p>
 
               <div className="mt-6 flex items-center justify-center gap-3">
                 <button
                   onClick={() => setCleanupTarget(null)}
                   disabled={cleaning}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmCleanup}
                   disabled={cleaning}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold font-mono transition-all shadow-md shadow-rose-600/20 flex items-center gap-2"
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
                 >
                   {cleaning ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>EXECUTING...</span>
+                      <span>Working...</span>
                     </>
                   ) : (
-                    <span>CONFIRM & EXECUTE</span>
+                    <span>Yes, Continue</span>
                   )}
                 </button>
               </div>

@@ -71,6 +71,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | AcknowledgementStatus>('all');
   const [sortBy, setSortBy] = useState<'severity' | 'time' | 'vessels'>('severity');
   const [isLoading, setIsLoading] = useState(true);
+  const [inboundFilter, setInboundFilter] = useState(false);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
@@ -80,7 +81,7 @@ export const DisruptionAlertCenterPage: React.FC = () => {
   const loadAlerts = async () => {
     setIsLoading(true);
     try {
-      const data = await getDisruptionAlerts();
+      const data = await getDisruptionAlerts(inboundFilter);
       if (data && data.length > 0) {
         setDisruptions(data);
         setSelectedDisruptionId((prev) => (prev && data.some((d: any) => d.id === prev) ? prev : data[0].id));
@@ -94,6 +95,9 @@ export const DisruptionAlertCenterPage: React.FC = () => {
 
   useEffect(() => {
     loadAlerts();
+  }, [inboundFilter]);
+
+  useEffect(() => {
     getMapVessels().then(setMapVessels).catch(console.error);
     getMapPorts().then(setMapPorts).catch(console.error);
     getMapRoutes().then(setMapRoutes).catch(console.error);
@@ -593,6 +597,21 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Inbound Fleet Threat Quick Filter */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                onClick={() => { setInboundFilter(!inboundFilter); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold transition-all w-full justify-center ${
+                  inboundFilter
+                    ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40 shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-rose-500 hover:border-rose-500/30'
+                }`}
+              >
+                <Ship className="w-3.5 h-3.5" />
+                <span>{inboundFilter ? '● Showing Inbound Fleet Threats Only' : 'Vessels En Route to Disrupted Ports'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Scrollable Disruption Cards List */}
@@ -697,6 +716,16 @@ export const DisruptionAlertCenterPage: React.FC = () => {
                       <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed mb-2">
                         {disruption.description}
                       </p>
+
+                      {/* Inbound Fleet Threat Badge */}
+                      {disruption.is_inbound_threat && (disruption.inbound_vessels_count || 0) > 0 && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/25 mb-2">
+                          <Ship className="w-3 h-3 text-rose-500" />
+                          <span className="text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {disruption.inbound_vessels_count} vessel{disruption.inbound_vessels_count !== 1 ? 's' : ''} en route to this area
+                          </span>
+                        </div>
+                      )}
 
                       {/* Predicted Ripple Ports Chips */}
                       {disruption.predicted_ripple_ports?.length ? (

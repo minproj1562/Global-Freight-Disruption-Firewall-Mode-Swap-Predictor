@@ -59,6 +59,9 @@ class AlertCenterDisruptionItem(BaseModel):
     # AI-predicted ripple port impacts (Network Influence — GNN / BFS simulation)
     predicted_ripple_ports: List[str] = []
     ripple_predictions: List[RipplePredictionItem] = []
+    # Inbound fleet threat detection — vessels heading towards disrupted port
+    is_inbound_threat: bool = False
+    inbound_vessels_count: int = 0
 
 class DisruptionActionResponse(BaseModel):
     id: str
