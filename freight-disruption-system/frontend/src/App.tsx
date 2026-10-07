@@ -22,6 +22,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { ForceDarkMode } from '@/components/ForceDarkMode';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import { LogisticsManagerAuthPage } from './pages/LogisticsManagerAuthPage';
+import { ExecutiveSummaryPage } from './pages/ExecutiveSummaryPage';
 
 function App() {
   return (
@@ -116,6 +117,10 @@ function App() {
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<AdminDashboardPage />} />
           <Route path="/admin/data" element={<AdminDashboardPage />} />
+
+          {/* Page 1.6 — Executive Summary & Risk Register */}
+          <Route path="/dashboard/executive-summary" element={<ExecutiveSummaryPage />} />
+          <Route path="/dashboard/risk-register" element={<ExecutiveSummaryPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
