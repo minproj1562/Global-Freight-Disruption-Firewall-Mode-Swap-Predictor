@@ -1020,22 +1020,39 @@ export const RerouteRecommendationPage: React.FC = () => {
                     </div>
 
                     {/* Action Row */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800/80 gap-3">
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 italic max-w-md">
                         {route.transit_summary}
                       </p>
 
-                      <button
-                        onClick={() => handleSelectRoute(route)}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-sm shrink-0 ${
-                          isSelected
-                            ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20'
-                            : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        {isSelected ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Check className="w-4 h-4 text-amber-500" />}
-                        <span>{isSelected ? 'Route Selected' : 'Select Route'}</span>
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dashboard/routes/${route.id}`, {
+                              state: { route, source: 'reroute-recommendations' },
+                            });
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 transition-all shadow-sm"
+                        >
+                          <Compass className="w-3.5 h-3.5 text-cyan-500" />
+                          <span>View Route</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSelectRoute(route)}
+                          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all shadow-sm ${
+                            isSelected
+                              ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20'
+                              : 'bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {isSelected ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Check className="w-4 h-4 text-amber-500" />}
+                          <span>{isSelected ? 'Route Selected' : 'Select Route'}</span>
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 );

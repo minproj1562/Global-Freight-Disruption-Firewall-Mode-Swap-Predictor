@@ -27,6 +27,7 @@ interface MapViewProps {
   congestionForecasts?: PortCongestionForecast[];
   selectedTimeHorizon?: CongestionTimeHorizon;
   highlightedActiveRoute?: ActiveRoute | null;
+  myFleetMmsis?: number[];
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -53,6 +54,7 @@ export const MapView: React.FC<MapViewProps> = ({
   congestionForecasts = [],
   selectedTimeHorizon = 'now',
   highlightedActiveRoute = null,
+  myFleetMmsis = [],
 }) => {
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -570,6 +572,9 @@ export const MapView: React.FC<MapViewProps> = ({
           lat -= Math.sin((vessel.course * Math.PI) / 180) * delta;
         }
 
+        const isMyFleet = Boolean(myFleetMmsis && myFleetMmsis.includes(vessel.mmsi));
+        const shouldHighlightFleet = Boolean(layers.myFleet && isMyFleet);
+
         if (markersRef.current[vessel.id]) {
           markersRef.current[vessel.id].setLngLat([lon, lat]);
         } else {
@@ -589,6 +594,12 @@ export const MapView: React.FC<MapViewProps> = ({
           el.innerHTML = `
             <div class="relative flex items-center justify-center">
               ${
+                shouldHighlightFleet
+                  ? `<div class="absolute -inset-3.5 rounded-full border-2 border-emerald-400 bg-emerald-500/30 animate-ping"></div>
+                     <div class="absolute -inset-2.5 rounded-full border-2 border-emerald-400 bg-emerald-500/40 animate-pulse"></div>`
+                  : ''
+              }
+              ${
                 isAlert
                   ? `<div class="absolute -inset-2 rounded-full bg-rose-500/40 animate-ping"></div>`
                   : ''
@@ -599,15 +610,20 @@ export const MapView: React.FC<MapViewProps> = ({
                      <div class="absolute -top-3 -right-3 w-4 h-4 rounded-full bg-rose-600 border border-slate-950 flex items-center justify-center text-white text-[8px] font-bold shadow-md z-10" title="Anomaly Detected (Isolation Forest ML)">!</div>`
                   : ''
               }
+              ${
+                shouldHighlightFleet
+                  ? `<div class="absolute -top-4 -left-3 px-1 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-black text-[7px] border border-slate-950 shadow-lg z-20">MY FLEET</div>`
+                  : ''
+              }
               <div style="transform: rotate(${vessel.heading}deg);" class="transition-transform duration-300">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="${colorClass} drop-shadow-md">
                   <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
               </div>
               <div class="vessel-label-box absolute top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-950/90 text-[10px] font-mono text-white whitespace-nowrap border border-slate-800 pointer-events-none shadow-md ${
-                layers.vesselNames ? 'block' : 'hidden'
+                layers.vesselNames || shouldHighlightFleet ? 'block' : 'hidden'
               }">
-                ${vessel.name}${isAnomalous ? ' <span class="text-rose-400 font-bold">⚠</span>' : ''}
+                ${shouldHighlightFleet ? '<span class="text-emerald-400 font-bold mr-1">★</span>' : ''}${vessel.name}${isAnomalous ? ' <span class="text-rose-400 font-bold">⚠</span>' : ''}
               </div>
             </div>
           `;
@@ -644,7 +660,7 @@ export const MapView: React.FC<MapViewProps> = ({
         delete markersRef.current[id];
       }
     });
-  }, [vessels, layers.vessels, layers.vesselNames, selectedVesselTypeFilters, replayProgress]);
+  }, [vessels, layers.vessels, layers.vesselNames, layers.myFleet, myFleetMmsis, selectedVesselTypeFilters, replayProgress]);
 
   // Render Port Markers with Congestion Glow Rings
   useEffect(() => {

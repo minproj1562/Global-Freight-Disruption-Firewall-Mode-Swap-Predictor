@@ -314,3 +314,104 @@ export interface CongestionTrendPoint {
   selectedPortScore: number;
   [altPortName: string]: string | number;
 }
+
+// ============= MULTIMODAL ROUTE & AIS VESSEL REGISTRY EXTENSIONS =============
+
+export type LegTransportMode = 'sea' | 'road' | 'air' | 'rail';
+export type LegStatus = 'completed' | 'active' | 'upcoming';
+
+export interface RouteLegWaypoint {
+  name: string;
+  code?: string;
+  coordinates: [number, number]; // [lon, lat]
+}
+
+export interface RouteLeg {
+  id: string;
+  leg_order: number;
+  mode: LegTransportMode;
+  origin: RouteLegWaypoint;
+  destination: RouteLegWaypoint;
+  distance: number; // in nautical miles or km
+  distance_formatted?: string;
+  duration: string; // e.g. "4.5 days", "14 hrs"
+  duration_hours?: number;
+  carrier_name?: string;
+  vehicle_type?: string; // e.g. "Ultra Large Container Vessel (ULCV)", "Euro 6 Long-Haul Freight Truck", "Boeing 777F Air Cargo"
+  status: LegStatus;
+  geometry?: [number, number][]; // [lon, lat] GeoJSON coordinates array
+  notes?: string;
+}
+
+export interface DetailedRoute {
+  id: string;
+  name: string;
+  vessel_id?: string;
+  vessel_name?: string;
+  origin_port_name: string;
+  destination_port_name: string;
+  status: RouteStatus;
+  total_distance: string;
+  estimated_duration: string;
+  eta: string;
+  total_cost_usd?: number;
+  cost?: string;
+  risk_level: DisruptionSeverity;
+  current_mode: LegTransportMode | TransportMode;
+  current_position: [number, number]; // [lon, lat] overall vessel/cargo position
+  cargo_summary?: string;
+  corridor_name?: string;
+  legs: RouteLeg[];
+  active_leg_index: number;
+  confidence_score?: number;
+}
+
+/**
+ * Simulated AIS Data Model
+ * NOTE: This simulates the exact live feed emitted by maritime AIS transponders.
+ * Used as the project's AIS implementation until integrated with a live AIS API / FastAPI endpoint.
+ */
+export interface AISVesselData {
+  mmsi: number;
+  imo: number;
+  name: string;
+  vessel_type: VesselType;
+  flag: string;
+  latitude: number;
+  longitude: number;
+  speed: number; // knots
+  course: number; // degrees (0-359)
+  heading: number; // degrees (0-359)
+  navigation_status: string; // e.g. "Under way using engine", "At anchor", "Moored"
+  destination: string;
+  eta: string;
+  timestamp: string; // ISO 8601 or formatted UTC
+}
+
+export interface RegisteredVessel {
+  id: string;
+  name: string;
+  imo: number;
+  mmsi: number;
+  vessel_type: VesselType;
+  flag: string;
+  registered_at: string;
+  notes?: string;
+  // Associated AIS live telemetry (dynamically merged if MMSI exists in simulated pool)
+  has_live_ais: boolean;
+  current_lat?: number;
+  current_lon?: number;
+  speed?: number;
+  course?: number;
+  heading?: number;
+  navigation_status?: string;
+  destination?: string;
+  eta?: string;
+  last_ais_update?: string;
+}
+
+export interface AISLookupResult {
+  found: boolean;
+  vessel: AISVesselData | null;
+  match_field?: 'name' | 'mmsi' | 'imo';
+}

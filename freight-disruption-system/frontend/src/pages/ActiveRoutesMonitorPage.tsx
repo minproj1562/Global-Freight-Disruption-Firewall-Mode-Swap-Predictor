@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Compass,
   Package,
+  ExternalLink,
 } from 'lucide-react';
 
 import { useAuthStore } from '@/store/authStore';
@@ -325,12 +326,14 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
     return action.action_type || 'continue';
   };
 
-  // Recommended Action Button Trigger
+  // Recommended Action Button Trigger - Navigates to Route Detail Page for Reroute
   const handleActionClick = (route: ActiveRoute) => {
     const actionStr = getActionString(route.recommended_action).toLowerCase();
     if (actionStr.includes('reroute')) {
-      navigate('/dashboard/reroute-planner', {
+      navigate(`/dashboard/routes/${route.id}`, {
         state: {
+          route,
+          source: 'active-routes',
           vesselId: route.vessel_id,
           vesselName: route.vessel_name,
           originPort: route.origin_port_name,
@@ -798,23 +801,37 @@ export const ActiveRoutesMonitorPage: React.FC = () => {
                               const actionStr = getActionString(route.recommended_action);
                               const actionLower = actionStr.toLowerCase();
                               return (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleActionClick(route);
-                                  }}
-                                  className={`px-3 py-1 rounded-xl text-[11px] font-bold uppercase transition-all shadow-sm ${
-                                    actionLower.includes('reroute')
-                                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white font-mono hover:opacity-90 shadow-rose-500/20'
-                                      : actionLower.includes('speed')
-                                      ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/25'
-                                      : actionLower.includes('wait')
-                                      ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/40 hover:bg-purple-500/25'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-                                  }`}
-                                >
-                                  {actionStr}
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleActionClick(route);
+                                    }}
+                                    className={`px-3 py-1 rounded-xl text-[11px] font-bold uppercase transition-all shadow-sm ${
+                                      actionLower.includes('reroute')
+                                        ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white font-mono hover:opacity-90 shadow-rose-500/20'
+                                        : actionLower.includes('speed')
+                                        ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/25'
+                                        : actionLower.includes('wait')
+                                        ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/40 hover:bg-purple-500/25'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                                    }`}
+                                  >
+                                    {actionStr}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/dashboard/routes/${route.id}`, {
+                                        state: { route, source: 'active-routes' },
+                                      });
+                                    }}
+                                    title="View Route Journey"
+                                    className="p-1 rounded-xl text-slate-400 hover:text-cyan-500 hover:bg-cyan-500/10 transition-all border border-slate-200 dark:border-slate-800"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               );
                             })()}
                           </td>

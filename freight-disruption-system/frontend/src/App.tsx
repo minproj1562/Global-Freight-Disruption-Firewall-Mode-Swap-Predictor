@@ -16,6 +16,8 @@ import { RerouteRecommendationPage } from './pages/RerouteRecommendationPage';
 import { ActiveRoutesMonitorPage } from './pages/ActiveRoutesMonitorPage';
 import { CongestionForecastPage } from './pages/CongestionForecastPage';
 import { AnalyticsSimulationPage } from './pages/AnalyticsSimulationPage';
+import { RouteDetailPage } from './pages/RouteDetailPage';
+import { VesselRegistryPage } from './pages/VesselRegistryPage';
 import { Toaster } from '@/components/ui/toaster';
 import { ForceDarkMode } from '@/components/ForceDarkMode';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
@@ -58,6 +60,15 @@ function App() {
           {/* Page 1.4 — Active Routes Monitor */}
           <Route path="/dashboard/active-routes" element={<ActiveRoutesMonitorPage />} />
           <Route path="/dashboard/routes" element={<ActiveRoutesMonitorPage />} />
+
+          {/* Page 1.7 — Route Detail Page (In-Depth Journey Analysis) */}
+          <Route path="/dashboard/routes/:routeId" element={<RouteDetailPage />} />
+          <Route path="/dashboard/route-detail/:routeId" element={<RouteDetailPage />} />
+
+          {/* Page 1.8 — Vessel Registry / My Fleet */}
+          <Route path="/dashboard/vessel-registry" element={<VesselRegistryPage />} />
+          <Route path="/dashboard/my-fleet" element={<VesselRegistryPage />} />
+          <Route path="/vessel-registry" element={<VesselRegistryPage />} />
 
           {/* Page 1.5 — Congestion Forecast (Ripple-Heat) Map */}
           <Route path="/dashboard/congestion-forecast" element={<CongestionForecastPage />} />

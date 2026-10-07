@@ -12,6 +12,7 @@ export interface LayerVisibilityState {
   weather?: boolean;
   piracy?: boolean;
   iceCoverage?: boolean;
+  myFleet?: boolean;
 }
 
 interface MapToolbarProps {
@@ -35,6 +36,7 @@ export const MapToolbar: React.FC<MapToolbarProps> = ({
 
   const layerItems: { key: keyof LayerVisibilityState; label: string; icon: any; color: string }[] = [
     { key: 'vessels', label: 'Vessels Fleet', icon: Ship, color: 'text-amber-400' },
+    { key: 'myFleet', label: 'My Fleet (Registered)', icon: Ship, color: 'text-emerald-400' },
     { key: 'ports', label: 'Port Terminals', icon: Anchor, color: 'text-sky-400' },
     { key: 'disruptions', label: 'Disruption Zones', icon: AlertTriangle, color: 'text-rose-400' },
     { key: 'routes', label: 'Transit Routes', icon: RouteIcon, color: 'text-indigo-400' },

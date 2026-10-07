@@ -12,7 +12,8 @@ import {
   Menu, 
   ChevronLeft,
   Truck,
-  Boxes
+  Boxes,
+  Ship
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +28,7 @@ export const LogisticsManagerSidebar: React.FC = () => {
     { name: 'Alert Center', icon: AlertTriangle, route: '/dashboard/disruptions' },
     { name: 'Reroute Planner', icon: Compass, route: '/dashboard/reroute-planner' },
     { name: 'Active Routes', icon: Route, route: '/dashboard/active-routes' },
+    { name: 'Vessel Registry', icon: Ship, route: '/dashboard/vessel-registry' },
     { name: 'Congestion Heatmap', icon: Flame, route: '/dashboard/congestion-forecast' },
     { name: 'Simulation Lab', icon: Boxes, route: '/dashboard/analytics-simulation' },
   ];

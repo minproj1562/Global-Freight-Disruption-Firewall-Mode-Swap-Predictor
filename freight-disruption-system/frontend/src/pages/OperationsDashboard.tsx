@@ -51,19 +51,21 @@ export const OperationsDashboard: React.FC = () => {
     last_updated: 'Just now',
   });
   const [secondaryInfra, setSecondaryInfra] = useState<SecondaryInfrastructure[]>([]);
+  const [registeredFleetMmsis, setRegisteredFleetMmsis] = useState<number[]>([]);
   const [_isLoading, setIsLoading] = useState<boolean>(true);
 
   // Load live map data from Backend REST API
   useEffect(() => {
     const loadMapData = async () => {
       try {
-        const [vList, pList, dList, rList, kData, infraList] = await Promise.all([
+        const [vList, pList, dList, rList, kData, infraList, fleetList] = await Promise.all([
           getMapVessels().catch(() => []),
           getMapPorts().catch(() => []),
           getMapDisruptions().catch(() => []),
           getMapRoutes().catch(() => []),
           getMapKPIs().catch(() => null),
           getSecondaryInfrastructure().catch(() => []),
+          import('@/services/fleetService').then((m) => m.getRegisteredFleet()).catch(() => []),
         ]);
         if (vList && vList.length > 0) setVessels(vList);
         if (pList && pList.length > 0) setPorts(pList);
@@ -71,6 +73,7 @@ export const OperationsDashboard: React.FC = () => {
         if (rList && rList.length > 0) setRoutes(rList);
         if (kData) setKpis(kData);
         if (infraList && infraList.length > 0) setSecondaryInfra(infraList);
+        if (fleetList && fleetList.length > 0) setRegisteredFleetMmsis(fleetList.map((f: any) => f.mmsi));
       } catch (err) {
         console.error('Failed to load live map data:', err);
       } finally {
@@ -91,6 +94,7 @@ export const OperationsDashboard: React.FC = () => {
     weather: false,
     piracy: false,
     iceCoverage: false,
+    myFleet: false,
   });
 
   // Filter State
@@ -320,6 +324,7 @@ export const OperationsDashboard: React.FC = () => {
             setQuickPopupPoint(point);
           }}
           replayProgress={replayProgress}
+          myFleetMmsis={registeredFleetMmsis}
         />
       </main>
 
