@@ -50,14 +50,18 @@ def get_admin_vessels(
             id=v.id,
             mmsi=v.mmsi,
             imo=v.imo or 0,
-            name=v.name,
+            name=v.name or f"Vessel {v.mmsi}",
             type=v.vessel_type or "Container",
-            flag=v.flag or "Unknown",
-            dwt=v.dwt or 0.0,
-            currentPort=v.current_port or "At Sea",
+            vessel_type=v.vessel_type or "Container",
+            flag=v.flag or "Panama",
+            dwt=float(v.dwt or 0.0),
+            currentPort=v.current_port or "Port of Rotterdam",
+            current_port=v.current_port or "Port of Rotterdam",
             status=v.status or "Underway",
             lastAisUpdate=v.last_ais_update_str or "Just now",
-            isActive=v.is_active if v.is_active is not None else True
+            last_ais_update_str=v.last_ais_update_str or "Just now",
+            isActive=v.is_active if v.is_active is not None else True,
+            is_active=v.is_active if v.is_active is not None else True
         )
         for v in vessels
     ]

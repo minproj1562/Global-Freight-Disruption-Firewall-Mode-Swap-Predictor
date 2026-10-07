@@ -1,7 +1,6 @@
 // frontend/src/features/admin/VesselManagement.tsx
 // Page 4.3 — Vessel Management
-// Table of 50 pre-seeded vessels (MMSI, name, type, flag, DWT, current port, status, last AIS update).
-// Add/Edit/Delete, refresh AIS, mark active/inactive.
+// Fleet registry table with add/edit/delete, AIS refresh, and active/inactive toggle.
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,7 +19,6 @@ import {
   Save,
   Radio,
 } from 'lucide-react';
-import { INITIAL_50_VESSELS } from '@/shared/mock/adminMockData';
 import {
   getAdminVessels,
   createAdminVessel,
@@ -28,52 +26,46 @@ import {
   deleteAdminVessel,
   toggleAdminVesselActive,
   refreshAisStreamData,
-  AdminVessel
+  AdminVessel,
 } from '@/services/api';
 
 export const VesselManagement: React.FC = () => {
-  const [vessels, setVessels] = useState<AdminVessel[]>(INITIAL_50_VESSELS);
+  const [vessels, setVessels] = useState<AdminVessel[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  void isLoading;
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Refreshing AIS animation state
   const [isRefreshingAis, setIsRefreshingAis] = useState(false);
 
-  // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingVessel, setEditingVessel] = useState<AdminVessel | null>(null);
 
-  // Form State for Add New Vessel
   const [newVesselData, setNewVesselData] = useState<Omit<AdminVessel, 'id' | 'lastAisUpdate' | 'isActive'>>({
     mmsi: 211000000,
     imo: 9800000,
     name: '',
     type: 'Container',
-    flag: 'Panama 🇵🇦',
+    flag: 'Panama',
     dwt: 150000,
     currentPort: 'Port of Rotterdam',
     status: 'Underway',
   });
 
-  // Fetch vessels from Backend API
   const fetchVessels = async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const data = await getAdminVessels({ search: searchTerm, type: typeFilter, status: statusFilter });
-      if (data && data.length > 0) {
-        setVessels(data);
-      }
-    } catch (err) {
-      console.warn('Backend API connection fallback to mock data:', err);
+      setVessels(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('Failed to load fleet data:', err);
+      setLoadError(err?.message || 'Could not load the vessel fleet.');
     } finally {
       setIsLoading(false);
     }
@@ -83,36 +75,29 @@ export const VesselManagement: React.FC = () => {
     fetchVessels();
   }, []);
 
-  // Handle Refresh AIS Trigger
   const handleRefreshAis = async () => {
     setIsRefreshingAis(true);
     try {
       await refreshAisStreamData();
       await fetchVessels();
     } catch (err) {
-      setVessels((prev) =>
-        prev.map((v) => ({ ...v, lastAisUpdate: 'Just now' }))
-      );
+      setVessels((prev) => prev.map((v) => ({ ...v, lastAisUpdate: 'Just now' })));
     } finally {
       setIsRefreshingAis(false);
     }
   };
 
-  // Toggle Active / Inactive State per vessel
   const handleToggleActive = async (id: string) => {
     try {
       const updated = await toggleAdminVesselActive(id);
       setVessels((prev) => prev.map((v) => (v.id === id ? updated : v)));
     } catch (err) {
-      setVessels((prev) =>
-        prev.map((v) => (v.id === id ? { ...v, isActive: !v.isActive } : v))
-      );
+      setVessels((prev) => prev.map((v) => (v.id === id ? { ...v, isActive: !v.isActive } : v)));
     }
   };
 
-  // Delete Vessel Action
   const handleDeleteVessel = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete vessel "${name}" (ID: ${id}) from the fleet registry?`)) {
+    if (confirm(`Remove "${name}" from the fleet? This cannot be undone.`)) {
       try {
         await deleteAdminVessel(id);
         setVessels((prev) => prev.filter((v) => v.id !== id));
@@ -122,7 +107,6 @@ export const VesselManagement: React.FC = () => {
     }
   };
 
-  // Submit Add Vessel
   const handleAddVesselSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVesselData.name) return;
@@ -146,14 +130,13 @@ export const VesselManagement: React.FC = () => {
       imo: 9800000,
       name: '',
       type: 'Container',
-      flag: 'Panama 🇵🇦',
+      flag: 'Panama',
       dwt: 150000,
       currentPort: 'Port of Rotterdam',
       status: 'Underway',
     });
   };
 
-  // Submit Save Edit Vessel
   const handleEditVesselSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVessel) return;
@@ -162,34 +145,27 @@ export const VesselManagement: React.FC = () => {
       const updated = await updateAdminVessel(editingVessel.id, editingVessel);
       setVessels((prev) => prev.map((v) => (v.id === editingVessel.id ? updated : v)));
     } catch (err) {
-      setVessels((prev) =>
-        prev.map((v) => (v.id === editingVessel.id ? editingVessel : v))
-      );
+      setVessels((prev) => prev.map((v) => (v.id === editingVessel.id ? editingVessel : v)));
     }
     setEditingVessel(null);
   };
 
-
-  // Filtered dataset
   const filteredVessels = useMemo(() => {
     return vessels.filter((v) => {
       const matchesSearch =
-        v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.mmsi.toString().includes(searchTerm) ||
-        v.imo.toString().includes(searchTerm) ||
-        v.currentPort.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.flag.toLowerCase().includes(searchTerm.toLowerCase());
+        (v.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.mmsi ? v.mmsi.toString() : '').includes(searchTerm) ||
+        (v.imo ? v.imo.toString() : '').includes(searchTerm) ||
+        (v.currentPort || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.flag || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
-
       if (typeFilter !== 'all' && v.type !== typeFilter) return false;
       if (statusFilter !== 'all' && v.status !== statusFilter) return false;
-
       return true;
     });
   }, [vessels, searchTerm, typeFilter, statusFilter]);
 
-  // Paginated dataset
   const totalPages = Math.ceil(filteredVessels.length / itemsPerPage) || 1;
   const paginatedVessels = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -199,222 +175,235 @@ export const VesselManagement: React.FC = () => {
   const getStatusBadge = (status: AdminVessel['status']) => {
     switch (status) {
       case 'Underway':
-        return 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300';
+        return 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30 text-sky-600 dark:text-sky-400';
       case 'Moored':
-        return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300';
+        return 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
       case 'At Anchor':
-        return 'bg-amber-500/15 border-amber-500/40 text-amber-300';
+        return 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400';
       case 'Maintenance':
-        return 'bg-purple-500/15 border-purple-500/40 text-purple-300';
+        return 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30 text-violet-600 dark:text-violet-400';
       case 'Inactive':
-        return 'bg-slate-700/40 border-slate-600 text-slate-400';
+        return 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400';
     }
   };
 
+  const inputClass =
+    'w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 transition-shadow';
+
   return (
-    <div className="space-y-8 text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="space-y-6">
       {/* SECTION HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-600 dark:text-cyan-400 mb-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-violet-600 dark:text-violet-400 mb-1">
             <Ship className="w-4 h-4" />
-            <span>PAGE 4.3 • FLEET MANAGEMENT & AIS CONTROLS</span>
+            <span>Vessel Fleet</span>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-            50 Pre-Seeded Vessel Fleet Management
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Full registry of 50 pre-seeded maritime vessels. Refresh live AIS positions, toggle vessel active states, or perform CRUD operations.
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Fleet Registry</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Track vessel positions, update fleet records, and manage which vessels are actively monitored.
           </p>
         </div>
 
-        {/* Global Action Buttons */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleRefreshAis}
             disabled={isRefreshingAis}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold transition-all flex items-center gap-2"
+            className="px-4 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium transition-colors flex items-center gap-2"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshingAis ? 'animate-spin text-cyan-400' : ''}`} />
-            {isRefreshingAis ? 'Broadcasting AIS Ping...' : 'Refresh AIS (50 Vessels)'}
+            <RefreshCw className={`w-4 h-4 ${isRefreshingAis ? 'animate-spin text-violet-500' : ''}`} />
+            {isRefreshingAis ? 'Updating positions...' : 'Refresh Vessel Positions'}
           </button>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-400 transition-all flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm transition-colors flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" /> Add New Vessel
+            <Plus className="w-4 h-4" /> Add Vessel
           </button>
         </div>
       </div>
 
-      {/* FILTER & TOOLBAR */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+      {/* FILTER TOOLBAR */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search Name, MMSI, IMO, Port..."
+            placeholder="Search by name, MMSI, IMO, or port..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+            className={`${inputClass} pl-9`}
           />
         </div>
 
-        <div>
-          <select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-          >
-            <option value="all">All Vessel Types</option>
-            <option value="Container">Container Ship</option>
-            <option value="Tanker">Crude Tanker</option>
-            <option value="Bulk Carrier">Bulk Carrier</option>
-            <option value="LNG Carrier">LNG Carrier</option>
-            <option value="Ro-Ro">Ro-Ro Vehicle Carrier</option>
-            <option value="Chemical Tanker">Chemical Tanker</option>
-            <option value="Tug / Support">Tug / Support Vessel</option>
-          </select>
-        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className={inputClass}
+        >
+          <option value="all">All Vessel Types</option>
+          <option value="Container">Container Ship</option>
+          <option value="Tanker">Crude Tanker</option>
+          <option value="Bulk Carrier">Bulk Carrier</option>
+          <option value="LNG Carrier">LNG Carrier</option>
+          <option value="Ro-Ro">Ro-Ro Vehicle Carrier</option>
+          <option value="Chemical Tanker">Chemical Tanker</option>
+          <option value="Tug / Support">Tug / Support Vessel</option>
+        </select>
 
-        <div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-          >
-            <option value="all">All Statuses</option>
-            <option value="Underway">Underway</option>
-            <option value="Moored">Moored</option>
-            <option value="At Anchor">At Anchor</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Inactive">Inactive</option>
-          </select>
-        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className={inputClass}
+        >
+          <option value="all">All Statuses</option>
+          <option value="Underway">Underway</option>
+          <option value="Moored">Moored</option>
+          <option value="At Anchor">At Anchor</option>
+          <option value="Maintenance">Maintenance</option>
+          <option value="Inactive">Inactive</option>
+        </select>
       </div>
 
-      {/* 50 PRE-SEEDED VESSELS TABLE */}
-      <div className="bg-slate-900/80 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+      {/* VESSEL TABLE */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[11px] border-b border-slate-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wide border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="py-3.5 px-4 font-semibold">Vessel Name & MMSI</th>
-                <th className="py-3.5 px-4 font-semibold">Type & Flag</th>
-                <th className="py-3.5 px-4 font-semibold">DWT Capacity</th>
-                <th className="py-3.5 px-4 font-semibold">Current Location / Port</th>
-                <th className="py-3.5 px-4 font-semibold">Status</th>
-                <th className="py-3.5 px-4 font-semibold">Last AIS Ingest</th>
-                <th className="py-3.5 px-4 font-semibold">Active State</th>
-                <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
+                <th className="py-3.5 px-4 font-medium">Vessel</th>
+                <th className="py-3.5 px-4 font-medium">Type & Flag</th>
+                <th className="py-3.5 px-4 font-medium">Capacity</th>
+                <th className="py-3.5 px-4 font-medium">Current Location</th>
+                <th className="py-3.5 px-4 font-medium">Status</th>
+                <th className="py-3.5 px-4 font-medium">Last Position Update</th>
+                <th className="py-3.5 px-4 font-medium">Monitoring</th>
+                <th className="py-3.5 px-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {paginatedVessels.map((vessel) => (
-                <tr key={vessel.id} className="hover:bg-slate-800/40 transition-colors">
-                  {/* Name & MMSI */}
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-white text-sm flex items-center gap-2">
-                      <Ship className="w-4 h-4 text-cyan-400 shrink-0" />
-                      <span>{vessel.name}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      MMSI: {vessel.mmsi} | IMO: {vessel.imo}
-                    </div>
-                  </td>
-
-                  {/* Type & Flag */}
-                  <td className="py-3.5 px-4">
-                    <div className="font-semibold text-slate-200">{vessel.type}</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">{vessel.flag}</div>
-                  </td>
-
-                  {/* DWT */}
-                  <td className="py-3.5 px-4 font-mono font-medium text-amber-300">
-                    {vessel.dwt.toLocaleString()} DWT
-                  </td>
-
-                  {/* Current Port */}
-                  <td className="py-3.5 px-4 font-medium text-slate-200">
-                    {vessel.currentPort}
-                  </td>
-
-                  {/* Status */}
-                  <td className="py-3.5 px-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(vessel.status)}`}>
-                      {vessel.status}
-                    </span>
-                  </td>
-
-                  {/* Last AIS Update */}
-                  <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
-                    <span className="flex items-center gap-1.5 text-cyan-400">
-                      <Radio className="w-3 h-3 text-cyan-400" />
-                      {vessel.lastAisUpdate}
-                    </span>
-                  </td>
-
-                  {/* Active / Inactive Toggle Switch */}
-                  <td className="py-3.5 px-4">
-                    <button
-                      onClick={() => handleToggleActive(vessel.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold transition-all ${
-                        vessel.isActive
-                          ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'
-                          : 'bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {vessel.isActive ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-slate-500" />}
-                      {vessel.isActive ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-
-                  {/* Actions (Edit / Delete) */}
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => setEditingVessel(vessel)}
-                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                        title="Edit Vessel"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteVessel(vessel.id, vessel.name)}
-                        className="p-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
-                        title="Delete Vessel"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {isLoading && vessels.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-violet-500" />
+                      <span>Loading fleet records...</span>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : filteredVessels.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    {loadError ? (
+                      <div className="text-amber-500 space-y-2">
+                        <p>{loadError}</p>
+                        <button onClick={fetchVessels} className="px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg border border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 text-sm">
+                          Try Again
+                        </button>
+                      </div>
+                    ) : (
+                      'No vessels match your search.'
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                paginatedVessels.map((vessel) => (
+                  <tr key={vessel.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                        <Ship className="w-4 h-4 text-violet-500 shrink-0" />
+                        <span>{vessel.name}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                        MMSI {vessel.mmsi} &bull; IMO {vessel.imo}
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <div className="font-medium text-slate-700 dark:text-slate-300">{vessel.type}</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">{vessel.flag}</div>
+                    </td>
+
+                    <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-300">
+                      {vessel.dwt.toLocaleString()} DWT
+                    </td>
+
+                    <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-300">{vessel.currentPort}</td>
+
+                    <td className="py-3.5 px-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(vessel.status)}`}>
+                        {vessel.status}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-xs">
+                      <span className="flex items-center gap-1.5">
+                        <Radio className="w-3 h-3 text-emerald-500" />
+                        {vessel.lastAisUpdate}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <button
+                        onClick={() => handleToggleActive(vessel.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                          vessel.isActive
+                            ? 'bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        {vessel.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        {vessel.isActive ? 'Tracked' : 'Not Tracked'}
+                      </button>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setEditingVessel(vessel)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors"
+                          title="Edit vessel"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVessel(vessel.id, vessel.name)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                          title="Delete vessel"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* PAGINATION FOOTER */}
-        <div className="bg-slate-950 px-6 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+        {/* PAGINATION */}
+        <div className="bg-slate-50 dark:bg-slate-800/40 px-6 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
           <div>
-            Showing <strong className="text-white">{paginatedVessels.length}</strong> of <strong className="text-white">{filteredVessels.length}</strong> vessels (Total Fleet: 50)
+            Showing <strong className="text-slate-800 dark:text-white">{paginatedVessels.length}</strong> of{' '}
+            <strong className="text-slate-800 dark:text-white">{filteredVessels.length}</strong> vessels (fleet total: {vessels.length})
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-800"
+              className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -424,7 +413,7 @@ export const VesselManagement: React.FC = () => {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 disabled:opacity-40 hover:bg-slate-800"
+              className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -435,66 +424,66 @@ export const VesselManagement: React.FC = () => {
       {/* ADD VESSEL MODAL */}
       <AnimatePresence>
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4"
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl space-y-4"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-emerald-400" />
-                  Add New Vessel to Fleet
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-violet-500" />
+                  Add a New Vessel
                 </h3>
-                <button onClick={() => setIsAddModalOpen(false)} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={() => setIsAddModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleAddVesselSubmit} className="space-y-3 text-xs">
+              <form onSubmit={handleAddVesselSubmit} className="space-y-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">Vessel Name</label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Vessel Name</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. EVER DIAMOND"
                     value={newVesselData.name}
                     onChange={(e) => setNewVesselData({ ...newVesselData, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className={inputClass}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 mb-1">MMSI Number</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">MMSI Number</label>
                     <input
                       type="number"
                       required
                       value={newVesselData.mmsi}
                       onChange={(e) => setNewVesselData({ ...newVesselData, mmsi: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      className={inputClass}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 mb-1">IMO Number</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">IMO Number</label>
                     <input
                       type="number"
                       required
                       value={newVesselData.imo}
                       onChange={(e) => setNewVesselData({ ...newVesselData, imo: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 mb-1">Vessel Type</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Vessel Type</label>
                     <select
                       value={newVesselData.type}
                       onChange={(e) => setNewVesselData({ ...newVesselData, type: e.target.value as any })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      className={inputClass}
                     >
                       <option value="Container">Container</option>
                       <option value="Tanker">Tanker</option>
@@ -506,50 +495,50 @@ export const VesselManagement: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-300 mb-1">DWT Capacity</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Capacity (DWT)</label>
                     <input
                       type="number"
                       value={newVesselData.dwt}
                       onChange={(e) => setNewVesselData({ ...newVesselData, dwt: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 mb-1">Flag Registry</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Flag Country</label>
                     <input
                       type="text"
                       value={newVesselData.flag}
                       onChange={(e) => setNewVesselData({ ...newVesselData, flag: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      className={inputClass}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-300 mb-1">Current Port</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Current Port</label>
                     <input
                       type="text"
                       value={newVesselData.currentPort}
                       onChange={(e) => setNewVesselData({ ...newVesselData, currentPort: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+                    className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400"
+                    className="px-5 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors"
                   >
-                    Register Vessel
+                    Add Vessel
                   </button>
                 </div>
               </form>
@@ -561,41 +550,41 @@ export const VesselManagement: React.FC = () => {
       {/* EDIT VESSEL MODAL */}
       <AnimatePresence>
         {editingVessel && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4"
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl space-y-4"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Edit2 className="w-4 h-4 text-cyan-400" />
-                  Edit Vessel #{editingVessel.id}
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-violet-500" />
+                  Edit Vessel — {editingVessel.id}
                 </h3>
-                <button onClick={() => setEditingVessel(null)} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={() => setEditingVessel(null)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleEditVesselSubmit} className="space-y-3 text-xs">
+              <form onSubmit={handleEditVesselSubmit} className="space-y-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">Vessel Name</label>
+                  <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Vessel Name</label>
                   <input
                     type="text"
                     value={editingVessel.name}
                     onChange={(e) => setEditingVessel({ ...editingVessel, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    className={inputClass}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 mb-1">Status</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Status</label>
                     <select
                       value={editingVessel.status}
                       onChange={(e) => setEditingVessel({ ...editingVessel, status: e.target.value as any })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      className={inputClass}
                     >
                       <option value="Underway">Underway</option>
                       <option value="Moored">Moored</option>
@@ -606,27 +595,27 @@ export const VesselManagement: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 mb-1">Current Port</label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-300 font-medium mb-1">Current Port</label>
                     <input
                       type="text"
                       value={editingVessel.currentPort}
                       onChange={(e) => setEditingVessel({ ...editingVessel, currentPort: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setEditingVessel(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+                    className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold hover:bg-cyan-400 flex items-center gap-1.5"
+                    className="px-5 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 flex items-center gap-1.5 transition-colors"
                   >
                     <Save className="w-4 h-4" /> Save Vessel
                   </button>

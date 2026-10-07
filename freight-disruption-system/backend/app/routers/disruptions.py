@@ -72,7 +72,7 @@ def _compute_ripple_predictions(db: Session, lat: float, lon: float, severity: s
 
 
 @router.get("/alert-center", response_model=List[AlertCenterDisruptionItem])
-def get_alert_center_disruptions(db: Session = Depends(get_db)):
+def get_alert_center_disruptions(inbound_only: bool = False, db: Session = Depends(get_db)):
     """Fetch active disruption alerts, dynamically linked with live database state, spatial proximity,
     and AI-predicted ripple effects on downstream ports."""
     db_disruptions = db.query(GlobalDisruption).filter(GlobalDisruption.resolved == False).all()
@@ -82,6 +82,82 @@ def get_alert_center_disruptions(db: Session = Depends(get_db)):
         for d in db_disruptions:
             poly = spatial_service.generate_circle_polygon(d.latitude, d.longitude, d.radius_nm or 100.0)
             near_vessels = spatial_service.find_vessels_near_point(db, d.latitude, d.longitude, d.radius_nm or 100.0)
+
+            # ---------- Inbound Fleet Threat Detection ----------
+            # Find vessels whose destination matches this port or whose heading
+            # intercepts the disruption epicenter within a 96-hour operational window.
+            all_active_vessels = db.query(Vessel).filter(
+                Vessel.latitude.isnot(None),
+                Vessel.longitude.isnot(None),
+                Vessel.is_active == True,
+            ).all()
+
+            # Resolve disruption to nearest port for destination name matching
+            nearest_port = _find_nearest_port(db, d.latitude, d.longitude)
+            port_match_names = set()
+            if nearest_port:
+                port_match_names = {
+                    nearest_port.name.lower(),
+                    nearest_port.code.lower() if nearest_port.code else "",
+                }
+
+            inbound_vessels: list = []
+            for v in all_active_vessels:
+                # Skip vessels already counted as spatially proximate
+                if any(nv["id"] == v.id for nv in near_vessels):
+                    continue
+
+                is_inbound = False
+                eta_hours = 999.0
+                reason = ""
+
+                # Check 1: Destination port name/code match
+                if v.destination_port and port_match_names:
+                    dest_lower = v.destination_port.lower()
+                    if any(pm in dest_lower for pm in port_match_names if pm):
+                        dist = spatial_service.haversine_distance_nm(
+                            v.latitude, v.longitude, d.latitude, d.longitude
+                        )
+                        eta_hours = dist / v.speed if v.speed and v.speed > 0.5 else 999.0
+                        is_inbound = True
+                        reason = f"Destination: {v.destination_port}"
+
+                # Check 2: Heading vector alignment (geodesic bearing)
+                if not is_inbound and v.heading is not None and v.speed and v.speed > 0.5:
+                    heading_towards, ang_diff, est_hrs = spatial_service.is_vessel_heading_towards(
+                        v.latitude, v.longitude, v.heading, v.speed,
+                        d.latitude, d.longitude,
+                        angular_tolerance_deg=35.0, max_eta_hours=96.0
+                    )
+                    if heading_towards:
+                        is_inbound = True
+                        eta_hours = est_hrs
+                        reason = f"On heading course ({ang_diff}° deviation)"
+
+                if is_inbound:
+                    inbound_vessels.append({
+                        "vessel": v,
+                        "eta_hours": round(eta_hours, 1),
+                        "reason": reason,
+                    })
+
+            # Build inbound threat affected-vessel items
+            inbound_items = [
+                AffectedVesselItem(
+                    id=str(iv["vessel"].id),
+                    name=iv["vessel"].name,
+                    mmsi=iv["vessel"].mmsi,
+                    vessel_type=iv["vessel"].vessel_type or "Cargo",
+                    flag=iv["vessel"].flag or "International",
+                    distance_to_epicenter_nm=spatial_service.haversine_distance_nm(
+                        iv["vessel"].latitude, iv["vessel"].longitude, d.latitude, d.longitude
+                    ),
+                    status=f"Inbound — {iv['reason']}",
+                    eta_impact_hours=iv["eta_hours"],
+                    destination_port=iv["vessel"].destination_port or "En Route"
+                )
+                for iv in sorted(inbound_vessels, key=lambda x: x["eta_hours"])[:10]
+            ]
 
             affected_items = [
                 AffectedVesselItem(
@@ -100,6 +176,10 @@ def get_alert_center_disruptions(db: Session = Depends(get_db)):
 
             ripple_predictions, ripple_port_codes = _compute_ripple_predictions(db, d.latitude, d.longitude, d.severity)
 
+            # Combine proximity + inbound vessels
+            combined_vessels = affected_items + inbound_items
+            total_inbound = len(inbound_vessels)
+
             results.append(AlertCenterDisruptionItem(
                 id=d.id,
                 name=f"{d.disruption_type} - {d.location_name}",
@@ -112,8 +192,8 @@ def get_alert_center_disruptions(db: Session = Depends(get_db)):
                 longitude=d.longitude,
                 radius_nm=d.radius_nm or 100.0,
                 polygon_coordinates=poly,
-                affected_vessels_count=len(near_vessels),
-                affected_vessels_list=affected_items,
+                affected_vessels_count=len(near_vessels) + total_inbound,
+                affected_vessels_list=combined_vessels[:15],
                 active_since=d.start_date,
                 time_since_detected="Active",
                 estimated_duration_remaining="Ongoing",
@@ -132,7 +212,12 @@ def get_alert_center_disruptions(db: Session = Depends(get_db)):
                 ),
                 predicted_ripple_ports=ripple_port_codes,
                 ripple_predictions=ripple_predictions,
+                is_inbound_threat=total_inbound > 0,
+                inbound_vessels_count=total_inbound,
             ))
+
+        if inbound_only:
+            results = [r for r in results if r.inbound_vessels_count > 0]
         return results
 
     # Fallback curated baseline if DB table is unseeded

@@ -5,6 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
+  fetchNetworkOverview,
+  fetchAlternativeRoutes,
+  fetchNetworkTechnicalDetails,
+} from '@/services/api';
+import {
   ResponsiveContainer,
   AreaChart,
   Area,
@@ -35,6 +40,8 @@ import {
   X,
   ArrowRight,
   Edit3,
+  Network,
+  GitBranch,
 } from 'lucide-react';
 
 import { useToast } from '@/components/ui/use-toast';
@@ -144,6 +151,13 @@ export const SinglePortDetailPage: React.FC = () => {
   const [operatingCondition, setOperatingCondition] = useState<'normal' | 'busy' | 'severe' | 'lockdown'>('busy');
   const [apiBaselineCongestion, setApiBaselineCongestion] = useState(50);
 
+  // Network Impact Analyzer State
+  const [showNetworkPanel, setShowNetworkPanel] = useState(false);
+  const [networkLoading, setNetworkLoading] = useState(false);
+  const [networkOverview, setNetworkOverview] = useState<any>(null);
+  const [alternativeRoutes, setAlternativeRoutes] = useState<any[]>([]);
+  const [technicalDetails, setTechnicalDetails] = useState<any>(null);
+
   const recalculateCongestion = (
     total: number,
     occupied: number,
@@ -157,6 +171,25 @@ export const SinglePortDetailPage: React.FC = () => {
     const conditionContrib = condition === 'normal' ? 0 : condition === 'busy' ? 5 : condition === 'severe' ? 12 : 20;
     const finalVal = Math.min(100, Math.max(5, Math.round(berthContrib + queueContrib + conditionContrib)));
     setCongestionValue(finalVal);
+  };
+
+  const loadNetworkImpact = async () => {
+    if (!portDetail?.id) return;
+    setNetworkLoading(true);
+    try {
+      const [overview, alternatives, details] = await Promise.all([
+        fetchNetworkOverview(portDetail.id).catch(() => null),
+        fetchAlternativeRoutes(portDetail.id).catch(() => []),
+        fetchNetworkTechnicalDetails(portDetail.id).catch(() => null),
+      ]);
+      setNetworkOverview(overview);
+      setAlternativeRoutes(alternatives);
+      setTechnicalDetails(details);
+    } catch (err) {
+      console.error('Network impact load error:', err);
+    } finally {
+      setNetworkLoading(false);
+    }
   };
 
   const handleOpenCongestionModal = () => {
@@ -839,6 +872,212 @@ export const SinglePortDetailPage: React.FC = () => {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            </section>
+
+            {/* ===== NETWORK IMPACT ANALYZER ===== */}
+            <section className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
+              <div 
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => {
+                  const willShow = !showNetworkPanel;
+                  setShowNetworkPanel(willShow);
+                  if (willShow && !networkOverview) {
+                    loadNetworkImpact();
+                  }
+                }}
+              >
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Network className="w-5 h-5 text-indigo-500" />
+                    Network Impact Analyzer
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Which ports affect this port?</p>
+                </div>
+                <button className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                  {showNetworkPanel ? <X className="w-5 h-5" /> : <GitBranch className="w-5 h-5" />}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showNetworkPanel && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-6">
+                      {networkLoading ? (
+                        <div className="flex items-center justify-center py-10 space-x-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                          <span className="text-sm font-mono text-slate-500">Calculating global route ripples...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Chokepoint Role */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mb-1 uppercase">Chokepoint Role</p>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {networkOverview?.chokepoint_score?.toFixed(1) || '0.0'}
+                                <span className="text-sm text-slate-500 ml-1">/ 100</span>
+                              </div>
+                            </div>
+
+                            {/* Direct Connectivity */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mb-1 uppercase">Direct Connectivity</p>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {networkOverview?.direct_connectivity_percent?.toFixed(1) || '0.0'}%
+                              </div>
+                            </div>
+
+                            {/* SPoF Risk */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mb-1 uppercase">Single Point of Failure Risk</p>
+                              <div className="mt-1">
+                                {networkOverview?.single_point_of_failure_risk ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                                    <AlertTriangle className="w-3 h-3" /> HIGH RISK
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                                    <CheckCircle className="w-3 h-3" /> LOW RISK
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Global Rank */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                              <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mb-1 uppercase">Global Rank</p>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                                #{networkOverview?.global_importance_rank || '--'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Connected Trade Partners */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Direct Trade Partners</h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="border-b border-slate-200 dark:border-slate-800">
+                                      <th className="pb-2 font-mono text-slate-500 uppercase">Port Name</th>
+                                      <th className="pb-2 font-mono text-slate-500 uppercase">Code</th>
+                                      <th className="pb-2 font-mono text-slate-500 uppercase text-right">Avg Transit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {networkOverview?.direct_trade_partners?.map((partner: any, idx: number) => (
+                                      <tr key={idx} className="border-b border-slate-200 dark:border-slate-800 last:border-0">
+                                        <td className="py-2 text-slate-700 dark:text-slate-300 font-medium">{partner.port_name}</td>
+                                        <td className="py-2 font-mono text-slate-500">{partner.port_code}</td>
+                                        <td className="py-2 font-mono text-slate-700 dark:text-slate-300 text-right">{partner.average_transit_days} days</td>
+                                      </tr>
+                                    ))}
+                                    {!networkOverview?.direct_trade_partners?.length && (
+                                      <tr>
+                                        <td colSpan={3} className="py-4 text-center text-slate-500 italic">No direct partners found</td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Network Influence Metrics */}
+                            <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-4">
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">Network Influence Metrics</h4>
+                              
+                              <div>
+                                <div className="flex justify-between items-end mb-1">
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Route Importance</p>
+                                    <p className="text-[10px] text-slate-500">How often this port sits on the shortest route</p>
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-indigo-500">
+                                    {technicalDetails?.betweenness_centrality?.toFixed(3) || '0.000'}
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (technicalDetails?.betweenness_centrality || 0) * 100)}%` }} />
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between items-end mb-1">
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Port Reach</p>
+                                    <p className="text-[10px] text-slate-500">How quickly goods can reach all other ports</p>
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-emerald-500">
+                                    {technicalDetails?.closeness_centrality?.toFixed(3) || '0.000'}
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, (technicalDetails?.closeness_centrality || 0) * 100)}%` }} />
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between items-end mb-1">
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Network Influence</p>
+                                    <p className="text-[10px] text-slate-500">How well-connected its trading partners are</p>
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-amber-500">
+                                    {technicalDetails?.eigenvector_centrality?.toFixed(3) || '0.000'}
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, (technicalDetails?.eigenvector_centrality || 0) * 100)}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Diversion Options */}
+                          <div className="bg-slate-50 dark:bg-slate-950 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white">Diversion Options</h4>
+                            <p className="text-xs text-slate-500 mb-3">If this port becomes unavailable, these are the nearest viable alternatives</p>
+                            
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-slate-200 dark:border-slate-800">
+                                    <th className="pb-2 font-mono text-slate-500 uppercase">Port Name</th>
+                                    <th className="pb-2 font-mono text-slate-500 uppercase">Code</th>
+                                    <th className="pb-2 font-mono text-slate-500 uppercase text-right">Extra Transit Days</th>
+                                    <th className="pb-2 font-mono text-slate-500 uppercase text-right">Est. Cost Change</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {alternativeRoutes?.map((route: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-slate-200 dark:border-slate-800 last:border-0">
+                                      <td className="py-2 text-slate-700 dark:text-slate-300 font-medium">{route.port_name}</td>
+                                      <td className="py-2 font-mono text-slate-500">{route.port_code}</td>
+                                      <td className="py-2 font-mono text-amber-600 dark:text-amber-400 text-right">+{route.extra_transit_days} days</td>
+                                      <td className="py-2 font-mono text-rose-600 dark:text-rose-400 text-right">+${(route.estimated_cost_delta_usd || 0).toLocaleString()}</td>
+                                    </tr>
+                                  ))}
+                                  {!alternativeRoutes?.length && (
+                                    <tr>
+                                      <td colSpan={4} className="py-4 text-center text-slate-500 italic">No diversion options found</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </section>
           </>
         )}

@@ -94,6 +94,9 @@ export interface Disruption {
   predicted_ripple_ports?: string[];
   ripple_predictions?: RipplePrediction[];
   financial_impact_usd?: number;
+  /** Inbound fleet threat — vessels heading towards disrupted port */
+  is_inbound_threat?: boolean;
+  inbound_vessels_count?: number;
 }
 
 export interface ModeSwapOption {

@@ -44,10 +44,10 @@ export const OperationsDashboard: React.FC = () => {
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [kpis, setKpis] = useState<any>({
-    active_vessels_count: 620,
-    active_disruptions_count: 3,
-    vessels_affected_count: 14,
-    routes_needing_reroute: 4,
+    total_vessels: 0,
+    active_disruptions: 0,
+    vessels_affected: 0,
+    routes_needing_reroute: 0,
     last_updated: 'Just now',
   });
   const [secondaryInfra, setSecondaryInfra] = useState<SecondaryInfrastructure[]>([]);
@@ -71,7 +71,21 @@ export const OperationsDashboard: React.FC = () => {
         if (pList && pList.length > 0) setPorts(pList);
         if (dList && dList.length > 0) setDisruptions(dList);
         if (rList && rList.length > 0) setRoutes(rList);
-        if (kData) setKpis(kData);
+        if (kData) {
+          setKpis({
+            ...kData,
+            total_vessels: kData.total_vessels || (vList ? vList.length : 0),
+            active_disruptions: kData.active_disruptions ?? (dList ? dList.length : 0),
+          });
+        } else {
+          setKpis({
+            total_vessels: vList ? vList.length : 0,
+            active_disruptions: dList ? dList.length : 0,
+            vessels_affected: 0,
+            routes_needing_reroute: 0,
+            last_updated: 'Live',
+          });
+        }
         if (infraList && infraList.length > 0) setSecondaryInfra(infraList);
         if (fleetList && fleetList.length > 0) setRegisteredFleetMmsis(fleetList.map((f: any) => f.mmsi));
       } catch (err) {

@@ -52,13 +52,19 @@ class AdminVesselResponse(BaseModel):
     mmsi: int
     imo: int
     name: str
-    type: str = Field(alias="vessel_type")
+    type: str
     flag: str
     dwt: float
-    currentPort: str = Field(alias="current_port")
+    currentPort: str
     status: str
-    lastAisUpdate: str = Field(alias="last_ais_update_str")
-    isActive: bool = Field(alias="is_active")
+    lastAisUpdate: str
+    isActive: bool
+
+    # Backwards-compatibility aliases
+    vessel_type: Optional[str] = None
+    current_port: Optional[str] = None
+    last_ais_update_str: Optional[str] = None
+    is_active: Optional[bool] = None
 
     class Config:
         populate_by_name = True

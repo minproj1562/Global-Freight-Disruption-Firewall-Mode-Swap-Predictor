@@ -253,13 +253,26 @@ def get_map_routes(db: Session = Depends(get_db)):
 
 @router.get("/kpis", response_model=KPISnapshotResponse)
 def get_map_kpis(db: Session = Depends(get_db)):
+    """Compute live operational KPIs directly from database vessel, incident, and route states."""
+    active_vessels = db.query(Vessel).filter(Vessel.is_active == True).count()
     total_vessels = db.query(Vessel).count()
-    active_disruptions = db.query(GlobalDisruption).filter(GlobalDisruption.resolved == False).count()
+    disruptions = db.query(GlobalDisruption).filter(GlobalDisruption.resolved == False).all()
+    active_disruptions_count = len(disruptions)
+
+    affected_vessel_ids = set()
+    for d in disruptions:
+        near = spatial_service.find_vessels_near_point(db, d.latitude, d.longitude, d.radius_nm or 100.0)
+        for v in near:
+            affected_vessel_ids.add(v["id"])
+
+    routes = get_map_routes(db)
+    routes_needing_reroute_count = sum(1 for r in routes if getattr(r, "requires_reroute", False))
+
     return KPISnapshotResponse(
-        total_vessels=max(total_vessels, 142),
-        active_disruptions=max(active_disruptions, 4),
-        vessels_affected=18,
-        routes_needing_reroute=4,
+        total_vessels=active_vessels or total_vessels,
+        active_disruptions=active_disruptions_count,
+        vessels_affected=len(affected_vessel_ids),
+        routes_needing_reroute=routes_needing_reroute_count,
         last_updated=datetime.utcnow().isoformat(),
     )
 

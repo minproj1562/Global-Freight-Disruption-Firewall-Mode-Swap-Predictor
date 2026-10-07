@@ -86,6 +86,61 @@ class SpatialService:
         return points
 
     @staticmethod
+    def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate initial bearing (forward azimuth) from point 1 to point 2.
+        Returns bearing in degrees (0-360) measured clockwise from true north."""
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_lambda = math.radians(lon2 - lon1)
+
+        x = math.sin(delta_lambda) * math.cos(phi2)
+        y = (math.cos(phi1) * math.sin(phi2) -
+             math.sin(phi1) * math.cos(phi2) * math.cos(delta_lambda))
+        bearing = math.degrees(math.atan2(x, y))
+        return (bearing + 360.0) % 360.0
+
+    @staticmethod
+    def is_vessel_heading_towards(
+        vessel_lat: float, vessel_lon: float,
+        vessel_heading: float, vessel_speed_kts: float,
+        target_lat: float, target_lon: float,
+        angular_tolerance_deg: float = 35.0,
+        max_eta_hours: float = 96.0
+    ) -> Tuple[bool, float, float]:
+        """Determine if a vessel's current heading will bring it towards a target point.
+        Uses forward geodesic bearing comparison within an angular divergence envelope.
+        Returns: (is_heading_towards, angular_difference_deg, estimated_hours_to_arrival)
+        """
+        if vessel_lat is None or vessel_lon is None or vessel_heading is None:
+            return False, 999.0, 999.0
+
+        # Vessel must be making way (underway threshold: 0.5 knots)
+        if vessel_speed_kts is None or vessel_speed_kts < 0.5:
+            return False, 999.0, 999.0
+
+        # Bearing from vessel to target
+        required_bearing = SpatialService.calculate_bearing(
+            vessel_lat, vessel_lon, target_lat, target_lon
+        )
+
+        # Angular difference (smallest angle between two bearings)
+        diff = abs(vessel_heading - required_bearing)
+        angular_diff = min(diff, 360.0 - diff)
+
+        # Distance to target
+        distance_nm = SpatialService.haversine_distance_nm(
+            vessel_lat, vessel_lon, target_lat, target_lon
+        )
+
+        # ETA estimate: distance / speed
+        estimated_hours = distance_nm / vessel_speed_kts if vessel_speed_kts > 0 else 999.0
+
+        # Vessel is heading towards if angular diff is within tolerance AND ETA is within horizon
+        is_heading = angular_diff <= angular_tolerance_deg and estimated_hours <= max_eta_hours
+
+        return is_heading, round(angular_diff, 1), round(estimated_hours, 1)
+
+    @staticmethod
     def find_vessels_near_point(db: Session, lat: float, lon: float, radius_nm: float) -> List[Dict[str, Any]]:
         """
         Find all active vessels within radius_nm of (lat, lon).
@@ -95,7 +150,7 @@ class SpatialService:
             # High-performance PostGIS query using native geom column and GiST spatial index
             radius_meters = radius_nm * 1852.0
             sql = text("""
-                SELECT id, mmsi, name, vessel_type, latitude, longitude, speed, heading,
+                SELECT id, mmsi, name, vessel_type, latitude, longitude, speed, heading, destination_port,
                        ST_Distance(
                            COALESCE(geom::geography, ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography),
                            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
@@ -120,7 +175,8 @@ class SpatialService:
                     "longitude": r[5],
                     "speed": r[6],
                     "heading": r[7],
-                    "distance_nm": round(float(r[8]), 2)
+                    "destination_port": r[8],
+                    "distance_nm": round(float(r[9]), 2)
                 }
                 for r in result
             ]
@@ -141,6 +197,7 @@ class SpatialService:
                         "longitude": v.longitude,
                         "speed": v.speed,
                         "heading": v.heading,
+                        "destination_port": v.destination_port,
                         "distance_nm": d
                     })
             matched.sort(key=lambda x: x["distance_nm"])
