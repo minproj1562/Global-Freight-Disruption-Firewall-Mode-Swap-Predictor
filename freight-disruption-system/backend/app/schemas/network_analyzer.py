@@ -135,3 +135,35 @@ class RippleDashboardResponse(BaseModel):
     outgoing_impacts: List[OutgoingImpact]
     preparation_plan: List[PreparationAction]
     historical_precedents: List[HistoricalPrecedent]
+
+
+# ============================================================
+# GRAPH TOPOLOGY SCHEMAS (Map Visualization — Network Watch page)
+# ============================================================
+
+class GraphNode(BaseModel):
+    port_id: str
+    port_name: str
+    port_code: str
+    latitude: Optional[float]
+    longitude: Optional[float]
+    congestion_percent: float
+    is_center: bool
+    relation: str  # "self" | "incoming_threat" | "outgoing_impact" | "connected"
+    risk_level: str  # "NONE" | "LOW" | "MEDIUM" | "HIGH"
+
+
+class GraphEdge(BaseModel):
+    from_port_id: str
+    to_port_id: str
+    direction: str  # "incoming" | "outgoing" | "neutral"
+    risk_level: str
+    predicted_increase_pct: float
+    transit_days: float
+
+
+class GraphTopologyResponse(BaseModel):
+    center_port_id: str
+    center_port_name: str
+    nodes: List[GraphNode]
+    edges: List[GraphEdge]

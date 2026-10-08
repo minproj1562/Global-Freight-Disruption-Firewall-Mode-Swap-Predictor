@@ -551,3 +551,38 @@ export const fetchNetworkTechnicalDetails = async (portId: string): Promise<Tech
   const response = await api.get<TechnicalDetails>(`/api/network-analyzer/${portId}/technical-details`);
   return response.data;
 };
+
+// ============= NETWORK TOPOLOGY (Trade Network Map — Network Watch page) =============
+
+export interface GraphNode {
+  port_id: string;
+  port_name: string;
+  port_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  congestion_percent: number;
+  is_center: boolean;
+  relation: 'self' | 'incoming_threat' | 'outgoing_impact' | 'connected' | string;
+  risk_level: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | string;
+}
+
+export interface GraphEdge {
+  from_port_id: string;
+  to_port_id: string;
+  direction: 'incoming' | 'outgoing' | 'neutral' | string;
+  risk_level: string;
+  predicted_increase_pct: number;
+  transit_days: number;
+}
+
+export interface GraphTopology {
+  center_port_id: string;
+  center_port_name: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export const fetchGraphTopology = async (portId: string): Promise<GraphTopology> => {
+  const response = await api.get<GraphTopology>(`/api/network-analyzer/${portId}/graph-topology`);
+  return response.data;
+};
