@@ -26,6 +26,7 @@ from app.schemas.network_analyzer import (
     ShutdownAffectedPort,
     TechnicalDetailsResponse,
     RippleDashboardResponse,
+    GraphTopologyResponse,
 )
 
 router = APIRouter(prefix="/api/network-analyzer", tags=["Network Impact Analyzer"])
@@ -52,7 +53,20 @@ def get_ripple_dashboard(port_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not build network ripple dashboard: {e}")
 
-
+@router.get("/{port_id}/graph-topology", response_model=GraphTopologyResponse)
+def get_graph_topology(port_id: str, db: Session = Depends(get_db)):
+    """
+    Map-ready trade network snapshot for the Network Watch page's visual
+    map: this port plus its direct trade partners, color-coded by whether
+    they're currently threatening this port, being affected by it, or
+    just normally connected — reuses the ripple dashboard's calculations.
+    """
+    port = _get_port_or_404(db, port_id)
+    try:
+        return network_impact_service.build_graph_topology(db, port)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not build the network map: {e}")
+    
 @router.get("/{port_id}/overview", response_model=NetworkOverviewResponse)
 def get_network_overview(port_id: str, db: Session = Depends(get_db)):
     """

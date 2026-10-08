@@ -102,6 +102,29 @@ def compute_all_centralities(G: "nx.Graph") -> Dict[str, Dict[str, float]]:
     }
 
 
+def compute_berth_capacity_norm(G: "nx.Graph") -> Dict[str, float]:
+    """
+    Returns {port_id: normalized_berth_capacity} where each port's real
+    berth_capacity (stored as a node attribute by build_port_graph) is
+    scaled 0-1 relative to the largest port in the CURRENT graph.
+
+    Used as a GNN input feature: a port with proportionally more berth
+    capacity can physically absorb more diverted/waiting vessels before
+    a disruption turns into severe congestion, so the model should weigh
+    ripple predictions differently for a mega-hub vs. a small feeder port.
+
+    Kept as a shared helper (rather than duplicated inline) so training
+    (train_gnn_model.py) and live inference (gnn_ripple_predictor.py)
+    ALWAYS compute this identically — any drift between the two would
+    silently corrupt the trained model's predictions.
+    """
+    capacities = {n: float(G.nodes[n].get("berth_capacity", 0) or 0) for n in G.nodes}
+    max_cap = max(capacities.values()) if capacities else 0.0
+    if max_cap <= 0:
+        return {n: 0.0 for n in capacities}
+    return {n: round(c / max_cap, 4) for n, c in capacities.items()}
+
+
 def find_articulation_points(G: "nx.Graph") -> List[str]:
     """
     Ports which, if removed, would split the trade network into

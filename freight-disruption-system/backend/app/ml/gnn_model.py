@@ -10,6 +10,25 @@ appropriate for the small port-network graphs (tens of nodes) used here:
 
 where A~ = A + I (self-loops) and D~ is its degree matrix.
 
+INPUT FEATURE SET (v2 — 6 features per node):
+  1. congestion_pct_norm     — the port's current congestion level (0-1)
+  2. degree_centrality       — how many direct trade partners it has (0-1)
+  3. is_epicenter            — 1.0 if this node is the disruption origin
+  4. shock_magnitude_norm    — size of the injected shock (0 for non-epicenter)
+  5. betweenness_centrality  — how often this port sits on the SHORTEST
+     path between two OTHER ports, i.e. its role as a structural "bridge"
+     in global trade (a high-betweenness port disrupted tends to force
+     more rerouting elsewhere than a low-betweenness one of equal size)
+  6. berth_capacity_norm     — the port's physical berth capacity,
+     scaled 0-1 relative to the largest port currently in the network
+     (a bigger port can absorb more diverted/waiting vessels before a
+     disruption turns into severe congestion)
+Features 5 and 6 were added specifically to let the GCN learn structural
+and physical-capacity effects beyond raw congestion/connectivity — see
+graph_engine.compute_all_centralities (betweenness) and
+graph_engine.compute_berth_capacity_norm, both computed from the REAL
+PortNetwork database graph, never fabricated.
+
 TRAINING METHODOLOGY NOTE (for academic transparency):
 No public, labeled, port-to-port disruption-cascade dataset exists
 anywhere — a well-documented gap in maritime resilience literature
@@ -20,10 +39,10 @@ weighted BFS propagation simulation (see graph_engine.simulate_shock_
 propagation, used identically in train_gnn_model.py) generates
 synthetic but structurally realistic (epicenter, severity, graph-state)
 -> (ripple outcome) pairs, grounded in REAL port network topology
-(PortNetwork table) and REAL port congestion features. The GCN is
-trained to approximate this simulation's outcome function, enabling
-sub-millisecond inference and generalization to disruption scenarios
-the simulation itself never explicitly enumerated.
+(PortNetwork table) and REAL port congestion/berth-capacity features.
+The GCN is trained to approximate this simulation's outcome function,
+enabling sub-millisecond inference and generalization to disruption
+scenarios the simulation itself never explicitly enumerated.
 """
 import torch
 import torch.nn as nn
@@ -66,7 +85,7 @@ class PortRippleGCN(nn.Module):
     epicenter node.
     """
 
-    def __init__(self, input_dim: int = 4, hidden_dim: int = 16, output_dim: int = 3, dropout: float = 0.2):
+    def __init__(self, input_dim: int = 6, hidden_dim: int = 16, output_dim: int = 3, dropout: float = 0.2):
         super().__init__()
         self.gcn1 = GCNLayer(input_dim, hidden_dim)
         self.gcn2 = GCNLayer(hidden_dim, hidden_dim)
@@ -91,7 +110,14 @@ class PortGNNPredictor:
     trained yet, consistent get_model_info() contract.
     """
 
-    FEATURE_NAMES = ["congestion_pct_norm", "degree_centrality", "is_epicenter", "shock_magnitude_norm"]
+    FEATURE_NAMES = [
+        "congestion_pct_norm",
+        "degree_centrality",
+        "is_epicenter",
+        "shock_magnitude_norm",
+        "betweenness_centrality",
+        "berth_capacity_norm",
+    ]
 
     def __init__(self, model_path: str = "app/ml/models/gnn_ripple_model.pt"):
         self.model_path = Path(model_path)
@@ -118,6 +144,13 @@ class PortGNNPredictor:
             self.model.eval()
             self.metadata = checkpoint.get("metadata", {})
             self.is_trained = True
+            if checkpoint.get("input_dim") != len(self.FEATURE_NAMES):
+                print(
+                    f"[GNN Predictor] [WARN] Loaded checkpoint expects {checkpoint.get('input_dim')} "
+                    f"input features but current code builds {len(self.FEATURE_NAMES)}. "
+                    f"Predictions will fail gracefully and fall back to BFS simulation until you "
+                    f"retrain: python -m app.ml.train_gnn_model"
+                )
             print(f"[GNN Predictor] [OK] Trained GCN loaded (trained_at={self.metadata.get('trained_at', 'unknown')})")
         except Exception as e:
             print(f"[GNN Predictor] [ERR] Failed to load GCN checkpoint: {e}")
@@ -130,8 +163,19 @@ class PortGNNPredictor:
         degree_centrality_by_id: Dict[str, float],
         epicenter_id: str,
         shock_magnitude_pct: float,
+        betweenness_centrality_by_id: Optional[Dict[str, float]] = None,
+        berth_capacity_norm_by_id: Optional[Dict[str, float]] = None,
     ) -> np.ndarray:
-        """Builds the [N, input_dim] feature matrix for a given disruption scenario."""
+        """
+        Builds the [N, 6] feature matrix for a given disruption scenario.
+        betweenness_centrality_by_id and berth_capacity_norm_by_id default
+        to empty dicts (-> 0.0 per node) only as a defensive fallback;
+        callers (gnn_ripple_predictor.py, train_gnn_model.py) always pass
+        real values computed from the current graph.
+        """
+        betweenness_centrality_by_id = betweenness_centrality_by_id or {}
+        berth_capacity_norm_by_id = berth_capacity_norm_by_id or {}
+
         n = len(node_id_order)
         features = np.zeros((n, len(self.FEATURE_NAMES)), dtype=np.float32)
         for i, pid in enumerate(node_id_order):
@@ -140,6 +184,8 @@ class PortGNNPredictor:
             is_epi = 1.0 if pid == epicenter_id else 0.0
             features[i, 2] = is_epi
             features[i, 3] = (shock_magnitude_pct / 100.0) if is_epi else 0.0
+            features[i, 4] = betweenness_centrality_by_id.get(pid, 0.0) or 0.0
+            features[i, 5] = berth_capacity_norm_by_id.get(pid, 0.0) or 0.0
         return features
 
     def predict(self, node_id_order: List[str], adjacency: np.ndarray, node_features: np.ndarray) -> np.ndarray:

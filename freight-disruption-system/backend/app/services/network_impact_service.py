@@ -1,3 +1,4 @@
+# backend/app/services/network_impact_service.py
 """
 backend/app/services/network_impact_service.py
 
@@ -64,7 +65,7 @@ def _get_recent_trend(db: Session, port_id: str) -> Tuple[float, str]:
     """
     Reads the real last-48h congestion history for a port and returns
     (multiplier, label). No fabricated data — if history is too sparse,
-    returns a neutral multiplier and 'stable'.
+    returns a neutral multiplier and 'steady'.
     """
     cutoff = datetime.utcnow() - timedelta(hours=48)
     rows = (
@@ -74,18 +75,18 @@ def _get_recent_trend(db: Session, port_id: str) -> Tuple[float, str]:
         .all()
     )
     if len(rows) < 2:
-        return 1.0, "stable"
+        return 1.0, "steady"
 
     delta = rows[-1].congestion_percent - rows[0].congestion_percent
     if delta >= 8:
-        return 1.3, "rising sharply"
+        return 1.3, "getting worse quickly"
     if delta >= 3:
-        return 1.12, "rising"
+        return 1.12, "getting worse"
     if delta <= -8:
-        return 0.7, "easing sharply"
+        return 0.7, "clearing up quickly"
     if delta <= -3:
-        return 0.88, "easing"
-    return 1.0, "stable"
+        return 0.88, "clearing up"
+    return 1.0, "steady"
 
 
 def _proximity_factor(transit_days: float) -> float:
@@ -168,6 +169,12 @@ def get_incoming_ripple(db: Session, port: Port, G: "nx.Graph") -> List[Dict[str
 
         extra_vessels = max(1, round((port.waiting_vessels or 4) * (pct / 100.0) + 1))
 
+        # NOTE: This summary deliberately does NOT restate the source port's
+        # name/congestion/trend — the UI already shows those in a separate,
+        # dedicated field right next to this text. Repeating it here was
+        # causing the "57% congestion... 57% congestion" duplicate-looking
+        # text reported by Port Managers. This sentence now only explains
+        # the NEW information: the effect on THIS port.
         incoming.append({
             "upstream_port_id": neighbor_id,
             "upstream_port_name": neighbor_port.name,
@@ -182,10 +189,9 @@ def get_incoming_ripple(db: Session, port: Port, G: "nx.Graph") -> List[Dict[str
             "confidence_pct": _model_confidence_pct(result["is_trained_gnn_used"]),
             "prediction_engine": result["model_architecture"],
             "plain_language_summary": (
-                f"{neighbor_port.name} is at {congestion:.0f}% congestion and {trend_label}. Based on how "
-                f"closely your trade routes connect ({transit_days:.1f} day transit link), your port's "
-                f"arrivals/wait times could rise by about {pct:.0f}% within {time_to_impact} days "
-                f"(~{extra_vessels} extra vessels waiting)."
+                f"Your two ports are connected by a {transit_days:.1f}-day shipping link, so this will likely "
+                f"reach you. Expect about {pct:.0f}% more arrivals/wait time within {time_to_impact} day(s) — "
+                f"roughly {extra_vessels} extra vessel(s) waiting."
             ),
         })
 
@@ -223,9 +229,9 @@ def get_outgoing_ripple(db: Session, port: Port, G: "nx.Graph") -> List[Dict[str
         extra_vessels = max(1, round(pct * 0.3))
         risk = _risk_level_from_pct(pct)
         coordination = (
-            "Alert port authority now" if risk == "HIGH" else
-            "Share berth / schedule update" if risk == "MEDIUM" else
-            "Monitor only"
+            "Call or message their port authority today" if risk == "HIGH" else
+            "Share your berth/schedule update with them" if risk == "MEDIUM" else
+            "No action needed — just keep an eye on it"
         )
         outgoing.append({
             "downstream_port_id": item["port_id"],
@@ -237,9 +243,9 @@ def get_outgoing_ripple(db: Session, port: Port, G: "nx.Graph") -> List[Dict[str
             "risk_level": risk,
             "recommended_coordination": coordination,
             "plain_language_summary": (
-                f"At your port's current congestion level ({congestion:.0f}%), {item['port_name']} could see "
-                f"roughly +{pct:.0f}% congestion within {time_to_impact} days "
-                f"(~{extra_vessels} extra vessels waiting there), based on a {transit_days:.1f}-day trade link."
+                f"Because your port is busy right now, {item['port_name']} could see about +{pct:.0f}% more "
+                f"congestion within {time_to_impact} day(s) — roughly {extra_vessels} extra vessel(s) waiting "
+                f"there — based on your {transit_days:.1f}-day shipping link."
             ),
         })
 
@@ -254,7 +260,7 @@ def get_outgoing_ripple(db: Session, port: Port, G: "nx.Graph") -> List[Dict[str
 def get_port_health_banner(port: Port, incoming: List[Dict[str, Any]], outgoing: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not incoming:
         status = "GREEN"
-        headline = "No active upstream threats detected. Your network position looks stable."
+        headline = "No nearby ports are currently busy enough to affect you. You're in good shape."
         min_days = None
     else:
         worst = incoming[0]
@@ -267,8 +273,8 @@ def get_port_health_banner(port: Port, incoming: List[Dict[str, Any]], outgoing:
         else:
             status = "GREEN"
         headline = (
-            f"{len(incoming)} upstream threat(s) detected. Earliest impact: {min_days} day(s). "
-            f"Largest expected increase: +{peak:.0f}% arrivals from {worst['upstream_port_name']}."
+            f"{len(incoming)} nearby port(s) could affect you. Earliest impact: {min_days} day(s). "
+            f"Biggest expected increase: +{peak:.0f}% arrivals, coming from {worst['upstream_port_name']}."
         )
 
     avg_confidence = (
@@ -300,24 +306,24 @@ def generate_preparation_plan(incoming: List[Dict[str, Any]], outgoing: List[Dic
         if peak >= 15:
             plan.append({
                 "time_window": f"Day 1-{max(1, days - 1)}",
-                "action": f"Pre-allocate additional berths ahead of {threat['upstream_port_name']} congestion reaching you",
+                "action": f"Free up extra berths before {threat['upstream_port_name']}'s congestion reaches you",
                 "resource_required": "2 extra berths, additional shift staff",
-                "expected_outcome": f"Absorb the extra ~{threat['additional_waiting_vessels']} vessels without anchorage delay",
+                "expected_outcome": f"Handle the extra ~{threat['additional_waiting_vessels']} vessels without anchorage delays",
                 "status": "Pending",
             })
         elif peak >= 7:
             plan.append({
                 "time_window": f"Day 1-{days}",
-                "action": f"Coordinate berth schedule with {threat['upstream_port_name']} port authority",
+                "action": f"Coordinate berth schedule with {threat['upstream_port_name']}'s port authority",
                 "resource_required": "1 coordination call / email",
-                "expected_outcome": "Stagger arrivals to reduce peak congestion",
+                "expected_outcome": "Spread out arrivals to avoid a traffic jam",
                 "status": "Pending",
             })
         else:
             plan.append({
                 "time_window": f"Day 1-{days}",
-                "action": f"Monitor {threat['upstream_port_name']} congestion trend",
-                "resource_required": "None — dashboard tracking only",
+                "action": f"Keep an eye on {threat['upstream_port_name']}'s congestion",
+                "resource_required": "None — just watch the dashboard",
                 "expected_outcome": "Early warning if the situation worsens",
                 "status": "Pending",
             })
@@ -326,9 +332,9 @@ def generate_preparation_plan(incoming: List[Dict[str, Any]], outgoing: List[Dic
         if impact["risk_level"] in ("HIGH", "MEDIUM"):
             plan.append({
                 "time_window": f"Day 1-{impact['time_to_impact_days']}",
-                "action": f"Notify {impact['downstream_port_name']} of expected congestion increase",
+                "action": f"Give {impact['downstream_port_name']} a heads-up about your congestion",
                 "resource_required": "1 coordination alert",
-                "expected_outcome": f"Give {impact['downstream_port_name']} time to prepare for +{impact['predicted_congestion_increase_pct']:.0f}% arrivals",
+                "expected_outcome": f"Let {impact['downstream_port_name']} prepare for +{impact['predicted_congestion_increase_pct']:.0f}% more arrivals",
                 "status": "Pending",
             })
 
@@ -359,6 +365,86 @@ def get_historical_precedents(db: Session, limit: int = 3) -> List[Dict[str, Any
         for s in scenarios
     ]
 
+# ============================================================
+# GRAPH TOPOLOGY — feeds the Network Watch map visualization
+# ============================================================
+
+def build_graph_topology(db: Session, port: Port) -> Dict[str, Any]:
+    """
+    Serializes the port's trade network neighborhood into map-ready
+    nodes (with coordinates) and edges (color-coded by ripple risk),
+    reusing the SAME incoming/outgoing ripple calculations already
+    computed for the dashboard — no duplicate GNN/BFS inference calls.
+    """
+    graph_engine.ensure_port_has_edges(db, port.id)
+    G = graph_engine.build_port_graph(db)
+
+    if port.id not in G.nodes:
+        return {"center_port_id": port.id, "center_port_name": port.name, "nodes": [], "edges": []}
+
+    incoming = get_incoming_ripple(db, port, G)
+    outgoing = get_outgoing_ripple(db, port, G)
+    incoming_by_id = {t["upstream_port_id"]: t for t in incoming}
+    outgoing_by_id = {o["downstream_port_id"]: o for o in outgoing}
+
+    nodes: List[Dict[str, Any]] = [{
+        "port_id": port.id,
+        "port_name": port.name,
+        "port_code": port.code,
+        "latitude": port.latitude,
+        "longitude": port.longitude,
+        "congestion_percent": float(port.congestion_percent or 0),
+        "is_center": True,
+        "relation": "self",
+        "risk_level": "NONE",
+    }]
+    edges: List[Dict[str, Any]] = []
+
+    for neighbor_id in G.neighbors(port.id):
+        node_data = G.nodes[neighbor_id]
+        threat = incoming_by_id.get(neighbor_id)
+        impact = outgoing_by_id.get(neighbor_id)
+
+        if threat:
+            relation, risk_level, pct, direction = "incoming_threat", threat["risk_level"], threat["predicted_congestion_increase_pct"], "incoming"
+        elif impact:
+            relation, risk_level, pct, direction = "outgoing_impact", impact["risk_level"], impact["predicted_congestion_increase_pct"], "outgoing"
+        else:
+            # A normally-connected trade partner with no significant ripple
+            # right now. Deliberately NOT given a risk_level of "LOW" (which
+            # elsewhere means "a small but real risk") — this is "no risk
+            # detected", so the map/legend should render these neutral/gray,
+            # not green. See risk_level="NONE" used for the center port above.
+            relation, risk_level, pct, direction = "connected", "NONE", 0.0, "neutral"
+
+        nodes.append({
+            "port_id": neighbor_id,
+            "port_name": node_data.get("name", neighbor_id),
+            "port_code": node_data.get("code", neighbor_id),
+            "latitude": node_data.get("latitude"),
+            "longitude": node_data.get("longitude"),
+            "congestion_percent": float(node_data.get("congestion_percent", 0) or 0),
+            "is_center": False,
+            "relation": relation,
+            "risk_level": risk_level,
+        })
+
+        edge_data = G[port.id][neighbor_id]
+        edges.append({
+            "from_port_id": neighbor_id if direction == "incoming" else port.id,
+            "to_port_id": port.id if direction == "incoming" else neighbor_id,
+            "direction": direction,
+            "risk_level": risk_level,
+            "predicted_increase_pct": round(pct, 1),
+            "transit_days": float(edge_data.get("transit_days", 0.0) or 0.0),
+        })
+
+    return {
+        "center_port_id": port.id,
+        "center_port_name": port.name,
+        "nodes": nodes,
+        "edges": edges,
+    }
 
 # ============================================================
 # MASTER AGGREGATOR
