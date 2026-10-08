@@ -384,8 +384,61 @@ const buildDetailedRouteFromActive = async (active: ActiveRoute): Promise<Detail
         notes: 'Final mile distribution truck to consignee premises.',
       },
     ];
+  } else if (active.id.includes('ever-given') || active.id === 'route-ever-given-01') {
+    // Pure Sea Transoceanic Liner Route (EVER GIVEN)
+    const leg1Coords: [number, number][] = waypoints.slice(0, 3);
+    const leg2Coords: [number, number][] = waypoints.slice(2, 5);
+    const leg3Coords: [number, number][] = waypoints.slice(4);
+
+    legs = [
+      {
+        id: `${active.id}-leg-1`,
+        leg_order: 1,
+        mode: 'sea',
+        origin: { name: 'Shanghai International Port (CNSHA)', code: 'CNSHA', coordinates: waypoints[0] || [121.47, 31.23] },
+        destination: { name: 'Singapore / Malacca Strait Transit', code: 'SGSIN', coordinates: waypoints[2] || [80.0, 6.0] },
+        distance: 2800,
+        distance_formatted: '2,800 NM',
+        duration: '6.2 Days',
+        carrier_name: 'Evergreen Marine Line (Ocean Alliance)',
+        vehicle_type: 'Golden-Class Container Ship (20,124 TEU)',
+        status: 'completed',
+        geometry: leg1Coords.length > 1 ? leg1Coords : waypoints,
+        notes: 'East Asia Departure via South China Sea corridors completed on schedule.',
+      },
+      {
+        id: `${active.id}-leg-2`,
+        leg_order: 2,
+        mode: 'sea',
+        origin: { name: 'Southern Sri Lanka Waypoint', code: 'LKLKA', coordinates: waypoints[2] || [80.0, 6.0] },
+        destination: { name: 'Northern Red Sea / Suez Approach', code: 'EGSUZ', coordinates: active.current_coordinates },
+        distance: 3920,
+        distance_formatted: '3,920 NM',
+        duration: '8.8 Days',
+        carrier_name: 'Evergreen Marine Line (Ocean Alliance)',
+        vehicle_type: 'Golden-Class Container Ship (20,124 TEU)',
+        status: 'active',
+        geometry: leg2Coords.length > 1 ? leg2Coords : waypoints,
+        notes: 'Critical hazard warning: Active anti-ship missile threat reported in Bab-el-Mandeb. Naval escort liaison assigned.',
+      },
+      {
+        id: `${active.id}-leg-3`,
+        leg_order: 3,
+        mode: 'sea',
+        origin: { name: 'Northern Red Sea Convoy Gate', code: 'EGSUZ', coordinates: active.current_coordinates },
+        destination: { name: 'Port of Rotterdam Terminal', code: 'NLRTM', coordinates: waypoints[waypoints.length - 1] || [3.9, 51.95] },
+        distance: 3240,
+        distance_formatted: '3,240 NM',
+        duration: '7.5 Days',
+        carrier_name: 'Evergreen Marine Line (Ocean Alliance)',
+        vehicle_type: 'Golden-Class Container Ship (20,124 TEU)',
+        status: 'upcoming',
+        geometry: leg3Coords.length > 1 ? leg3Coords : waypoints,
+        notes: 'Suez northbound convoy transit followed by Mediterranean crossing to English Channel.',
+      },
+    ];
   } else {
-    // Pure Sea Leg or Standard Monomodal
+    // General Sea Leg or Standard Monomodal
     const firstHalfWaypoints = waypoints.slice(0, midIndex + 1);
     const secondHalfWaypoints = waypoints.slice(midIndex);
 
@@ -442,7 +495,7 @@ const buildDetailedRouteFromActive = async (active: ActiveRoute): Promise<Detail
     cargo_summary: active.cargo_summary,
     corridor_name: active.current_location_name,
     legs,
-    active_leg_index: 0,
+    active_leg_index: active.id.includes('ever-given') ? 1 : 0,
     confidence_score: 92,
   };
 };
