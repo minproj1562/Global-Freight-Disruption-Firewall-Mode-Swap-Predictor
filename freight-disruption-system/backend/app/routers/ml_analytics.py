@@ -2,12 +2,15 @@
 """
 Machine Learning Inference Router.
 Exposes REST endpoints for Random Forest Risk Scoring, Isolation Forest Anomaly Detection,
-LSTM ETA Forecasting, and Gradient Boosting Delay Probability.
+LSTM ETA Forecasting, Gradient Boosting Delay Probability, and GNN/BFS Ripple Prediction.
 """
-from fastapi import APIRouter, Query, HTTPException, status
+from fastapi import APIRouter, Query, HTTPException, status, Depends
+from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
-from app.ml import rf_predictor, vessel_anomaly_detector, gb_delay_predictor, lstm_eta_predictor
+from app.database import get_db
+from app.ml import rf_predictor, vessel_anomaly_detector, gb_delay_predictor, lstm_eta_predictor, gnn_predictor
+from app.services.gnn_ripple_predictor import gnn_ripple_predictor
 
 router = APIRouter(prefix="/api/ml", tags=["ML Models & Analytics"])
 
@@ -44,6 +47,11 @@ class DelayProbabilityRequest(BaseModel):
     fuel_price_index: Optional[float] = Field(1.0, description="Fuel price index")
     geopolitical_risk: Optional[float] = Field(5.0, description="Geopolitical risk (0-10)")
     carrier_reliability: Optional[float] = Field(85.0, description="Carrier reliability %")
+
+class RipplePredictionRequest(BaseModel):
+    epicenter_port_id_or_code: str = Field(..., description="Port ID or UN/LOCODE acting as disruption epicenter")
+    disruption_severity: str = Field("critical", description="low, medium, high, critical")
+    shock_magnitude_pct: float = Field(50.0, description="Raw shock magnitude percentage before severity scaling")
 
 @router.post("/risk-score")
 def predict_risk_score(payload: RiskPredictionRequest):
@@ -102,9 +110,23 @@ def predict_delay_probability(payload: DelayProbabilityRequest):
         carrier_reliability=payload.carrier_reliability or 85.0
     )
 
+@router.post("/ripple-predict")
+def predict_ripple_effects(payload: RipplePredictionRequest, db: Session = Depends(get_db)):
+    """
+    Predict downstream port congestion ripple effects (3/7/14-day horizons)
+    using the trained GCN, falling back live to the physics-informed BFS
+    corridor propagation simulation if the GCN hasn't been trained yet.
+    """
+    return gnn_ripple_predictor.predict_multi_horizon_ripple(
+        epicenter_port_id_or_code=payload.epicenter_port_id_or_code,
+        disruption_severity=payload.disruption_severity,
+        shock_magnitude_pct=payload.shock_magnitude_pct,
+        db=db,
+    )
+
 @router.get("/model-info")
 def get_all_models_metadata():
-    """Retrieve metadata and training status for all 4 Phase 3 ML models."""
+    """Retrieve metadata and training status for all 5 ML models (Phase 3 + GNN Network Influence)."""
     return {
         "random_forest": rf_predictor.get_model_info(),
         "isolation_forest": {
@@ -123,5 +145,6 @@ def get_all_models_metadata():
             "model_type": "Kinematic Sequential ETA Model",
             "is_trained": True,
             "target": "Remaining Transit Hours & ETA Datetime"
-        }
+        },
+        "graph_convolutional_network": gnn_predictor.get_model_info()
     }

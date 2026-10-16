@@ -1,3 +1,4 @@
+// frontend/src/shared/components/ConnectionIndicator.tsx
 import React from 'react';
 import { RefreshCw, Radio } from 'lucide-react';
 import { useConnection } from '../hooks/useConnection';
