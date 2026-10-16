@@ -1,3 +1,4 @@
+# backend/app/core/config.py
 """
 Application Configuration
 Loads environment variables and provides type-safe settings
@@ -37,14 +38,6 @@ class Settings(BaseSettings):
 
     # ============= CORS =============
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
-
-    # ============= EMAIL (SMTP) =============
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM: str = "noreply@freightdisruption.internal"
-    SMTP_TLS: bool = True
 
     # ============= SERVER =============
     HOST: str = "0.0.0.0"
